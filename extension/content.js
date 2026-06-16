@@ -315,17 +315,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function findComposerButton() {
   const main = document.querySelector('div[role="main"]') || document;
   
-  // 1. Search visible elements inside main content area first
-  const mainElements = main.querySelectorAll('span, div, a');
+  // 1. Search visible text-only leaf elements inside main content area first
+  const mainElements = main.querySelectorAll('span, p, button, a');
   for (const el of mainElements) {
-    // Skip large container layout elements that contain the entire page text
-    if (el.tagName === "DIV" && el.children.length > 2 && !el.getAttribute('role')) {
-      continue;
-    }
-    const text = el.innerText || "";
-    if (text.includes("在想些什麼") || text.includes("Create a post") || 
-        text.includes("想分享什麼") || text.includes("建立貼文") || 
-        text.includes("寫些什麼")) {
+    const text = el.innerText || el.textContent || "";
+    // Ensure we match the short label text (not a huge block of layout text)
+    if (text.length < 50 && (
+        text.includes("在想些什麼") || 
+        text.includes("Create a post") || 
+        text.includes("想分享什麼") || 
+        text.includes("建立貼文") || 
+        text.includes("寫些什麼")
+    )) {
       const btn = el.closest('div[role="button"]') || el.closest('a') || el;
       if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
         console.log("[Chamber] Identified visible composer button inside main feed:", btn, "Text:", text);
@@ -334,16 +335,17 @@ function findComposerButton() {
     }
   }
   
-  // 2. Search visible elements globally as fallback
-  const globalElements = document.querySelectorAll('span, div, a');
+  // 2. Search globally in spans/p/button/a as fallback
+  const globalElements = document.querySelectorAll('span, p, button, a');
   for (const el of globalElements) {
-    if (el.tagName === "DIV" && el.children.length > 2 && !el.getAttribute('role')) {
-      continue;
-    }
-    const text = el.innerText || "";
-    if (text.includes("在想些什麼") || text.includes("Create a post") || 
-        text.includes("想分享什麼") || text.includes("建立貼文") || 
-        text.includes("寫些什麼")) {
+    const text = el.innerText || el.textContent || "";
+    if (text.length < 50 && (
+        text.includes("在想些什麼") || 
+        text.includes("Create a post") || 
+        text.includes("想分享什麼") || 
+        text.includes("建立貼文") || 
+        text.includes("寫些什麼")
+    )) {
       const btn = el.closest('div[role="button"]') || el.closest('a') || el;
       if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
         console.log("[Chamber] Identified visible composer button globally:", btn, "Text:", text);
