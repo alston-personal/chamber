@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Chamber",
+  "version": "1.0.0",
+  "description": "Chamber - 個人臉書貼文與多媒體安全備份工具",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.facebook.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.facebook.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": ["*://*.facebook.com/*"]
+    }
+  ]
+}

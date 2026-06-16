@@ -1,0 +1,226 @@
+/**
+ * content.js - Chamber Protocol Content Script
+ * 
+ * Injected into Facebook pages. Performs DOM monitoring, appends the backup buttons,
+ * scrapes historical post data, and relays intercepted GraphQL events to background.js.
+ */
+
+// 1. Inject inject.js into the page's main context
+function injectNetworkHook() {
+  try {
+    const script = document.createElement("script");
+    script.src = chrome.runtime.getURL("inject.js");
+    script.onload = function() {
+      this.remove();
+    };
+    (document.head || document.documentElement).appendChild(script);
+  } catch (err) {
+    console.error("[Chamber] Injection of GraphQL hook failed:", err);
+  }
+}
+injectNetworkHook();
+
+// 2. Listen to postMessages from inject.js
+window.addEventListener("message", (event) => {
+  // Guard clause for safety and origin validation
+  if (event.source !== window) return;
+  if (event.data && event.data.source === "chamber-graphql-interceptor") {
+    console.log("[Chamber] Content script received intercepted draft post:", event.data.data);
+    // Forward directly to the background script
+    chrome.runtime.sendMessage({
+      action: "BACKUP_POST_DRAFT",
+      payload: event.data.data
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[Chamber] Extension background script unreachable:", chrome.runtime.lastError.message);
+      } else {
+        console.log("[Chamber] Background script ACK auto-sync backup:", response);
+      }
+    });
+  }
+});
+
+// 3. Inject CSS styles for the [🔒 備份至 Web3] Button
+const styleTag = document.createElement("style");
+styleTag.textContent = `
+  .chamber-backup-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    margin-left: 10px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2), 0 2px 4px -1px rgba(99, 102, 241, 0.1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .chamber-backup-btn:hover {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+  }
+  .chamber-backup-btn:active {
+    transform: translateY(0);
+  }
+  .chamber-btn-container {
+    display: flex;
+    align-items: center;
+    margin: 5px 16px;
+  }
+`;
+document.head.appendChild(styleTag);
+
+// 4. Inject manual backup button on historic posts
+function getFacebookPostData(postEl) {
+  // Try to locate text content using common Facebook article structures
+  // - Message block: div[data-ad-preview="message"], div[data-testid="post_message"]
+  // - Fallbacks: div[dir="auto"] inside posts
+  let textContent = "";
+  const msgEl = postEl.querySelector('div[data-ad-preview="message"]') || 
+                postEl.querySelector('div[data-testid="post_message"]') ||
+                postEl.querySelector('div[dir="auto"]');
+  if (msgEl) {
+    textContent = msgEl.innerText || msgEl.textContent || "";
+  }
+
+  // Find images containing fbcdn urls or standard image blocks
+  let primaryFbCdn = "";
+  const imgEl = postEl.querySelector('img[src*="fbcdn.net"]');
+  if (imgEl) {
+    primaryFbCdn = imgEl.src;
+  }
+
+  // Find video elements if available
+  let videoEl = postEl.querySelector('video');
+  if (videoEl && videoEl.src) {
+    primaryFbCdn = videoEl.src; // Using video source url
+  }
+
+  // Try to find the post permalink
+  let postUrl = "";
+  const linkEl = postEl.querySelector('a[href*="/posts/"]') || 
+                 postEl.querySelector('a[href*="/permalink.php"]') || 
+                 postEl.querySelector('a[href*="/permalink/"]') || 
+                 postEl.querySelector('a[href*="story_fbid="]') ||
+                 postEl.querySelector('a[href*="/photos/"]') ||
+                 postEl.querySelector('a[href*="/videos/"]');
+  if (linkEl && linkEl.href) {
+    // Clean up query parameters if possible to keep it neat
+    try {
+      const parsedUrl = new URL(linkEl.href);
+      // Keep only key post identificators if relevant
+      postUrl = parsedUrl.origin + parsedUrl.pathname + parsedUrl.search;
+    } catch {
+      postUrl = linkEl.href;
+    }
+  }
+
+  // Generate metadata
+  const timestamp = Math.floor(Date.now() / 1000); // Scraped timestamp
+
+  return {
+    textContent,
+    media: {
+      primary_fb_cdn: primaryFbCdn,
+      fallback_backup: ""
+    },
+    timestamp,
+    sourceUrl: postUrl || ""
+  };
+}
+
+function handleBackupClick(btn, postEl) {
+  const data = getFacebookPostData(postEl);
+  if (!data.textContent && !data.media.primary_fb_cdn) {
+    alert("無法偵測到貼文內容或媒體網址！");
+    return;
+  }
+
+  btn.innerText = "⏳ 備份中...";
+  btn.disabled = true;
+  btn.style.background = "#9ca3af";
+
+  chrome.runtime.sendMessage({
+    action: "BACKUP_HISTORIC_POST",
+    payload: data
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      alert("備份失敗：擴充功能背景服務不可用！");
+      btn.innerText = "🔒 備份至 Web3";
+      btn.disabled = false;
+      btn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
+    } else if (response && response.success) {
+      btn.innerText = "✅ 已備份至 Arweave";
+      btn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+      console.log("[Chamber] Historic post successfully processed:", response.txId);
+    } else {
+      alert("備份失敗: " + (response ? response.error : "未知錯誤"));
+      btn.innerText = "🔒 備份至 Web3";
+      btn.disabled = false;
+      btn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
+    }
+  });
+}
+
+function processDOM() {
+  // Scan for typical Facebook timeline articles / posts containers
+  // Standard selectors include: div[role="article"], div[data-testid="post_container"]
+  const articles = document.querySelectorAll('div[role="article"]');
+  articles.forEach((article) => {
+    // Check if we already injected a button for this article to prevent duplication
+    if (article.dataset.chamberInjected) return;
+    article.dataset.chamberInjected = "true";
+
+    // Locate action headers, like post creation meta blocks, or insert below content
+    // Find heading metadata blocks
+    const heading = article.querySelector('div[data-testid="UserContentHeader"]') || 
+                    article.querySelector('h2') || 
+                    article.firstChild;
+
+    if (heading) {
+      const container = document.createElement("div");
+      container.className = "chamber-btn-container";
+
+      const btn = document.createElement("button");
+      btn.className = "chamber-backup-btn";
+      btn.innerHTML = `
+        <svg style="margin-right: 4px;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        備份至 Web3
+      `;
+
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handleBackupClick(btn, article);
+      });
+
+      container.appendChild(btn);
+      heading.parentNode.insertBefore(container, heading.nextSibling);
+    }
+  });
+}
+
+// 5. Initialize MutationObserver to watch for dynamically loaded feed articles
+const observer = new MutationObserver((mutations) => {
+  processDOM();
+});
+
+// Start observing the page body
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
+});
+
+// Run initial DOM parse
+setTimeout(processDOM, 3000);

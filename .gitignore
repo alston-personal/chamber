@@ -1,0 +1,29 @@
+# Chamber Protocol Git Ignore Configuration
+
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Next.js build output and cache
+.next/
+**/build/
+**/out/
+
+# Environment configurations containing secrets (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+api/.env
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# System files
+.DS_Store
+Thumbs.db
