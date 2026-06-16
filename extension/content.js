@@ -318,27 +318,42 @@ function findComposerButton() {
 }
 
 function findPhotoBtn() {
-  const elements = document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] i');
-  for (const el of elements) {
-    const label = el.getAttribute('aria-label') || el.innerText || "";
-    if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
-      return el.closest('div[role="button"]') || el;
+  const selectors = [
+    'div[role="dialog"] div[role="button"]',
+    'div[role="dialog"] i',
+    'div[role="main"] div[role="button"]',
+    'div[role="button"]',
+    'i'
+  ];
+  for (const selector of selectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const el of elements) {
+      const label = el.getAttribute('aria-label') || el.innerText || "";
+      if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
+        return el.closest('div[role="button"]') || el;
+      }
     }
   }
   return null;
 }
 
-function triggerUpload(fileInput, blob) {
-  try {
-    const file = new File([blob], "chamber-reborn-card.png", { type: "image/png" });
-    const container = new DataTransfer();
-    container.items.add(file);
-    fileInput.files = container.files;
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log("[Chamber] Reborn card image auto-uploaded successfully.");
-  } catch (err) {
-    console.error("[Chamber] Auto-upload file trigger failed:", err);
-  }
+function triggerUpload(fileInput, imageUrl) {
+  if (!imageUrl) return;
+  fetch(imageUrl)
+    .then(res => res.blob())
+    .then(blob => {
+      try {
+        const file = new File([blob], "chamber-reborn-card.png", { type: "image/png" });
+        const container = new DataTransfer();
+        container.items.add(file);
+        fileInput.files = container.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log("[Chamber] Reborn card image auto-uploaded successfully.");
+      } catch (err) {
+        console.error("[Chamber] Auto-upload file trigger failed:", err);
+      }
+    })
+    .catch(err => console.error("[Chamber] Failed to fetch image blob:", err));
 }
 
 function fillText(textbox, text) {
@@ -357,90 +372,77 @@ function fillText(textbox, text) {
   console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
 }
 
-function proceedWithFill(dialog, text, imageUrl) {
-  const textbox = dialog.querySelector('div[role="textbox"]') || 
-                  document.querySelector('div[role="textbox"]');
-  if (!textbox) {
-    console.error("[Chamber] Textbox not found in dialog.");
-    return;
-  }
-
-  // 1. Fill Text
-  fillText(textbox, text);
-
-  // 2. Upload Image
-  if (imageUrl) {
-    fetch(imageUrl)
-      .then(res => res.blob())
-      .then(blob => {
-        const fileInput = dialog.querySelector('input[type="file"]');
-        if (fileInput) {
-          triggerUpload(fileInput, blob);
-        } else {
-          console.warn("[Chamber] File input not found even after switching mode.");
-        }
-      })
-      .catch(err => console.error("[Chamber] Failed to fetch image blob:", err));
-  }
-}
-
 function handleOpenComposerAndFill(text, imageUrl) {
-  const dialog = document.querySelector('div[role="dialog"]');
-  if (!dialog) {
-    const btn = findComposerButton();
-    if (btn) {
-      console.log("[Chamber] Found composer button, clicking it...");
-      btn.click();
-      
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        const activeDialog = document.querySelector('div[role="dialog"]');
-        if (activeDialog) {
-          clearInterval(interval);
-          setTimeout(() => {
-            handleOpenComposerAndFill(text, imageUrl);
-          }, 300); // Wait for Dialog CSS transition
-        } else if (attempts > 30) {
-          clearInterval(interval);
-          console.warn("[Chamber] Failed to find composer dialog after clicking.");
-        }
-      }, 100);
-    } else {
-      console.warn("[Chamber] Could not locate any Facebook post composer button.");
-      alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
-    }
-    return;
-  }
+  const textbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
+                  document.querySelector('div[role="textbox"]');
 
-  // Ensure photo mode is ready first if we have an image
-  if (imageUrl) {
-    const fileInput = dialog.querySelector('input[type="file"]');
-    if (!fileInput) {
-      const photoBtn = findPhotoBtn();
-      if (photoBtn) {
-        console.log("[Chamber] Photo mode not active, switching to photo mode...");
-        photoBtn.click();
-        
-        let attempts = 0;
-        const interval = setInterval(() => {
-          attempts++;
-          const activeFileInput = dialog.querySelector('input[type="file"]');
-          if (activeFileInput) {
-            clearInterval(interval);
-            setTimeout(() => {
-              proceedWithFill(dialog, text, imageUrl);
-            }, 400); // Buffer for layout to stabilize
-          } else if (attempts > 20) {
-            clearInterval(interval);
-            console.warn("[Chamber] Photo file input did not render, fallback filling...");
-            proceedWithFill(dialog, text, imageUrl);
-          }
-        }, 100);
+  if (textbox) {
+    if (imageUrl) {
+      const fileInput = document.querySelector('input[type="file"]');
+      if (!fileInput) {
+        const photoBtn = findPhotoBtn();
+        if (photoBtn) {
+          console.log("[Chamber] Photo mode not active, switching to photo mode...");
+          photoBtn.click();
+          
+          let attempts = 0;
+          const interval = setInterval(() => {
+            attempts++;
+            const activeFileInput = document.querySelector('input[type="file"]');
+            if (activeFileInput) {
+              clearInterval(interval);
+              setTimeout(() => {
+                const freshTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
+                                     document.querySelector('div[role="textbox"]');
+                if (freshTextbox) {
+                  fillText(freshTextbox, text);
+                }
+                triggerUpload(activeFileInput, imageUrl);
+              }, 400); // Buffer for layout to stabilize
+            } else if (attempts > 20) {
+              clearInterval(interval);
+              console.warn("[Chamber] Photo file input did not render, fallback...");
+              fillText(textbox, text);
+            }
+          }, 100);
+          return;
+        }
+      } else {
+        // Photo mode is already active
+        fillText(textbox, text);
+        triggerUpload(fileInput, imageUrl);
         return;
       }
+    } else {
+      // No image, just write text
+      fillText(textbox, text);
+      return;
     }
   }
 
-  proceedWithFill(dialog, text, imageUrl);
+  // If textbox was not found, click the main composer button to open it
+  const btn = findComposerButton();
+  if (btn) {
+    console.log("[Chamber] Found composer button, clicking it...");
+    btn.click();
+    
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const activeTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
+                            document.querySelector('div[role="textbox"]');
+      if (activeTextbox) {
+        clearInterval(interval);
+        setTimeout(() => {
+          handleOpenComposerAndFill(text, imageUrl);
+        }, 400); // Buffer for composer dialog to render
+      } else if (attempts > 30) {
+        clearInterval(interval);
+        console.warn("[Chamber] Failed to find composer textbox after clicking.");
+      }
+    }, 100);
+  } else {
+    console.warn("[Chamber] Could not locate any Facebook post composer button.");
+    alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
+  }
 }
