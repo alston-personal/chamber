@@ -313,14 +313,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 function findComposerButton() {
-  const divs = document.querySelectorAll('div[role="button"]');
-  for (const div of divs) {
-    const text = div.innerText || "";
-    if (text.includes("在想些什麼") || text.includes("Create a post") || text.includes("想分享什麼") || text.includes("建立貼文") || text.includes("寫些什麼")) {
-      return div;
+  // Broad scan for any span, div, or a containing the classic composer prompts
+  const elements = document.querySelectorAll('span, div, a');
+  for (const el of elements) {
+    const text = el.innerText || "";
+    if (text.includes("在想些什麼") || text.includes("Create a post") || 
+        text.includes("想分享什麼") || text.includes("建立貼文") || 
+        text.includes("寫些什麼")) {
+      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
+      console.log("[Chamber] Identified composer button candidate:", btn, "Text:", text);
+      return btn;
     }
   }
-  return document.querySelector('div[role="main"] div[role="button"]');
+  // Fallbacks
+  const fallback = document.querySelector('div[role="main"] div[role="button"]') || 
+                   document.querySelector('div[role="button"]');
+  console.warn("[Chamber] Composer button search fell back to default query:", fallback);
+  return fallback;
 }
 
 function findComposerContainer(textbox) {
