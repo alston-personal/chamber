@@ -446,12 +446,14 @@ function handleOpenComposerAndFill(text, imageUrl) {
               clearInterval(interval);
               console.warn("[Chamber] Photo file input did not render, fallback...");
               fillText(textbox, text);
+              alert("⚠️ 聲明文字已為您填入！由於 Facebook 介面更新，圖片自動上傳受阻，請手動點擊發文框的『相片/影片』按鈕並按下 Ctrl+V 貼上轉世卡即可發佈！");
             }
           }, 100);
           return;
         } else {
           console.warn("[Chamber] Photo button not found inside composer container.");
           fillText(textbox, text);
+          alert("⚠️ 聲明文字已為您填入！由於 Facebook 介面更新，未找到圖片上傳按鈕，請手動點擊發文框的『相片/影片』按鈕並按下 Ctrl+V 貼上轉世卡！");
         }
       } else {
         // Photo mode is already active
@@ -484,10 +486,11 @@ function handleOpenComposerAndFill(text, imageUrl) {
       } else if (attempts > 30) {
         clearInterval(interval);
         console.warn("[Chamber] Failed to find composer textbox after clicking.");
+        alert("🛡️ Chamber 已將『轉世聲明文字與卡片圖片』複製至剪貼簿！由於臉書介面更動，我們未能自動開啟發文框。請您手動點擊臉書的『在想些什麼...』，並直接按下 Ctrl+V 貼上即可完美發佈！");
       }
     }, 100);
   } else {
     console.warn("[Chamber] Could not locate any Facebook post composer button.");
-    alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
+    alert("🛡️ Chamber 已將『轉世聲明文字與卡片圖片』複製至剪貼簿！由於臉書介面更動，未能自動定位發文按鈕。請您手動點擊臉書的『在想些什麼...』，並直接按下 Ctrl+V 貼上即可完美發佈！");
   }
 }
