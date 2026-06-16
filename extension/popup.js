@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.font = "bold 10px monospace";
       ctx.fillText("studio.milkcat.org/echo • Arweave Devnet Storage", 300, 720);
 
-      // 4. Trigger file download & Copy both Text and Image to Clipboard (Multi-Mime)
+      // 4. Copy both Text and Image to Clipboard (Multi-Mime)
       canvas.toBlob(async (imageBlob) => {
         try {
           const textBlob = new Blob([textToCopy], { type: "text/plain" });
@@ -299,13 +299,13 @@ document.addEventListener("DOMContentLoaded", () => {
           await navigator.clipboard.write([item]);
           console.log("[Chamber] Copy text and image to clipboard successful.");
           
-          genCardBtn.innerText = "✅ 複製成功 & 卡片已下載！";
+          genCardBtn.innerText = "✅ 複製成功 & 發文框已開啟！";
           genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
         } catch (clipErr) {
           console.warn("[Chamber] Multi-mime clipboard write failed:", clipErr);
           // Fallback to text-only copy
           await navigator.clipboard.writeText(textToCopy);
-          genCardBtn.innerText = "✅ 複製聲明 & 卡片已下載！";
+          genCardBtn.innerText = "✅ 複製聲明 & 發文框已開啟！";
           genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
         }
       }, "image/png");
@@ -329,15 +329,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = "chamber-reborn-card.png";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
       setTimeout(() => {
-        genCardBtn.innerText = "⚡ 生成聲明並下載轉世卡";
+        genCardBtn.innerText = "⚡ 一鍵生成聲明並發佈";
         genCardBtn.style.background = ""; // revert
         genCardBtn.disabled = false;
       }, 3000);
@@ -345,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("[Chamber] Failed to generate card:", err);
       alert("生成失敗，錯誤: " + err.message);
-      genCardBtn.innerText = "⚡ 生成聲明並下載轉世卡";
+      genCardBtn.innerText = "⚡ 一鍵生成聲明並發佈";
       genCardBtn.disabled = false;
     }
   });
