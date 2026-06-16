@@ -12,15 +12,22 @@ const APP_NAME = "Chamber";
 // Chamber Protocol API Server (on the same VM as the web-feed)
 const CHAMBER_API_BASE = "https://studio.milkcat.org/chamber-api";
 
-// Retrieve config from chrome storage
+// Retrieve config from chrome storage and resolve the active wallet / key tier
 async function getExtensionConfig() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["boundWalletAddress", "imgurClientId"], (data) => {
-      resolve({
-        boundWalletAddress: data.boundWalletAddress || null, // null = custodial mode
-        imgurClientId: data.imgurClientId || "mock_imgur_id",
-      });
-    });
+    chrome.storage.local.get(
+      ["nativeWalletAddress", "nativeWalletPrivateKey", "customWalletAddress", "customWalletPrivateKey", "imgurClientId"],
+      (data) => {
+        const activeWallet = data.customWalletAddress || data.nativeWalletAddress || null;
+        const activeKey = data.customWalletPrivateKey || data.nativeWalletPrivateKey || null;
+        
+        resolve({
+          boundWalletAddress: activeWallet,
+          walletPrivateKey: activeKey,
+          imgurClientId: data.imgurClientId || "mock_imgur_id",
+        });
+      }
+    );
   });
 }
 

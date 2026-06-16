@@ -332,9 +332,15 @@
         
         <!-- Wallet Address -->
         <div class="form-group">
-          <label for="walletAddress">Web3 儲存帳號 (對應 Hash)</label>
-          <input type="text" id="walletAddress" placeholder="自動生成託管帳號">
-          <div class="field-desc">預設自動產生。亦可自訂輸入您的 Ethereum 錢包地址。</div>
+          <label for="walletAddress">自訂 Web3 儲存帳號 (優先使用)</label>
+          <input type="text" id="walletAddress" placeholder="輸入您的自訂錢包位址 0x...">
+          <div class="field-desc">若留空，系統會優先使用下方的原生備選帳號進行託管備份。</div>
+        </div>
+
+        <!-- Native Wallet (Read-only reference) -->
+        <div class="form-group" style="opacity: 0.85;">
+          <label>系統原生備選帳號 (常駐託管)</label>
+          <span id="nativeWalletLabel" style="font-family: monospace; font-size: 11px; color: var(--text-muted); word-break: break-all; background: rgba(15, 23, 42, 0.45); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border);">正在生成...</span>
         </div>
 
         <!-- Private / Encryption Key -->

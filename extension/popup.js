@@ -62,26 +62,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 2. Load configurations and handle first-time initialization
   chrome.storage.local.get(
-    ["walletAddress", "walletPrivateKey", "imgurClientId", "isEncryptionEnabled", "lastEchoUrl", "lastFbUserIdHash"],
+    ["nativeWalletAddress", "nativeWalletPrivateKey", "customWalletAddress", "customWalletPrivateKey", "imgurClientId", "isEncryptionEnabled", "lastEchoUrl", "lastFbUserIdHash"],
     (data) => {
-      let walletAddress = data.walletAddress;
-      let walletPrivateKey = data.walletPrivateKey;
+      let nativeWalletAddress = data.nativeWalletAddress;
+      let nativeWalletPrivateKey = data.nativeWalletPrivateKey;
       
       // Auto-initialize custodial wallet if not set
-      if (!walletAddress) {
-        walletAddress = "0x" + generateRandomHex(20); // 20 bytes = 40 hex chars
-        chrome.storage.local.set({ walletAddress });
-      }
-      
-      // Auto-initialize encryption key if not set
-      if (!walletPrivateKey) {
-        walletPrivateKey = generateRandomHex(32); // 32 bytes = 64 hex chars
-        chrome.storage.local.set({ walletPrivateKey });
+      if (!nativeWalletAddress) {
+        nativeWalletAddress = "0x" + generateRandomHex(20); // 20 bytes = 40 hex chars
+        nativeWalletPrivateKey = generateRandomHex(32); // 32 bytes = 64 hex chars
+        chrome.storage.local.set({ nativeWalletAddress, nativeWalletPrivateKey });
       }
 
-      // Populate Inputs
-      walletAddressInput.value = walletAddress;
-      walletPrivateKeyInput.value = walletPrivateKey;
+      // Display Native Wallet Address (Read-only)
+      document.getElementById("nativeWalletLabel").innerText = nativeWalletAddress;
+
+      // Populate Inputs with Custom Wallet configuration (blank = custodial)
+      walletAddressInput.value = data.customWalletAddress || "";
+      walletPrivateKeyInput.value = data.customWalletPrivateKey || "";
       imgurClientIdInput.value = data.imgurClientId || "";
       if (data.isEncryptionEnabled !== undefined) {
         isEncryptionEnabledCheckbox.checked = data.isEncryptionEnabled;
@@ -102,22 +100,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 3. Save Settings Handler
   saveBtn.addEventListener("click", () => {
-    const walletAddress = walletAddressInput.value.trim();
-    const walletPrivateKey = walletPrivateKeyInput.value.trim();
+    const customWalletAddress = walletAddressInput.value.trim();
+    const customWalletPrivateKey = walletPrivateKeyInput.value.trim();
     const imgurClientId = imgurClientIdInput.value.trim();
     const isEncryptionEnabled = isEncryptionEnabledCheckbox.checked;
-
-    if (!walletAddress) {
-      alert("請填寫儲存錢包地址！");
-      return;
-    }
 
     saveBtn.innerText = "⏳ 儲存中...";
     saveBtn.disabled = true;
 
     chrome.storage.local.set({
-      walletAddress,
-      walletPrivateKey,
+      customWalletAddress,
+      customWalletPrivateKey,
       imgurClientId,
       isEncryptionEnabled
     }, () => {
@@ -209,9 +202,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 2. Fetch or fallback target URL for the QR Code
       const data = await new Promise((resolve) => {
-        chrome.storage.local.get(["lastEchoUrl", "walletAddress"], resolve);
+        chrome.storage.local.get(["lastEchoUrl", "customWalletAddress", "nativeWalletAddress"], resolve);
       });
-      const timelineUrl = data.lastEchoUrl || `https://studio.milkcat.org/echo/${data.walletAddress || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"}/all`;
+      const activeWallet = data.customWalletAddress || data.nativeWalletAddress || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
+      const timelineUrl = data.lastEchoUrl || `https://studio.milkcat.org/echo/${activeWallet}/all`;
 
       // 3. Create canvas
       const canvas = document.createElement("canvas");
@@ -285,10 +279,9 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillText("掃描二維碼訪問我的去中心化重生牆 (Echo)", 300, 530);
 
       // Draw wallet address at the bottom
-      const displayAddr = data.walletAddress || "CUSTODIAL_WALLET";
       ctx.fillStyle = "#38bdf8"; // sky-400
       ctx.font = "bold 13px monospace";
-      ctx.fillText(`KEY: ${displayAddr}`, 300, 600);
+      ctx.fillText(`KEY: ${activeWallet}`, 300, 600);
 
       // Draw branding seal
       ctx.fillStyle = "rgba(255, 255, 255, 0.2)";

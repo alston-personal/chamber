@@ -80,7 +80,7 @@ router.get("/health", (req, res) => {
 // ── POST /backup — main upload endpoint ──
 router.post("/backup", async (req, res) => {
   try {
-    const { fbUserId, content, platform, mediaUrls, privacy, timestamp, isDebug, sourceUrl } = req.body;
+    const { fbUserId, content, platform, mediaUrls, privacy, timestamp, isDebug, sourceUrl, boundWallet } = req.body;
     const isDebugMode = isDebug === true || isDebug === "true";
 
     if (!content || content.trim().length === 0) {
@@ -95,7 +95,7 @@ router.post("/backup", async (req, res) => {
       protocol_version: PROTOCOL_VERSION,
       app_name: APP_NAME,
       fb_user_id_hash: fbUserIdHash,
-      author_wallet: "CUSTODIAL", // custodial mode — user hasn't bound a wallet yet
+      author_wallet: boundWallet || "CUSTODIAL", // store active wallet address (custodial or custom)
       timestamp: timestamp || Math.floor(Date.now() / 1000),
       platform: platform || "facebook",
       content: content.substring(0, 50000), // 50KB text cap
@@ -125,6 +125,9 @@ router.post("/backup", async (req, res) => {
         { name: "Unix-Time", value: String(payload.timestamp) },
         { name: "Is-Debug", value: String(isDebugMode) },
       ];
+      if (boundWallet) {
+        tags.push({ name: "Author-Wallet", value: boundWallet });
+      }
 
       const receipt = await irys.upload(jsonStr, { tags });
       txId = receipt.id;
