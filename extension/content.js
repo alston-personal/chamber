@@ -318,6 +318,10 @@ function findComposerButton() {
   // 1. Search visible elements inside main content area first
   const mainElements = main.querySelectorAll('span, div, a');
   for (const el of mainElements) {
+    // Skip large container layout elements that contain the entire page text
+    if (el.tagName === "DIV" && el.children.length > 2 && !el.getAttribute('role')) {
+      continue;
+    }
     const text = el.innerText || "";
     if (text.includes("在想些什麼") || text.includes("Create a post") || 
         text.includes("想分享什麼") || text.includes("建立貼文") || 
@@ -333,6 +337,9 @@ function findComposerButton() {
   // 2. Search visible elements globally as fallback
   const globalElements = document.querySelectorAll('span, div, a');
   for (const el of globalElements) {
+    if (el.tagName === "DIV" && el.children.length > 2 && !el.getAttribute('role')) {
+      continue;
+    }
     const text = el.innerText || "";
     if (text.includes("在想些什麼") || text.includes("Create a post") || 
         text.includes("想分享什麼") || text.includes("建立貼文") || 
