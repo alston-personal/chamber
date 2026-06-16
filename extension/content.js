@@ -323,13 +323,21 @@ function findComposerButton() {
   return document.querySelector('div[role="main"] div[role="button"]');
 }
 
-function findComposerTextbox() {
-  // 1. Try modal dialog first - this is the most specific and safe
-  const modalTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]');
+function findComposerContainer(textbox) {
+  if (!textbox) return document.body;
+  return textbox.closest('div[role="dialog"]') || 
+         textbox.closest('div[role="main"]') || 
+         textbox.closest('form') || 
+         document.body;
+}
+
+function findComposerTextbox(container = document) {
+  // 1. Try modal dialog first inside the container - this is the most specific and safe
+  const modalTextbox = container.querySelector('div[role="dialog"] div[role="textbox"]');
   if (modalTextbox) return modalTextbox;
 
-  // 2. Query all textboxes and filter out comment/reply elements
-  const textboxes = document.querySelectorAll('div[role="textbox"]');
+  // 2. Query all textboxes inside the container and filter out comment/reply elements
+  const textboxes = container.querySelectorAll('div[role="textbox"]');
   for (const box of textboxes) {
     const label = box.getAttribute('aria-label') || "";
     // If it contains comment/reply keywords, ignore it
@@ -341,35 +349,25 @@ function findComposerTextbox() {
   return null;
 }
 
-function findPhotoBtn(textbox) {
-  if (!textbox) return null;
-  let parent = textbox;
-  while (parent && parent !== document.body) {
-    const selectors = ['div[role="button"]', 'i', 'div'];
-    for (const selector of selectors) {
-      const elements = parent.querySelectorAll(selector);
-      for (const el of elements) {
-        const label = el.getAttribute('aria-label') || el.innerText || "";
-        if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
-          const btn = el.closest('div[role="button"]') || el;
-          if (btn) return btn;
-        }
+function findPhotoBtn(container) {
+  if (!container) return null;
+  const selectors = ['div[role="button"]', 'i', 'div'];
+  for (const selector of selectors) {
+    const elements = container.querySelectorAll(selector);
+    for (const el of elements) {
+      const label = el.getAttribute('aria-label') || el.innerText || "";
+      if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
+        const btn = el.closest('div[role="button"]') || el;
+        if (btn) return btn;
       }
     }
-    parent = parent.parentElement;
   }
   return null;
 }
 
-function findFileInput(textbox) {
-  if (!textbox) return null;
-  let parent = textbox;
-  while (parent && parent !== document.body) {
-    const input = parent.querySelector('input[type="file"]');
-    if (input) return input;
-    parent = parent.parentElement;
-  }
-  return null;
+function findFileInput(container) {
+  if (!container) return null;
+  return container.querySelector('input[type="file"]');
 }
 
 function triggerUpload(fileInput, imageUrl) {
@@ -411,10 +409,13 @@ function handleOpenComposerAndFill(text, imageUrl) {
   const textbox = findComposerTextbox();
 
   if (textbox) {
+    // Locate the stable ancestor card/dialog container
+    const container = findComposerContainer(textbox);
+
     if (imageUrl) {
-      const fileInput = findFileInput(textbox);
+      const fileInput = findFileInput(container);
       if (!fileInput) {
-        const photoBtn = findPhotoBtn(textbox);
+        const photoBtn = findPhotoBtn(container);
         if (photoBtn) {
           console.log("[Chamber] Photo mode not active, switching to photo mode...");
           photoBtn.click();
@@ -422,11 +423,11 @@ function handleOpenComposerAndFill(text, imageUrl) {
           let attempts = 0;
           const interval = setInterval(() => {
             attempts++;
-            const activeFileInput = findFileInput(textbox);
+            const activeFileInput = findFileInput(container);
             if (activeFileInput) {
               clearInterval(interval);
               setTimeout(() => {
-                const freshTextbox = findComposerTextbox();
+                const freshTextbox = findComposerTextbox(container);
                 if (freshTextbox) {
                   fillText(freshTextbox, text);
                 }
@@ -440,7 +441,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
           }, 100);
           return;
         } else {
-          console.warn("[Chamber] Photo button not found relative to textbox.");
+          console.warn("[Chamber] Photo button not found inside composer container.");
           fillText(textbox, text);
         }
       } else {
