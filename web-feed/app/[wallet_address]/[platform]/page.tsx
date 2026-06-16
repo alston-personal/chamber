@@ -149,9 +149,28 @@ export default function PlatformFeed({
             })
           );
           
+          // Sort posts by timestamp DESC (newest first)
+          fetchedPosts.sort((a, b) => b.payload.timestamp - a.payload.timestamp);
+
+          // Deduplicate by source_url (if present), keeping only the latest version (Last-Write-Wins)
+          const seenSourceUrls = new Set<string>();
+          const dedupedPosts: PostItem[] = [];
+
+          for (const post of fetchedPosts) {
+            const sourceUrl = post.payload.source_url;
+            if (sourceUrl) {
+              if (seenSourceUrls.has(sourceUrl)) {
+                console.log(`[Chamber] Filtered out duplicate historic version of post: ${sourceUrl}`);
+                continue;
+              }
+              seenSourceUrls.add(sourceUrl);
+            }
+            dedupedPosts.push(post);
+          }
+
           // Client-side filter out debug posts unless URL query ?debug=true is specified
           const showDebug = searchParams.get("debug") === "true";
-          const filteredPosts = fetchedPosts.filter(p => showDebug || !p.isDebug);
+          const filteredPosts = dedupedPosts.filter(p => showDebug || !p.isDebug);
           setPosts(filteredPosts);
         } else {
           // Fallback to sample mock database
