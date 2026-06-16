@@ -313,19 +313,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 function findComposerButton() {
-  // Broad scan for any span, div, or a containing the classic composer prompts
-  const elements = document.querySelectorAll('span, div, a');
-  for (const el of elements) {
+  const main = document.querySelector('div[role="main"]') || document;
+  
+  // 1. Search visible elements inside main content area first
+  const mainElements = main.querySelectorAll('span, div, a');
+  for (const el of mainElements) {
     const text = el.innerText || "";
     if (text.includes("在想些什麼") || text.includes("Create a post") || 
         text.includes("想分享什麼") || text.includes("建立貼文") || 
         text.includes("寫些什麼")) {
       const btn = el.closest('div[role="button"]') || el.closest('a') || el;
-      console.log("[Chamber] Identified composer button candidate:", btn, "Text:", text);
-      return btn;
+      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+        console.log("[Chamber] Identified visible composer button inside main feed:", btn, "Text:", text);
+        return btn;
+      }
     }
   }
-  // Fallbacks
+  
+  // 2. Search visible elements globally as fallback
+  const globalElements = document.querySelectorAll('span, div, a');
+  for (const el of globalElements) {
+    const text = el.innerText || "";
+    if (text.includes("在想些什麼") || text.includes("Create a post") || 
+        text.includes("想分享什麼") || text.includes("建立貼文") || 
+        text.includes("寫些什麼")) {
+      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
+      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+        console.log("[Chamber] Identified visible composer button globally:", btn, "Text:", text);
+        return btn;
+      }
+    }
+  }
+
+  // 3. Last resort fallback
   const fallback = document.querySelector('div[role="main"] div[role="button"]') || 
                    document.querySelector('div[role="button"]');
   console.warn("[Chamber] Composer button search fell back to default query:", fallback);
@@ -343,7 +363,9 @@ function findComposerContainer(textbox) {
 function findComposerTextbox(container = document) {
   // 1. Try modal dialog first inside the container - this is the most specific and safe
   const modalTextbox = container.querySelector('div[role="dialog"] div[role="textbox"]');
-  if (modalTextbox) return modalTextbox;
+  if (modalTextbox && (modalTextbox.offsetWidth > 0 || modalTextbox.offsetHeight > 0)) {
+    return modalTextbox;
+  }
 
   // 2. Query all textboxes inside the container and filter out comment/reply elements
   const textboxes = container.querySelectorAll('div[role="textbox"]');
@@ -353,7 +375,9 @@ function findComposerTextbox(container = document) {
     if (label.includes("留言") || label.includes("回覆") || label.includes("comment") || label.includes("reply")) {
       continue;
     }
-    return box;
+    if (box.offsetWidth > 0 || box.offsetHeight > 0) {
+      return box;
+    }
   }
   return null;
 }
@@ -367,7 +391,9 @@ function findPhotoBtn(container) {
       const label = el.getAttribute('aria-label') || el.innerText || "";
       if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
         const btn = el.closest('div[role="button"]') || el;
-        if (btn) return btn;
+        if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+          return btn;
+        }
       }
     }
   }
