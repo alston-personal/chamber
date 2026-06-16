@@ -296,3 +296,114 @@ observer.observe(document.body, {
 
 // Run initial DOM parse
 setTimeout(processDOM, 3000);
+
+// 6. Listen to messages from popup.js for composer auto-fill automation
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "OPEN_FB_COMPOSER_AND_FILL") {
+    handleOpenComposerAndFill(request.payload.text, request.payload.imageUrl);
+    sendResponse({ success: true });
+    return true;
+  }
+});
+
+function findComposerButton() {
+  const divs = document.querySelectorAll('div[role="button"]');
+  for (const div of divs) {
+    const text = div.innerText || "";
+    if (text.includes("在想些什麼") || text.includes("Create a post") || text.includes("想分享什麼") || text.includes("建立貼文") || text.includes("寫些什麼")) {
+      return div;
+    }
+  }
+  return document.querySelector('div[role="main"] div[role="button"]');
+}
+
+function findPhotoBtn() {
+  const elements = document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] i');
+  for (const el of elements) {
+    const label = el.getAttribute('aria-label') || el.innerText || "";
+    if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
+      return el.closest('div[role="button"]') || el;
+    }
+  }
+  return null;
+}
+
+function triggerUpload(fileInput, blob) {
+  try {
+    const file = new File([blob], "chamber-reborn-card.png", { type: "image/png" });
+    const container = new DataTransfer();
+    container.items.add(file);
+    fileInput.files = container.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    console.log("[Chamber] Reborn card image auto-uploaded successfully.");
+  } catch (err) {
+    console.error("[Chamber] Auto-upload file trigger failed:", err);
+  }
+}
+
+function fillTextAndImage(textbox, text, imageUrl) {
+  // Focus and insert text using execCommand to keep React state in sync
+  textbox.focus();
+  document.execCommand('selectAll', false, null);
+  document.execCommand('delete', false, null);
+  document.execCommand('insertText', false, text);
+  console.log("[Chamber] Auto-filled composer textbox.");
+
+  // Upload image if provided
+  if (imageUrl) {
+    fetch(imageUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        let fileInput = document.querySelector('div[role="dialog"] input[type="file"]');
+        if (!fileInput) {
+          const photoBtn = findPhotoBtn();
+          if (photoBtn) {
+            photoBtn.click();
+            setTimeout(() => {
+              fileInput = document.querySelector('div[role="dialog"] input[type="file"]');
+              if (fileInput) {
+                triggerUpload(fileInput, blob);
+              }
+            }, 600);
+          }
+        } else {
+          triggerUpload(fileInput, blob);
+        }
+      })
+      .catch(err => console.error("[Chamber] Failed to fetch data URL for upload:", err));
+  }
+}
+
+function handleOpenComposerAndFill(text, imageUrl) {
+  const textbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
+                  document.querySelector('div[role="textbox"]');
+  if (textbox) {
+    fillTextAndImage(textbox, text, imageUrl);
+    return;
+  }
+
+  const btn = findComposerButton();
+  if (btn) {
+    console.log("[Chamber] Found composer button, clicking it...");
+    btn.click();
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const activeTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
+                            document.querySelector('div[role="textbox"]');
+      if (activeTextbox) {
+        clearInterval(interval);
+        setTimeout(() => {
+          fillTextAndImage(activeTextbox, text, imageUrl);
+        }, 400); // 400ms rendering buffer
+      } else if (attempts > 30) {
+        clearInterval(interval);
+        console.warn("[Chamber] Failed to find composer textbox after clicking.");
+      }
+    }, 100);
+  } else {
+    console.warn("[Chamber] Could not locate any Facebook post composer button.");
+    alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
+  }
+}

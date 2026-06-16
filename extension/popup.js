@@ -311,6 +311,24 @@ document.addEventListener("DOMContentLoaded", () => {
       }, "image/png");
 
       const dataUrl = canvas.toDataURL("image/png");
+
+      // Auto-fill Facebook Composer if currently on Facebook
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs[0] && tabs[0].url && tabs[0].url.includes("facebook.com")) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: "OPEN_FB_COMPOSER_AND_FILL",
+            payload: {
+              text: textToCopy,
+              imageUrl: dataUrl
+            }
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              console.debug("[Chamber] Content script was not ready to receive message:", chrome.runtime.lastError.message);
+            }
+          });
+        }
+      });
+
       const a = document.createElement("a");
       a.href = dataUrl;
       a.download = "chamber-reborn-card.png";
