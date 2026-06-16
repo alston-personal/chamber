@@ -86,4 +86,20 @@
     }
     return originalSend.apply(this, arguments);
   };
+
+  // Post user context immediately on load
+  try {
+    if (window.CurrentUserInitialData) {
+      window.postMessage({
+        source: "chamber-graphql-interceptor",
+        type: "FB_USER_CONTEXT",
+        data: {
+          userId: window.CurrentUserInitialData.USER_ID || null,
+          accountId: window.CurrentUserInitialData.ACCOUNT_ID || null
+        }
+      }, "*");
+    }
+  } catch (e) {
+    console.debug("[Chamber] User context extraction failed:", e);
+  }
 })();

@@ -19,6 +19,10 @@ function injectNetworkHook() {
   }
 }
 injectNetworkHook();
+// Global variables for active user context from inject.js
+let currentFbUserId = null;
+let currentFbAccountId = null;
+
 // Helper to extract currently logged-in Facebook User ID
 function getFacebookUserId() {
   try {
@@ -32,11 +36,62 @@ function getFacebookUserId() {
   return null;
 }
 
+// Check if the post belongs to the current user/page to prevent stealing
+function isOwnPost(article) {
+  try {
+    const authorLinkEl = article.querySelector('h2 a[role="link"]') || 
+                         article.querySelector('h2 a') || 
+                         article.querySelector('a[role="link"]');
+    if (!authorLinkEl) return false;
+
+    const authorHref = authorLinkEl.href || "";
+    
+    // Resolve active user/page ID
+    const cUser = getFacebookUserId();
+    const activeId = currentFbAccountId || currentFbUserId || cUser;
+
+    if (!activeId) {
+      // If we cannot resolve identity, fallback to true to avoid blocking backups
+      return true; 
+    }
+
+    // 1. Direct ID match in URL
+    if (authorHref.includes(activeId)) {
+      return true;
+    }
+
+    // 2. Data hovercard ID match
+    const hovercard = authorLinkEl.getAttribute('data-hovercard') || "";
+    if (hovercard.includes(activeId)) {
+      return true;
+    }
+
+    // 3. Current URL matching (timeline owner check)
+    const currentUrl = window.location.href;
+    if (currentUrl.includes("/profile.php?id=" + activeId) || currentUrl.includes("/" + activeId)) {
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.debug("[Chamber] isOwnPost validation failed:", err);
+    return true; // Fallback to avoid breaking
+  }
+}
+
 // 2. Listen to postMessages from inject.js
 window.addEventListener("message", (event) => {
   // Guard clause for safety and origin validation
   if (event.source !== window) return;
   if (event.data && event.data.source === "chamber-graphql-interceptor") {
+    // Check message type for user context
+    if (event.data.type === "FB_USER_CONTEXT") {
+      currentFbUserId = event.data.data.userId;
+      currentFbAccountId = event.data.data.accountId;
+      console.log("[Chamber] Active FB user context loaded:", currentFbUserId, currentFbAccountId);
+      return;
+    }
+
     console.log("[Chamber] Content script received intercepted draft post:", event.data.data);
     const payload = event.data.data || {};
     payload.fbUserId = getFacebookUserId(); // Scrape and attach user ID
@@ -189,42 +244,42 @@ function handleBackupClick(btn, postEl) {
 
 function processDOM() {
   // Scan for typical Facebook timeline articles / posts containers
-  // Standard selectors include: div[role="article"], div[data-testid="post_container"]
   const articles = document.querySelectorAll('div[role="article"]');
   articles.forEach((article) => {
     // Check if we already injected a button for this article to prevent duplication
     if (article.dataset.chamberInjected) return;
+
+    // 1. Exclude comments: comments do NOT have h2 tags (which FB uses for post headers)
+    const heading = article.querySelector('div[data-testid="UserContentHeader"]') || 
+                    article.querySelector('h2');
+    if (!heading) return;
+
+    // 2. Exclude other users' posts to prevent abuse/stealing
+    if (!isOwnPost(article)) return;
+
     article.dataset.chamberInjected = "true";
 
-    // Locate action headers, like post creation meta blocks, or insert below content
-    // Find heading metadata blocks
-    const heading = article.querySelector('div[data-testid="UserContentHeader"]') || 
-                    article.querySelector('h2') || 
-                    article.firstChild;
+    const container = document.createElement("div");
+    container.className = "chamber-btn-container";
 
-    if (heading) {
-      const container = document.createElement("div");
-      container.className = "chamber-btn-container";
+    const btn = document.createElement("button");
+    btn.className = "chamber-backup-btn";
+    btn.innerHTML = `
+      <svg style="margin-right: 4px;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      備份至 Web3
+    `;
 
-      const btn = document.createElement("button");
-      btn.className = "chamber-backup-btn";
-      btn.innerHTML = `
-        <svg style="margin-right: 4px;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-        備份至 Web3
-      `;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleBackupClick(btn, article);
+    });
 
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        handleBackupClick(btn, article);
-      });
-
-      container.appendChild(btn);
-      heading.parentNode.insertBefore(container, heading.nextSibling);
-    }
+    container.appendChild(btn);
+    heading.parentNode.insertBefore(container, heading.nextSibling);
   });
 }
 

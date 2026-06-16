@@ -288,7 +288,28 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.font = "bold 10px monospace";
       ctx.fillText("studio.milkcat.org/echo • Arweave Devnet Storage", 300, 720);
 
-      // 4. Trigger file download
+      // 4. Trigger file download & Copy both Text and Image to Clipboard (Multi-Mime)
+      canvas.toBlob(async (imageBlob) => {
+        try {
+          const textBlob = new Blob([textToCopy], { type: "text/plain" });
+          const item = new ClipboardItem({
+            "text/plain": textBlob,
+            "image/png": imageBlob
+          });
+          await navigator.clipboard.write([item]);
+          console.log("[Chamber] Copy text and image to clipboard successful.");
+          
+          genCardBtn.innerText = "✅ 複製成功 & 卡片已下載！";
+          genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+        } catch (clipErr) {
+          console.warn("[Chamber] Multi-mime clipboard write failed:", clipErr);
+          // Fallback to text-only copy
+          await navigator.clipboard.writeText(textToCopy);
+          genCardBtn.innerText = "✅ 複製聲明 & 卡片已下載！";
+          genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+        }
+      }, "image/png");
+
       const dataUrl = canvas.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = dataUrl;
@@ -296,10 +317,6 @@ document.addEventListener("DOMContentLoaded", () => {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      // 5. Update UI feedback
-      genCardBtn.innerText = "✅ 複製聲明並下載轉世卡成功！";
-      genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
 
       setTimeout(() => {
         genCardBtn.innerText = "⚡ 生成聲明並下載轉世卡";
