@@ -358,6 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }, (res) => {
             if (chrome.runtime.lastError) {
               console.debug("[Chamber] Content script was not ready to receive message:", chrome.runtime.lastError.message);
+              alert("⚠️ 偵測到擴充功能剛剛完成更新！\n請先「重新整理（F5）」您的 Facebook 頁面以激活最新版腳本。\n\n（備用方案：我們已將圖文複製到剪貼簿，您也可直接在臉書發文框按 Ctrl+V 貼上發佈！）");
             }
           });
         }
