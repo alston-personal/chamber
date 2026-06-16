@@ -19,6 +19,18 @@ function injectNetworkHook() {
   }
 }
 injectNetworkHook();
+// Helper to extract currently logged-in Facebook User ID
+function getFacebookUserId() {
+  try {
+    const match = document.cookie.match(/c_user=(\d+)/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  } catch (e) {
+    console.debug("[Chamber] Failed to read c_user cookie:", e);
+  }
+  return null;
+}
 
 // 2. Listen to postMessages from inject.js
 window.addEventListener("message", (event) => {
@@ -26,10 +38,13 @@ window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (event.data && event.data.source === "chamber-graphql-interceptor") {
     console.log("[Chamber] Content script received intercepted draft post:", event.data.data);
+    const payload = event.data.data || {};
+    payload.fbUserId = getFacebookUserId(); // Scrape and attach user ID
+    
     // Forward directly to the background script
     chrome.runtime.sendMessage({
       action: "BACKUP_POST_DRAFT",
-      payload: event.data.data
+      payload: payload
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.warn("[Chamber] Extension background script unreachable:", chrome.runtime.lastError.message);
@@ -143,6 +158,8 @@ function handleBackupClick(btn, postEl) {
     alert("無法偵測到貼文內容或媒體網址！");
     return;
   }
+
+  data.fbUserId = getFacebookUserId(); // Scrape and attach user ID
 
   btn.innerText = "⏳ 備份中...";
   btn.disabled = true;

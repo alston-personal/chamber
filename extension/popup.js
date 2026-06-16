@@ -1,16 +1,34 @@
 /**
- * popup.js - Interactive controls for the Chamber Settings Popup
+ * popup.js - Chamber Protocol Settings Popup Logic
+ *
+ * Implements dashboard navigation, connection badges, auto-generation of
+ * local key/custodial wallets, and canvas-based reborn ID cards.
  */
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Elements
+  const dashboardView = document.getElementById("dashboardView");
+  const settingsView = document.getElementById("settingsView");
+  
+  const toSettingsBtn = document.getElementById("toSettingsBtn");
+  const backBtn = document.getElementById("backBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const viewDocsBtn = document.getElementById("viewDocsBtn");
+  
   const walletAddressInput = document.getElementById("walletAddress");
   const walletPrivateKeyInput = document.getElementById("walletPrivateKey");
   const imgurClientIdInput = document.getElementById("imgurClientId");
   const isEncryptionEnabledCheckbox = document.getElementById("isEncryptionEnabled");
-  const saveBtn = document.getElementById("saveBtn");
+  
+  const timelineUrlText = document.getElementById("timelineUrlText");
+  const copyTimelineBtn = document.getElementById("copyTimelineBtn");
   const declarationTextarea = document.getElementById("declarationText");
   const genCardBtn = document.getElementById("genCardBtn");
+  
+  const connectionDot = document.getElementById("connectionDot");
+  const connectionBadge = document.getElementById("connectionBadge");
 
-  const TEMPLATE = `【本人樂觀開朗之 Web3 轉世聲明】
+  const DEFAULT_DECLARATION = `【本人樂觀開朗之 Web3 轉世聲明】
 
 本人不酗酒、不抽菸，無任何精神疾患，亦無任何尋短傾向。特此聲明：若本人帳號無預警消失，絕非自主登出。
 
@@ -24,34 +42,65 @@ document.addEventListener("DOMContentLoaded", () => {
 👉 Chamber 重生網址見留言第一樓 🛡️
 （電腦用戶可直接掃描下方身分卡 QR Code 訪問）`;
 
-  // Helper to load and format the editable declaration
-  function updateDeclarationText(walletAddr) {
-    if (walletAddr) {
-      declarationTextarea.value = TEMPLATE;
-    } else {
-      declarationTextarea.value = TEMPLATE;
-    }
+  // 1. Navigation toggle
+  toSettingsBtn.addEventListener("click", () => {
+    dashboardView.classList.add("hidden");
+    settingsView.classList.remove("hidden");
+  });
+
+  backBtn.addEventListener("click", () => {
+    settingsView.classList.add("hidden");
+    dashboardView.classList.remove("hidden");
+  });
+
+  // Helper to generate secure random hex string
+  function generateRandomHex(bytesCount) {
+    const arr = new Uint8Array(bytesCount);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
-  // Load existing configurations
+  // 2. Load configurations and handle first-time initialization
   chrome.storage.local.get(
-    ["walletAddress", "walletPrivateKey", "imgurClientId", "isEncryptionEnabled"],
+    ["walletAddress", "walletPrivateKey", "imgurClientId", "isEncryptionEnabled", "lastEchoUrl", "lastFbUserIdHash"],
     (data) => {
-      if (data.walletAddress) {
-        walletAddressInput.value = data.walletAddress;
-        updateDeclarationText(data.walletAddress);
-      } else {
-        updateDeclarationText("0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1");
+      let walletAddress = data.walletAddress;
+      let walletPrivateKey = data.walletPrivateKey;
+      
+      // Auto-initialize custodial wallet if not set
+      if (!walletAddress) {
+        walletAddress = "0x" + generateRandomHex(20); // 20 bytes = 40 hex chars
+        chrome.storage.local.set({ walletAddress });
       }
-      if (data.walletPrivateKey) walletPrivateKeyInput.value = data.walletPrivateKey;
-      if (data.imgurClientId) imgurClientIdInput.value = data.imgurClientId;
+      
+      // Auto-initialize encryption key if not set
+      if (!walletPrivateKey) {
+        walletPrivateKey = generateRandomHex(32); // 32 bytes = 64 hex chars
+        chrome.storage.local.set({ walletPrivateKey });
+      }
+
+      // Populate Inputs
+      walletAddressInput.value = walletAddress;
+      walletPrivateKeyInput.value = walletPrivateKey;
+      imgurClientIdInput.value = data.imgurClientId || "";
       if (data.isEncryptionEnabled !== undefined) {
         isEncryptionEnabledCheckbox.checked = data.isEncryptionEnabled;
       }
+
+      // Populate Timeline Link
+      if (data.lastEchoUrl) {
+        timelineUrlText.innerText = data.lastEchoUrl;
+        timelineUrlText.style.color = "#38bdf8"; // Active link color
+      } else {
+        timelineUrlText.innerText = "尚未激活，請先在 Facebook 備份...";
+        timelineUrlText.style.color = "#94a3b8"; // Muted color
+      }
+
+      declarationTextarea.value = DEFAULT_DECLARATION;
     }
   );
 
-  // Save configurations
+  // 3. Save Settings Handler
   saveBtn.addEventListener("click", () => {
     const walletAddress = walletAddressInput.value.trim();
     const walletPrivateKey = walletPrivateKeyInput.value.trim();
@@ -59,11 +108,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const isEncryptionEnabled = isEncryptionEnabledCheckbox.checked;
 
     if (!walletAddress) {
-      alert("請輸入儲存錢包地址！");
+      alert("請填寫儲存錢包地址！");
       return;
     }
 
-    saveBtn.innerText = "儲存中...";
+    saveBtn.innerText = "⏳ 儲存中...";
     saveBtn.disabled = true;
 
     chrome.storage.local.set({
@@ -72,24 +121,83 @@ document.addEventListener("DOMContentLoaded", () => {
       imgurClientId,
       isEncryptionEnabled
     }, () => {
-      updateDeclarationText(walletAddress);
       setTimeout(() => {
-        saveBtn.innerText = "設定已儲存！";
+        saveBtn.innerText = "💾 儲存成功！";
         saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
         
         setTimeout(() => {
-          saveBtn.innerText = "儲存設定";
-          saveBtn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
+          saveBtn.innerText = "💾 儲存並套用";
+          saveBtn.style.background = ""; // revert to class gradient
           saveBtn.disabled = false;
-        }, 1500);
-      }, 500);
+          // Return to dashboard after successful save
+          settingsView.classList.add("hidden");
+          dashboardView.classList.remove("hidden");
+        }, 1000);
+      }, 400);
     });
   });
 
-  // Generate Reborn Card on Canvas and download it
+  // 4. Dynamic Platform Connection Badge
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs && tabs[0]) {
+      const activeTab = tabs[0];
+      const url = activeTab.url || "";
+      let statusText = "🌐 探索中 - 前往 Facebook 啟動備份";
+      let dotColor = "#94a3b8"; // gray
+
+      if (url.includes("facebook.com")) {
+        statusText = "👥 已連結 Facebook 頁面 (Ready)";
+        dotColor = "#3b82f6"; // blue
+      } else if (url.includes("threads.net")) {
+        statusText = "🧵 已連結 Threads 頁面 (Ready)";
+        dotColor = "#c084fc"; // purple
+      } else if (url.includes("x.com") || url.includes("twitter.com")) {
+        statusText = "🐦 已連結 X (Twitter) (Ready)";
+        dotColor = "#38bdf8"; // sky blue
+      } else if (url.includes("instagram.com")) {
+        statusText = "📸 已連結 Instagram (Ready)";
+        dotColor = "#db2777"; // IG pink
+      }
+
+      connectionBadge.innerText = statusText;
+      connectionDot.style.backgroundColor = dotColor;
+      connectionDot.style.boxShadow = `0 0 10px ${dotColor}`;
+    }
+  });
+
+  // 5. Copy Reborn Link Handler
+  copyTimelineBtn.addEventListener("click", () => {
+    chrome.storage.local.get(["lastEchoUrl"], (data) => {
+      const targetUrl = data.lastEchoUrl || "";
+      if (!targetUrl) {
+        alert("請先完成首次備份以啟用重生牆網址！");
+        return;
+      }
+      
+      navigator.clipboard.writeText(targetUrl).then(() => {
+        copyTimelineBtn.innerText = "已複製！";
+        copyTimelineBtn.style.background = "rgba(16, 185, 129, 0.2)";
+        copyTimelineBtn.style.color = "#34d399";
+        copyTimelineBtn.style.borderColor = "rgba(16, 185, 129, 0.5)";
+        
+        setTimeout(() => {
+          copyTimelineBtn.innerText = "複製網址";
+          copyTimelineBtn.style.background = "";
+          copyTimelineBtn.style.color = "";
+          copyTimelineBtn.style.borderColor = "";
+        }, 1500);
+      });
+    });
+  });
+
+  // 6. View Docs Handler
+  viewDocsBtn.addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://studio.milkcat.org/echo/README_TEST.md" });
+  });
+
+  // 7. Reborn Card Generator Handler (HTML5 Canvas)
   genCardBtn.addEventListener("click", async () => {
-    const walletAddress = walletAddressInput.value.trim() || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
-    const textToCopy = declarationTextarea.value;
+    const textToCopy = declarationTextarea.value.trim();
 
     genCardBtn.innerText = "⏳ 正在生成轉世卡...";
     genCardBtn.disabled = true;
@@ -99,10 +207,13 @@ document.addEventListener("DOMContentLoaded", () => {
       await navigator.clipboard.writeText(textToCopy);
       console.log("[Chamber] Declaration text copied to clipboard.");
 
-      // 2. Build the target URL for the QR Code
-      const timelineUrl = `https://studio.milkcat.org/echo/${walletAddress}`;
+      // 2. Fetch or fallback target URL for the QR Code
+      const data = await new Promise((resolve) => {
+        chrome.storage.local.get(["lastEchoUrl", "walletAddress"], resolve);
+      });
+      const timelineUrl = data.lastEchoUrl || `https://studio.milkcat.org/echo/${data.walletAddress || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"}/all`;
 
-      // 3. Create a canvas
+      // 3. Create canvas
       const canvas = document.createElement("canvas");
       canvas.width = 600;
       canvas.height = 800;
@@ -111,9 +222,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Draw dark glowing background gradient
       const grad = ctx.createLinearGradient(0, 0, 0, 800);
-      grad.addColorStop(0, "#0f172a"); // slate-900
-      grad.addColorStop(0.5, "#1e1b4b"); // indigo-950
-      grad.addColorStop(1, "#020617"); // slate-950
+      grad.addColorStop(0, "#090d16"); // deep navy
+      grad.addColorStop(0.5, "#1e1b4b"); // indigo
+      grad.addColorStop(1, "#020617"); // black
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 600, 800);
 
@@ -150,7 +261,6 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillText("「他們可以砍掉我們的帳號，但永遠無法閹割我們的自由」", 300, 180);
 
       // Fetch and draw QR Code from public API
-      // Custom color matching our palette: foreground indigo (#6366f1), background slate-950 (#020617)
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=99-102-241&bgcolor=2-6-23&data=${encodeURIComponent(timelineUrl)}`;
       
       const qrImage = new Image();
@@ -175,14 +285,15 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillText("掃描二維碼訪問我的去中心化重生牆 (Echo)", 300, 530);
 
       // Draw wallet address at the bottom
+      const displayAddr = data.walletAddress || "CUSTODIAL_WALLET";
       ctx.fillStyle = "#38bdf8"; // sky-400
       ctx.font = "bold 13px monospace";
-      ctx.fillText(`ADDRESS: ${walletAddress}`, 300, 600);
+      ctx.fillText(`KEY: ${displayAddr}`, 300, 600);
 
       // Draw branding seal
       ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
       ctx.font = "bold 10px monospace";
-      ctx.fillText("studio.milkcat.org/echo • Arweave Immutable Storage", 300, 720);
+      ctx.fillText("studio.milkcat.org/echo • Arweave Devnet Storage", 300, 720);
 
       // 4. Trigger file download
       const dataUrl = canvas.toDataURL("image/png");
@@ -194,18 +305,18 @@ document.addEventListener("DOMContentLoaded", () => {
       document.body.removeChild(a);
 
       // 5. Update UI feedback
-      genCardBtn.innerText = "✅ 複製成功 & 卡片已下載！";
+      genCardBtn.innerText = "✅ 複製聲明並下載轉世卡成功！";
       genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
 
       setTimeout(() => {
         genCardBtn.innerText = "⚡ 生成聲明並下載轉世卡";
-        genCardBtn.style.background = "linear-gradient(135deg, #8b5cf6, #6d28d9)";
+        genCardBtn.style.background = ""; // revert
         genCardBtn.disabled = false;
       }, 3000);
 
     } catch (err) {
-      console.error("[Chamber] Failed to copy text or generate card:", err);
-      alert("生成失敗，請手動複製網址！錯誤: " + err.message);
+      console.error("[Chamber] Failed to generate card:", err);
+      alert("生成失敗，錯誤: " + err.message);
       genCardBtn.innerText = "⚡ 生成聲明並下載轉世卡";
       genCardBtn.disabled = false;
     }

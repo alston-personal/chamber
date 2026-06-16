@@ -171,6 +171,12 @@ async function processBackupTask(postData, isHistoric) {
   // 3. Upload via Chamber API (real Arweave upload, server pays with Irys Turbo free tier)
   const result = await uploadViaChamberAPI(apiPayload);
 
+  // Save timeline URL and hash to local storage for the popup dashboard
+  chrome.storage.local.set({
+    lastEchoUrl: result.echoUrl,
+    lastFbUserIdHash: result.fbUserIdHash
+  });
+
   return {
     success: true,
     txId: result.txId,

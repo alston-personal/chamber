@@ -5,94 +5,183 @@
   <title>Chamber Control</title>
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0f172a, #1e1b4b);
-      --card-bg: rgba(255, 255, 255, 0.05);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --primary-color: #6366f1;
-      --primary-hover: #4f46e5;
+      --bg-gradient: linear-gradient(135deg, #090d16, #111827, #1e1b4b);
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+      --accent-gradient: linear-gradient(135deg, #8b5cf6, #6d28d9);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
+      --success-color: #10b981;
     }
 
     body {
-      width: 340px;
+      width: 360px;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
       background: var(--bg-gradient);
       color: var(--text-main);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       box-sizing: border-box;
+      overflow-x: hidden;
     }
 
     .container {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
 
     header {
       text-align: center;
-      border-bottom: 1px solid var(--glass-border);
-      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 10px;
+      margin-bottom: 4px;
     }
 
     h1 {
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: 800;
       margin: 0;
-      background: linear-gradient(135deg, #a5b4fc, #6366f1);
+      background: linear-gradient(135deg, #c7d2fe, #818cf8, #a78bfa);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
     }
 
     .desc {
       font-size: 11px;
       color: var(--text-muted);
-      margin: 4px 0 0 0;
+      margin: 2px 0 0 0;
+      font-weight: 500;
     }
 
+    /* Connection Banner */
+    .connection-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #94a3b8;
+      box-shadow: 0 0 8px #94a3b8;
+      transition: all 0.3s ease;
+    }
+
+    /* Cards */
     .card {
       background: var(--card-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
       padding: 14px;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 2px;
+    }
+
+    /* URL Wrapper */
+    .url-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .url-text {
+      flex: 1;
+      font-size: 11px;
+      font-family: monospace;
+      color: #38bdf8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .small-btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 6px;
+      color: #a5b4fc;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .small-btn:hover {
+      background: rgba(99, 102, 241, 0.3);
+      color: #ffffff;
+    }
+
+    .tip-text {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Form Fields */
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .form-group:last-child {
-      margin-bottom: 0;
+      gap: 5px;
+      margin-bottom: 8px;
     }
 
     label {
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
 
     input[type="text"], input[type="password"] {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid var(--glass-border);
-      border-radius: 6px;
-      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
       color: var(--text-main);
       font-size: 12px;
       font-family: monospace;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     input[type="text"]:focus, input[type="password"]:focus {
-      border-color: var(--primary-color);
+      border-color: #6366f1;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+    }
+
+    .field-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.3;
     }
 
     .checkbox-group {
@@ -100,43 +189,90 @@
       align-items: center;
       gap: 8px;
       font-size: 12px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
-    button {
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
+    /* Buttons */
+    .btn-primary {
+      background: var(--primary-gradient);
       border: none;
       border-radius: 8px;
       color: #ffffff;
       padding: 10px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+      filter: brightness(1.1);
+    }
+
+    .btn-accent {
+      background: var(--accent-gradient);
+      border: none;
+      border-radius: 8px;
+      color: #ffffff;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
       transition: all 0.2s;
     }
 
-    button:hover {
-      background: linear-gradient(135deg, #4f46e5, #4338ca);
+    .btn-accent:hover {
       transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+      filter: brightness(1.1);
     }
 
-    .status-badge {
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      color: #34d399;
       justify-content: center;
-      margin-top: 8px;
+      gap: 4px;
     }
 
-    .dot {
-      width: 6px;
-      height: 6px;
-      background-color: #34d399;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #34d399;
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Views */
+    .view {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      font-family: monospace;
+      letter-spacing: 0.3px;
     }
   </style>
 </head>
@@ -147,43 +283,92 @@
       <p class="desc">去中心化社交備份密室 & 網關</p>
     </header>
 
-    <div class="card">
-      <div class="form-group">
-        <label for="walletAddress">Web3 儲存錢包地址</label>
-        <input type="text" id="walletAddress" placeholder="0x...">
+    <!-- Connection Banner (Applies to all screens) -->
+    <div class="connection-banner">
+      <div id="connectionDot" class="connection-dot"></div>
+      <span id="connectionBadge">正在偵測社交平台連結...</span>
+    </div>
+
+    <!-- 1. DASHBOARD VIEW -->
+    <div id="dashboardView" class="view">
+      <!-- Reborn Portal Link Card -->
+      <div class="card">
+        <span class="card-title">🛡️ 我的去中心化重生時光軸</span>
+        <div class="url-wrapper">
+          <span id="timelineUrlText" class="url-text">尚未備份，請先前往 Facebook...</span>
+          <button id="copyTimelineBtn" class="small-btn">複製網址</button>
+        </div>
+        <div id="timelineTip" class="tip-text">
+          在 Facebook 貼文下方點擊 <strong>`[🔒 備份至 Web3]`</strong> 進行首次備份，時光軸網址即會自動生成並激活！
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="walletPrivateKey">本地加密私鑰 (AES-GCM 密鑰)</label>
-        <input type="password" id="walletPrivateKey" placeholder="私鑰十六進制字串">
+      <!-- Reborn Card Generator Card -->
+      <div class="card">
+        <span class="card-title">🎴 Chamber 轉世聲明設定</span>
+        <div class="form-group" style="margin-bottom: 0;">
+          <textarea id="declarationText" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; color: var(--text-main); font-size: 11px; font-family: sans-serif; resize: vertical; min-height: 80px; outline: none; line-height: 1.4;" placeholder="輸入您的轉世聲明..."></textarea>
+        </div>
+        <button id="genCardBtn" class="btn-accent">⚡ 生成聲明並下載轉世卡</button>
       </div>
 
-      <div class="form-group">
-        <label for="imgurClientId">Imgur 備份網關 Client ID</label>
-        <input type="text" id="imgurClientId" placeholder="用於圖片/影片轉存">
-      </div>
-
-      <div class="checkbox-group">
-        <input type="checkbox" id="isEncryptionEnabled" checked>
-        <label for="isEncryptionEnabled" style="text-transform: none; font-size: 12px; font-weight: normal; color: var(--text-main);">
-          啟用限友貼文本地加密上鏈
-        </label>
+      <!-- Footer Buttons -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button id="toSettingsBtn" class="btn-secondary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          進階設定
+        </button>
+        <button id="viewDocsBtn" class="btn-secondary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          測試說明
+        </button>
       </div>
     </div>
 
-    <div class="card" style="margin-top: 10px;">
-      <div class="form-group">
-        <label for="declarationText">Chamber 轉世聲明文字</label>
-        <textarea id="declarationText" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 6px; padding: 8px; color: var(--text-main); font-size: 11px; font-family: sans-serif; resize: vertical; min-height: 100px; outline: none; line-height: 1.4;"></textarea>
+    <!-- 2. SETTINGS VIEW -->
+    <div id="settingsView" class="view hidden">
+      <div class="card">
+        <span class="card-title">⚙️ 進階核心設定</span>
+        
+        <!-- Wallet Address -->
+        <div class="form-group">
+          <label for="walletAddress">Web3 儲存帳號 (對應 Hash)</label>
+          <input type="text" id="walletAddress" placeholder="自動生成託管帳號">
+          <div class="field-desc">預設自動產生。亦可自訂輸入您的 Ethereum 錢包地址。</div>
+        </div>
+
+        <!-- Private / Encryption Key -->
+        <div class="form-group">
+          <label for="walletPrivateKey">貼文解密通行鑰 (AES Key)</label>
+          <input type="password" id="walletPrivateKey" placeholder="自動配置本地加密密鑰">
+          <div class="field-desc">用於本地加密限友貼文。已自動生成，您可複製備份供其他瀏覽器解密。</div>
+        </div>
+
+        <!-- Imgur Client ID -->
+        <div class="form-group">
+          <label for="imgurClientId">Imgur 圖片轉存金鑰 (選填)</label>
+          <input type="text" id="imgurClientId" placeholder="自訂 Imgur Client ID">
+          <div class="field-desc">未填寫時，系統將預設使用系統託管的 Cloudflare R2 備份儲存庫。</div>
+        </div>
+
+        <!-- Encryption Checkbox -->
+        <div class="checkbox-group">
+          <input type="checkbox" id="isEncryptionEnabled" checked>
+          <label for="isEncryptionEnabled" style="font-size: 11px; font-weight: normal; color: var(--text-main);">
+            啟用限友貼文本地加密上鏈 (AES-GCM)
+          </label>
+        </div>
       </div>
-      <button id="genCardBtn" style="width: 100%; margin-top: 8px; font-size: 12px; background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.3);">⚡ 生成聲明並下載轉世卡</button>
+
+      <!-- Action Buttons -->
+      <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 8px;">
+        <button id="saveBtn" class="btn-primary">💾 儲存並套用</button>
+        <button id="backBtn" class="btn-secondary">返回</button>
+      </div>
     </div>
 
-    <button id="saveBtn">儲存設定</button>
-
-    <div class="status-badge">
-      <div class="dot"></div>
-      <span>Chamber 核心引擎已啟動 (Arweave Gateway V3)</span>
+    <div class="footer-note">
+      Chamber Core V1.0.0 • Arweave Devnet
     </div>
   </div>
   <script src="popup.js"></script>
