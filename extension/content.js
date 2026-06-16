@@ -36,6 +36,12 @@ function getFacebookUserId() {
   return null;
 }
 
+// Track and isolate active Facebook User ID in storage for wallet mapping
+const initialFbUserId = getFacebookUserId();
+if (initialFbUserId) {
+  chrome.storage.local.set({ lastFbUserId: initialFbUserId });
+}
+
 // Check if the post belongs to the current user/page to prevent stealing
 function isOwnPost(article) {
   try {

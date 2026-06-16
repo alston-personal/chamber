@@ -61,42 +61,61 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 2. Load configurations and handle first-time initialization
-  chrome.storage.local.get(
-    ["nativeWalletAddress", "nativeWalletPrivateKey", "customWalletAddress", "customWalletPrivateKey", "imgurClientId", "isEncryptionEnabled", "lastEchoUrl", "lastFbUserIdHash"],
-    (data) => {
-      let nativeWalletAddress = data.nativeWalletAddress;
-      let nativeWalletPrivateKey = data.nativeWalletPrivateKey;
-      
-      // Auto-initialize custodial wallet if not set
-      if (!nativeWalletAddress) {
-        nativeWalletAddress = "0x" + generateRandomHex(20); // 20 bytes = 40 hex chars
-        nativeWalletPrivateKey = generateRandomHex(32); // 32 bytes = 64 hex chars
-        chrome.storage.local.set({ nativeWalletAddress, nativeWalletPrivateKey });
+  chrome.storage.local.get(["lastFbUserId", "imgurClientId"], (meta) => {
+    const userId = meta.lastFbUserId || "default";
+    const prefix = `user_${userId}_`;
+    
+    chrome.storage.local.get(
+      [
+        prefix + "nativeWalletAddress",
+        prefix + "nativeWalletPrivateKey",
+        prefix + "customWalletAddress",
+        prefix + "customWalletPrivateKey",
+        prefix + "isEncryptionEnabled",
+        prefix + "lastEchoUrl",
+        prefix + "lastFbUserIdHash"
+      ],
+      (data) => {
+        let nativeWalletAddress = data[prefix + "nativeWalletAddress"];
+        let nativeWalletPrivateKey = data[prefix + "nativeWalletPrivateKey"];
+        
+        // Auto-initialize custodial wallet if not set for this specific user
+        if (!nativeWalletAddress) {
+          nativeWalletAddress = "0x" + generateRandomHex(20); // 20 bytes = 40 hex chars
+          nativeWalletPrivateKey = generateRandomHex(32); // 32 bytes = 64 hex chars
+          const update = {};
+          update[prefix + "nativeWalletAddress"] = nativeWalletAddress;
+          update[prefix + "nativeWalletPrivateKey"] = nativeWalletPrivateKey;
+          chrome.storage.local.set(update);
+        }
+
+        // Display Native Wallet Address (Read-only)
+        document.getElementById("nativeWalletLabel").innerText = nativeWalletAddress;
+
+        // Populate Inputs with Custom Wallet configuration (blank = custodial)
+        walletAddressInput.value = data[prefix + "customWalletAddress"] || "";
+        walletPrivateKeyInput.value = data[prefix + "customWalletPrivateKey"] || "";
+        imgurClientIdInput.value = meta.imgurClientId || "";
+        if (data[prefix + "isEncryptionEnabled"] !== undefined) {
+          isEncryptionEnabledCheckbox.checked = data[prefix + "isEncryptionEnabled"];
+        } else {
+          isEncryptionEnabledCheckbox.checked = true; // default enabled
+        }
+
+        // Populate Timeline Link
+        const lastEchoUrl = data[prefix + "lastEchoUrl"];
+        if (lastEchoUrl) {
+          timelineUrlText.innerText = lastEchoUrl;
+          timelineUrlText.style.color = "#38bdf8"; // Active link color
+        } else {
+          timelineUrlText.innerText = "尚未激活，請先在 Facebook 備份...";
+          timelineUrlText.style.color = "#94a3b8"; // Muted color
+        }
+
+        declarationTextarea.value = DEFAULT_DECLARATION;
       }
-
-      // Display Native Wallet Address (Read-only)
-      document.getElementById("nativeWalletLabel").innerText = nativeWalletAddress;
-
-      // Populate Inputs with Custom Wallet configuration (blank = custodial)
-      walletAddressInput.value = data.customWalletAddress || "";
-      walletPrivateKeyInput.value = data.customWalletPrivateKey || "";
-      imgurClientIdInput.value = data.imgurClientId || "";
-      if (data.isEncryptionEnabled !== undefined) {
-        isEncryptionEnabledCheckbox.checked = data.isEncryptionEnabled;
-      }
-
-      // Populate Timeline Link
-      if (data.lastEchoUrl) {
-        timelineUrlText.innerText = data.lastEchoUrl;
-        timelineUrlText.style.color = "#38bdf8"; // Active link color
-      } else {
-        timelineUrlText.innerText = "尚未激活，請先在 Facebook 備份...";
-        timelineUrlText.style.color = "#94a3b8"; // Muted color
-      }
-
-      declarationTextarea.value = DEFAULT_DECLARATION;
-    }
-  );
+    );
+  });
 
   // 3. Save Settings Handler
   saveBtn.addEventListener("click", () => {
@@ -108,25 +127,30 @@ document.addEventListener("DOMContentLoaded", () => {
     saveBtn.innerText = "⏳ 儲存中...";
     saveBtn.disabled = true;
 
-    chrome.storage.local.set({
-      customWalletAddress,
-      customWalletPrivateKey,
-      imgurClientId,
-      isEncryptionEnabled
-    }, () => {
-      setTimeout(() => {
-        saveBtn.innerText = "💾 儲存成功！";
-        saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
-        
+    chrome.storage.local.get(["lastFbUserId"], (meta) => {
+      const userId = meta.lastFbUserId || "default";
+      const prefix = `user_${userId}_`;
+      
+      const update = { imgurClientId };
+      update[prefix + "customWalletAddress"] = customWalletAddress;
+      update[prefix + "customWalletPrivateKey"] = customWalletPrivateKey;
+      update[prefix + "isEncryptionEnabled"] = isEncryptionEnabled;
+
+      chrome.storage.local.set(update, () => {
         setTimeout(() => {
-          saveBtn.innerText = "💾 儲存並套用";
-          saveBtn.style.background = ""; // revert to class gradient
-          saveBtn.disabled = false;
-          // Return to dashboard after successful save
-          settingsView.classList.add("hidden");
-          dashboardView.classList.remove("hidden");
-        }, 1000);
-      }, 400);
+          saveBtn.innerText = "💾 儲存成功！";
+          saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+          
+          setTimeout(() => {
+            saveBtn.innerText = "💾 儲存並套用";
+            saveBtn.style.background = ""; // revert to class gradient
+            saveBtn.disabled = false;
+            // Return to dashboard after successful save
+            settingsView.classList.add("hidden");
+            dashboardView.classList.remove("hidden");
+          }, 1000);
+        }, 400);
+      });
     });
   });
 
@@ -160,25 +184,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 5. Copy Reborn Link Handler
   copyTimelineBtn.addEventListener("click", () => {
-    chrome.storage.local.get(["lastEchoUrl"], (data) => {
-      const targetUrl = data.lastEchoUrl || "";
-      if (!targetUrl) {
-        alert("請先完成首次備份以啟用重生牆網址！");
-        return;
-      }
-      
-      navigator.clipboard.writeText(targetUrl).then(() => {
-        copyTimelineBtn.innerText = "已複製！";
-        copyTimelineBtn.style.background = "rgba(16, 185, 129, 0.2)";
-        copyTimelineBtn.style.color = "#34d399";
-        copyTimelineBtn.style.borderColor = "rgba(16, 185, 129, 0.5)";
+    chrome.storage.local.get(["lastFbUserId"], (meta) => {
+      const userId = meta.lastFbUserId || "default";
+      const prefix = `user_${userId}_`;
+      chrome.storage.local.get([prefix + "lastEchoUrl"], (data) => {
+        const targetUrl = data[prefix + "lastEchoUrl"] || "";
+        if (!targetUrl) {
+          alert("請先完成首次備份以啟用重生牆網址！");
+          return;
+        }
         
-        setTimeout(() => {
-          copyTimelineBtn.innerText = "複製網址";
-          copyTimelineBtn.style.background = "";
-          copyTimelineBtn.style.color = "";
-          copyTimelineBtn.style.borderColor = "";
-        }, 1500);
+        navigator.clipboard.writeText(targetUrl).then(() => {
+          copyTimelineBtn.innerText = "已複製！";
+          copyTimelineBtn.style.background = "rgba(16, 185, 129, 0.2)";
+          copyTimelineBtn.style.color = "#34d399";
+          copyTimelineBtn.style.borderColor = "rgba(16, 185, 129, 0.5)";
+          
+          setTimeout(() => {
+            copyTimelineBtn.innerText = "複製網址";
+            copyTimelineBtn.style.background = "";
+            copyTimelineBtn.style.color = "";
+            copyTimelineBtn.style.borderColor = "";
+          }, 1500);
+        });
       });
     });
   });
@@ -201,11 +229,17 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[Chamber] Declaration text copied to clipboard.");
 
       // 2. Fetch or fallback target URL for the QR Code
-      const data = await new Promise((resolve) => {
-        chrome.storage.local.get(["lastEchoUrl", "customWalletAddress", "nativeWalletAddress"], resolve);
+      const meta = await new Promise((resolve) => {
+        chrome.storage.local.get(["lastFbUserId"], resolve);
       });
-      const activeWallet = data.customWalletAddress || data.nativeWalletAddress || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
-      const timelineUrl = data.lastEchoUrl || `https://studio.milkcat.org/echo/${activeWallet}/all`;
+      const userId = meta.lastFbUserId || "default";
+      const prefix = `user_${userId}_`;
+
+      const data = await new Promise((resolve) => {
+        chrome.storage.local.get([prefix + "lastEchoUrl", prefix + "customWalletAddress", prefix + "nativeWalletAddress"], resolve);
+      });
+      const activeWallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
+      const timelineUrl = data[prefix + "lastEchoUrl"] || `https://studio.milkcat.org/echo/${activeWallet}/all`;
 
       // 3. Create canvas
       const canvas = document.createElement("canvas");

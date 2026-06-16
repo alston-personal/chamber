@@ -13,13 +13,15 @@ const APP_NAME = "Chamber";
 const CHAMBER_API_BASE = "https://studio.milkcat.org/chamber-api";
 
 // Retrieve config from chrome storage and resolve the active wallet / key tier
-async function getExtensionConfig() {
+async function getExtensionConfig(fbUserId) {
+  const userId = fbUserId || "default";
+  const prefix = `user_${userId}_`;
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ["nativeWalletAddress", "nativeWalletPrivateKey", "customWalletAddress", "customWalletPrivateKey", "imgurClientId"],
+      [prefix + "nativeWalletAddress", prefix + "nativeWalletPrivateKey", prefix + "customWalletAddress", prefix + "customWalletPrivateKey", "imgurClientId"],
       (data) => {
-        const activeWallet = data.customWalletAddress || data.nativeWalletAddress || null;
-        const activeKey = data.customWalletPrivateKey || data.nativeWalletPrivateKey || null;
+        const activeWallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || null;
+        const activeKey = data[prefix + "customWalletPrivateKey"] || data[prefix + "nativeWalletPrivateKey"] || null;
         
         resolve({
           boundWalletAddress: activeWallet,
@@ -147,7 +149,8 @@ async function uploadViaChamberAPI(postPayload) {
 
 // Main Controller Flow
 async function processBackupTask(postData, isHistoric) {
-  const config = await getExtensionConfig();
+  const fbUserId = postData.fbUserId || postData.fb_user_id || null;
+  const config = await getExtensionConfig(fbUserId);
   console.log(`[Chamber] Processing backup task (Historic: ${isHistoric})`);
 
   // 1. Perform off-chain media fallback upload (image to Imgur/R2)
@@ -162,7 +165,7 @@ async function processBackupTask(postData, isHistoric) {
 
   // 2. Build API payload (custodial mode — server handles wallet signing)
   const apiPayload = {
-    fbUserId: postData.fbUserId || postData.fb_user_id || null,
+    fbUserId: fbUserId,
     content: postData.textContent || postData.content || "",
     platform: postData.platform || "facebook",
     mediaUrls: fallbackUrls.length > 0 ? fallbackUrls : mediaUrls,
@@ -178,11 +181,15 @@ async function processBackupTask(postData, isHistoric) {
   // 3. Upload via Chamber API (real Arweave upload, server pays with Irys Turbo free tier)
   const result = await uploadViaChamberAPI(apiPayload);
 
-  // Save timeline URL and hash to local storage for the popup dashboard
-  chrome.storage.local.set({
-    lastEchoUrl: result.echoUrl,
-    lastFbUserIdHash: result.fbUserIdHash
-  });
+  // Save timeline URL and hash to local storage for the popup dashboard under prefix
+  const userId = fbUserId || "default";
+  const prefix = `user_${userId}_`;
+  const update = {
+    lastFbUserId: userId
+  };
+  update[prefix + "lastEchoUrl"] = result.echoUrl;
+  update[prefix + "lastFbUserIdHash"] = result.fbUserIdHash;
+  chrome.storage.local.set(update);
 
   return {
     success: true,
