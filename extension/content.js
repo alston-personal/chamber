@@ -346,8 +346,16 @@ function fillTextAndImage(textbox, text, imageUrl) {
   textbox.focus();
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
-  document.execCommand('insertText', false, text);
-  console.log("[Chamber] Auto-filled composer textbox.");
+
+  // Convert newlines to HTML blocks so Draft.js/React rich editor preserves layout
+  const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const htmlText = text
+    .split("\n")
+    .map(line => line === "" ? "<br>" : `<div>${escapeHtml(line)}</div>`)
+    .join("");
+
+  document.execCommand('insertHTML', false, htmlText);
+  console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
 
   // Upload image if provided
   if (imageUrl) {
