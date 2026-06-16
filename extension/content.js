@@ -323,22 +323,51 @@ function findComposerButton() {
   return document.querySelector('div[role="main"] div[role="button"]');
 }
 
-function findPhotoBtn() {
-  const selectors = [
-    'div[role="dialog"] div[role="button"]',
-    'div[role="dialog"] i',
-    'div[role="main"] div[role="button"]',
-    'div[role="button"]',
-    'i'
-  ];
-  for (const selector of selectors) {
-    const elements = document.querySelectorAll(selector);
-    for (const el of elements) {
-      const label = el.getAttribute('aria-label') || el.innerText || "";
-      if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
-        return el.closest('div[role="button"]') || el;
+function findComposerTextbox() {
+  // 1. Try modal dialog first - this is the most specific and safe
+  const modalTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]');
+  if (modalTextbox) return modalTextbox;
+
+  // 2. Query all textboxes and filter out comment/reply elements
+  const textboxes = document.querySelectorAll('div[role="textbox"]');
+  for (const box of textboxes) {
+    const label = box.getAttribute('aria-label') || "";
+    // If it contains comment/reply keywords, ignore it
+    if (label.includes("留言") || label.includes("回覆") || label.includes("comment") || label.includes("reply")) {
+      continue;
+    }
+    return box;
+  }
+  return null;
+}
+
+function findPhotoBtn(textbox) {
+  if (!textbox) return null;
+  let parent = textbox;
+  while (parent && parent !== document.body) {
+    const selectors = ['div[role="button"]', 'i', 'div'];
+    for (const selector of selectors) {
+      const elements = parent.querySelectorAll(selector);
+      for (const el of elements) {
+        const label = el.getAttribute('aria-label') || el.innerText || "";
+        if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
+          const btn = el.closest('div[role="button"]') || el;
+          if (btn) return btn;
+        }
       }
     }
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+function findFileInput(textbox) {
+  if (!textbox) return null;
+  let parent = textbox;
+  while (parent && parent !== document.body) {
+    const input = parent.querySelector('input[type="file"]');
+    if (input) return input;
+    parent = parent.parentElement;
   }
   return null;
 }
@@ -379,14 +408,13 @@ function fillText(textbox, text) {
 }
 
 function handleOpenComposerAndFill(text, imageUrl) {
-  const textbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
-                  document.querySelector('div[role="textbox"]');
+  const textbox = findComposerTextbox();
 
   if (textbox) {
     if (imageUrl) {
-      const fileInput = document.querySelector('input[type="file"]');
+      const fileInput = findFileInput(textbox);
       if (!fileInput) {
-        const photoBtn = findPhotoBtn();
+        const photoBtn = findPhotoBtn(textbox);
         if (photoBtn) {
           console.log("[Chamber] Photo mode not active, switching to photo mode...");
           photoBtn.click();
@@ -394,12 +422,11 @@ function handleOpenComposerAndFill(text, imageUrl) {
           let attempts = 0;
           const interval = setInterval(() => {
             attempts++;
-            const activeFileInput = document.querySelector('input[type="file"]');
+            const activeFileInput = findFileInput(textbox);
             if (activeFileInput) {
               clearInterval(interval);
               setTimeout(() => {
-                const freshTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
-                                     document.querySelector('div[role="textbox"]');
+                const freshTextbox = findComposerTextbox();
                 if (freshTextbox) {
                   fillText(freshTextbox, text);
                 }
@@ -412,6 +439,9 @@ function handleOpenComposerAndFill(text, imageUrl) {
             }
           }, 100);
           return;
+        } else {
+          console.warn("[Chamber] Photo button not found relative to textbox.");
+          fillText(textbox, text);
         }
       } else {
         // Photo mode is already active
@@ -435,8 +465,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const activeTextbox = document.querySelector('div[role="dialog"] div[role="textbox"]') || 
-                            document.querySelector('div[role="textbox"]');
+      const activeTextbox = findComposerTextbox();
       if (activeTextbox) {
         clearInterval(interval);
         setTimeout(() => {
