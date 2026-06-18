@@ -152,6 +152,20 @@ async function processBackupTask(postData, isHistoric) {
   const fbUserId = postData.fbUserId || postData.fb_user_id || null;
   const config = await getExtensionConfig(fbUserId);
   console.log(`[Chamber] Processing backup task (Historic: ${isHistoric})`);
+  const userId = fbUserId || "default";
+  const prefix = `user_${userId}_`;
+  const mappingData = await new Promise((resolve) => {
+    chrome.storage.local.get(
+      [
+        prefix + "identityAlias",
+        prefix + "identityPlatform",
+        prefix + "identityDisplayName",
+        prefix + "identityActorType",
+        prefix + "identityActorId",
+      ],
+      resolve
+    );
+  });
 
   // 1. Perform off-chain media fallback upload (image to Imgur/R2)
   let fallbackUrls = [];
@@ -167,13 +181,17 @@ async function processBackupTask(postData, isHistoric) {
   const apiPayload = {
     fbUserId: fbUserId,
     content: postData.textContent || postData.content || "",
-    platform: postData.platform || "facebook",
+    platform: mappingData[prefix + "identityPlatform"] || postData.platform || "facebook",
     mediaUrls: fallbackUrls.length > 0 ? fallbackUrls : mediaUrls,
     privacy: postData.privacy || "PUBLIC",
     timestamp: postData.timestamp || Math.floor(Date.now() / 1000),
     // If user has bound a wallet, include it for the binding claim
     boundWallet: config.boundWalletAddress || null,
     sourceUrl: postData.sourceUrl || null,
+    identityAlias: mappingData[prefix + "identityAlias"] || null,
+    identityDisplayName: mappingData[prefix + "identityDisplayName"] || null,
+    identityActorType: mappingData[prefix + "identityActorType"] || "personal",
+    identityActorId: mappingData[prefix + "identityActorId"] || fbUserId || "default",
   };
 
   console.log("[Chamber] Sending payload to Chamber API...");
@@ -182,8 +200,6 @@ async function processBackupTask(postData, isHistoric) {
   const result = await uploadViaChamberAPI(apiPayload);
 
   // Save timeline URL and hash to local storage for the popup dashboard under prefix
-  const userId = fbUserId || "default";
-  const prefix = `user_${userId}_`;
   const update = {
     lastFbUserId: userId
   };

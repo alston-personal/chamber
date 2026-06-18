@@ -44,6 +44,7 @@ export default function PlatformFeed({
   params: Promise<{ wallet_address: string; platform: string }>;
 }) {
   const [walletAddress, setWalletAddress] = useState<string>("");
+  const [resolvedIdentityKey, setResolvedIdentityKey] = useState<string>("");
   const [currentPlatform, setCurrentPlatform] = useState<string>("all");
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,6 +61,32 @@ export default function PlatformFeed({
       setCurrentPlatform(p.platform.toLowerCase());
     });
   }, [params]);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    const looksLikeStableHash = walletAddress.startsWith("0x") || /^[a-f0-9]{32,64}$/i.test(walletAddress);
+    if (looksLikeStableHash) {
+      return;
+    }
+
+    const resolveAlias = async () => {
+      try {
+        const response = await fetch(`https://studio.milkcat.org/chamber-api/identity/resolve?alias=${encodeURIComponent(walletAddress)}&platform=${encodeURIComponent(currentPlatform)}`);
+        if (!response.ok) {
+          setResolvedIdentityKey(walletAddress);
+          return;
+        }
+        const data = await response.json();
+        setResolvedIdentityKey(data.contentKey || walletAddress);
+      } catch (err) {
+        console.warn("[Chamber] Alias resolution failed, falling back to route param:", err);
+        setResolvedIdentityKey(walletAddress);
+      }
+    };
+
+    resolveAlias();
+  }, [walletAddress, currentPlatform]);
 
   // Connect Web3 Wallet
   const connectWallet = async () => {
@@ -88,7 +115,10 @@ export default function PlatformFeed({
 
   // Fetch posts from Arweave/Irys GraphQL Indexer with dynamic platform & tag parameters
   useEffect(() => {
-    if (!walletAddress || !currentPlatform) return;
+    const looksLikeStableHash = walletAddress.startsWith("0x") || /^[a-f0-9]{32,64}$/i.test(walletAddress);
+    const queryIdentityKey = looksLikeStableHash ? walletAddress : (resolvedIdentityKey || walletAddress);
+    const queryTagName = looksLikeStableHash ? "FB-User-Hash" : "Identity-Key";
+    if (!queryIdentityKey || !currentPlatform) return;
 
     const fetchPosts = async () => {
       setLoading(true);
@@ -96,7 +126,7 @@ export default function PlatformFeed({
         // Build GraphQL tags matching user inputs
         const tagsFilter = [
           `{ name: "App-Name", values: ["Chamber"] }`,
-          `{ name: "FB-User-Hash", values: ["${walletAddress}"] }`
+          `{ name: "${queryTagName}", values: ["${queryIdentityKey}"] }`
         ];
 
         if (currentPlatform !== "all") {
@@ -205,7 +235,7 @@ export default function PlatformFeed({
     };
 
     fetchPosts();
-  }, [walletAddress, currentPlatform, activeTag]);
+  }, [walletAddress, resolvedIdentityKey, currentPlatform, activeTag, searchParams]);
 
   // Client-Side Cryptographic Decryption Function
   const handleDecryptPost = async (post: PostItem, index: number) => {

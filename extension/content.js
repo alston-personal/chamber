@@ -255,9 +255,12 @@ function processDOM() {
     // Check if we already injected a button for this article to prevent duplication
     if (article.dataset.chamberInjected) return;
 
-    // 1. Exclude comments: comments do NOT have h2 tags (which FB uses for post headers)
-    const heading = article.querySelector('div[data-testid="UserContentHeader"]') || 
-                    article.querySelector('h2');
+    // 1. Exclude obvious comment/reply blocks while keeping post cards broad enough
+    const heading = article.querySelector('div[data-testid="UserContentHeader"]') ||
+                    article.querySelector('h2') ||
+                    article.querySelector('div[data-ad-preview="message"]') ||
+                    article.querySelector('div[data-testid="post_message"]') ||
+                    article.querySelector('div[dir="auto"]');
     if (!heading) return;
 
     // 2. Exclude other users' posts to prevent abuse/stealing
@@ -285,7 +288,8 @@ function processDOM() {
     });
 
     container.appendChild(btn);
-    heading.parentNode.insertBefore(container, heading.nextSibling);
+    const anchor = heading.parentNode || article;
+    anchor.insertBefore(container, heading.nextSibling || null);
   });
 }
 
@@ -314,51 +318,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function findComposerButton() {
   const main = document.querySelector('div[role="main"]') || document;
-  
-  // 1. Search visible text-only leaf elements inside main content area first
-  const mainElements = main.querySelectorAll('span, p, button, a');
+  const composerLabels = [
+    "在想些什麼",
+    "你在想些什麼",
+    "What are you thinking",
+    "What's on your mind",
+    "What’s on your mind",
+    "Share what's on your mind",
+    "分享你的想法",
+    "分享近況",
+    "Create a post",
+    "想分享什麼",
+    "建立貼文",
+    "寫些什麼",
+    "發佈貼文",
+    "開始發文",
+    "Write something"
+  ];
+
+  const mainElements = main.querySelectorAll('span, p, button, a, div[role="button"]');
   for (const el of mainElements) {
     const text = el.innerText || el.textContent || "";
-    // Ensure we match the short label text (not a huge block of layout text)
-    if (text.length < 50 && (
-        text.includes("在想些什麼") || 
-        text.includes("Create a post") || 
-        text.includes("想分享什麼") || 
-        text.includes("建立貼文") || 
-        text.includes("寫些什麼")
-    )) {
+    if (text.length < 80 && composerLabels.some(label => text.includes(label))) {
       const btn = el.closest('div[role="button"]') || el.closest('a') || el;
       if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-        console.log("[Chamber] Identified visible composer button inside main feed:", btn, "Text:", text);
-        return btn;
-      }
-    }
-  }
-  
-  // 2. Search globally in spans/p/button/a as fallback
-  const globalElements = document.querySelectorAll('span, p, button, a');
-  for (const el of globalElements) {
-    const text = el.innerText || el.textContent || "";
-    if (text.length < 50 && (
-        text.includes("在想些什麼") || 
-        text.includes("Create a post") || 
-        text.includes("想分享什麼") || 
-        text.includes("建立貼文") || 
-        text.includes("寫些什麼")
-    )) {
-      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
-      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-        console.log("[Chamber] Identified visible composer button globally:", btn, "Text:", text);
         return btn;
       }
     }
   }
 
-  // 3. Last resort fallback
-  const fallback = document.querySelector('div[role="main"] div[role="button"]') || 
-                   document.querySelector('div[role="button"]');
-  console.warn("[Chamber] Composer button search fell back to default query:", fallback);
-  return fallback;
+  const globalElements = document.querySelectorAll('span, p, button, a, div[role="button"]');
+  for (const el of globalElements) {
+    const text = el.innerText || el.textContent || "";
+    if (text.length < 80 && composerLabels.some(label => text.includes(label))) {
+      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
+      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+        return btn;
+      }
+    }
+  }
+
+  const textboxes = document.querySelectorAll('div[role="textbox"], div[contenteditable="true"]');
+  for (const box of textboxes) {
+    const label = (box.getAttribute('aria-label') || box.getAttribute('placeholder') || box.innerText || "").trim();
+    if (label && composerLabels.some(keyword =>
+      label.includes(keyword) || keyword.includes(label)
+    )) {
+      if (box.offsetWidth > 0 || box.offsetHeight > 0) {
+        return box.closest('div[role="button"]') || box.closest('form') || box;
+      }
+    }
+  }
+
+  return document.querySelector('div[role="main"] div[role="button"]') ||
+    document.querySelector('div[role="button"]') ||
+    document.querySelector('div[role="main"] div[role="textbox"]') ||
+    document.querySelector('div[role="main"] div[contenteditable="true"]');
 }
 
 function findComposerContainer(textbox) {
@@ -370,6 +385,12 @@ function findComposerContainer(textbox) {
 }
 
 function findComposerTextbox(container = document) {
+  // If the container itself is the dialog, check it first
+  if (container !== document && container.getAttribute('role') === 'dialog') {
+    const box = container.querySelector('div[role="textbox"]');
+    if (box && (box.offsetWidth > 0 || box.offsetHeight > 0)) return box;
+  }
+
   // 1. Try modal dialog first inside the container - this is the most specific and safe
   const modalTextbox = container.querySelector('div[role="dialog"] div[role="textbox"]');
   if (modalTextbox && (modalTextbox.offsetWidth > 0 || modalTextbox.offsetHeight > 0)) {
@@ -391,50 +412,71 @@ function findComposerTextbox(container = document) {
   return null;
 }
 
-function findPhotoBtn(container) {
-  if (!container) return null;
-  const selectors = ['div[role="button"]', 'i', 'div'];
+function findPhotoBtn() {
+  const selectors = [
+    'div[role="dialog"] div[role="button"]',
+    'div[role="dialog"] i',
+    'div[role="main"] div[role="button"]',
+    'div[role="button"]',
+    'i'
+  ];
   for (const selector of selectors) {
-    const elements = container.querySelectorAll(selector);
+    const elements = document.querySelectorAll(selector);
     for (const el of elements) {
       const label = el.getAttribute('aria-label') || el.innerText || "";
       if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
-        const btn = el.closest('div[role="button"]') || el;
-        if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-          return btn;
-        }
+        return el.closest('div[role="button"]') || el;
       }
     }
   }
   return null;
 }
 
-function findFileInput(container) {
-  if (!container) return null;
-  return container.querySelector('input[type="file"]');
+function findFileInput() {
+  return document.querySelector('div[role="dialog"] input[type="file"]');
 }
 
-function triggerUpload(fileInput, imageUrl) {
-  if (!imageUrl) return;
-  fetch(imageUrl)
-    .then(res => res.blob())
-    .then(blob => {
-      try {
-        const file = new File([blob], "chamber-reborn-card.png", { type: "image/png" });
-        const container = new DataTransfer();
-        container.items.add(file);
-        fileInput.files = container.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log("[Chamber] Reborn card image auto-uploaded successfully.");
-      } catch (err) {
-        console.error("[Chamber] Auto-upload file trigger failed:", err);
-      }
-    })
-    .catch(err => console.error("[Chamber] Failed to fetch image blob:", err));
+function triggerUpload(fileInput, blob) {
+  try {
+    const file = new File([blob], "chamber-reborn-card.png", { type: "image/png" });
+    const container = new DataTransfer();
+    container.items.add(file);
+    fileInput.files = container.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    console.log("[Chamber] Reborn card image auto-uploaded successfully.");
+  } catch (err) {
+    console.error("[Chamber] Auto-upload file trigger failed:", err);
+  }
+}
+
+function activateElement(el) {
+  if (!el) return;
+  const options = { bubbles: true, cancelable: true, view: window };
+  try {
+    el.dispatchEvent(new MouseEvent("mousedown", options));
+    el.dispatchEvent(new MouseEvent("mouseup", options));
+    el.dispatchEvent(new MouseEvent("click", options));
+  } catch (err) {
+    console.debug("[Chamber] Synthetic mouse events failed, falling back to click():", err);
+    el.click();
+  }
 }
 
 function fillText(textbox, text) {
   textbox.focus();
+
+  // Explicitly set the window selection range to the textbox.
+  // This is required when focusing asynchronously, as window selection might be lost when the popup window closes.
+  try {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(textbox);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  } catch (selectErr) {
+    console.debug("[Chamber] Failed to set selection range:", selectErr);
+  }
+
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
 
@@ -442,90 +484,127 @@ function fillText(textbox, text) {
   const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const htmlText = text
     .split("\n")
-    .map(line => line === "" ? "<br>" : `<div>${escapeHtml(line)}</div>`)
+    .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
     .join("");
 
   document.execCommand('insertHTML', false, htmlText);
   console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
 }
 
-function handleOpenComposerAndFill(text, imageUrl) {
-  const textbox = findComposerTextbox();
+function pasteText(textbox, text) {
+  if (!textbox) return false;
 
-  if (textbox) {
-    // Locate the stable ancestor card/dialog container
-    const container = findComposerContainer(textbox);
-
-    if (imageUrl) {
-      const fileInput = findFileInput(container);
-      if (!fileInput) {
-        const photoBtn = findPhotoBtn(container);
-        if (photoBtn) {
-          console.log("[Chamber] Photo mode not active, switching to photo mode...");
-          photoBtn.click();
-          
-          let attempts = 0;
-          const interval = setInterval(() => {
-            attempts++;
-            const activeFileInput = findFileInput(container);
-            if (activeFileInput) {
-              clearInterval(interval);
-              setTimeout(() => {
-                const freshTextbox = findComposerTextbox(container);
-                if (freshTextbox) {
-                  fillText(freshTextbox, text);
-                }
-                triggerUpload(activeFileInput, imageUrl);
-              }, 400); // Buffer for layout to stabilize
-            } else if (attempts > 20) {
-              clearInterval(interval);
-              console.warn("[Chamber] Photo file input did not render, fallback...");
-              fillText(textbox, text);
-              alert("⚠️ 聲明文字已為您填入！由於 Facebook 介面更新，圖片自動上傳受阻，請手動點擊發文框的『相片/影片』按鈕並按下 Ctrl+V 貼上轉世卡即可發佈！");
-            }
-          }, 100);
-          return;
-        } else {
-          console.warn("[Chamber] Photo button not found inside composer container.");
-          fillText(textbox, text);
-          alert("⚠️ 聲明文字已為您填入！由於 Facebook 介面更新，未找到圖片上傳按鈕，請手動點擊發文框的『相片/影片』按鈕並按下 Ctrl+V 貼上轉世卡！");
-        }
-      } else {
-        // Photo mode is already active
-        fillText(textbox, text);
-        triggerUpload(fileInput, imageUrl);
-        return;
-      }
-    } else {
-      // No image, just write text
-      fillText(textbox, text);
-      return;
-    }
+  textbox.focus();
+  try {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(textbox);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  } catch (err) {
+    console.debug("[Chamber] Failed to prime selection for paste:", err);
   }
 
-  // If textbox was not found, click the main composer button to open it
+  try {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData("text/plain", text);
+    const pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData
+    });
+    const accepted = textbox.dispatchEvent(pasteEvent);
+    console.log("[Chamber] Synthetic paste event dispatched:", accepted);
+    return accepted;
+  } catch (err) {
+    console.debug("[Chamber] Synthetic paste event failed:", err);
+    return false;
+  }
+}
+
+function getActiveComposerTextbox() {
+  return document.querySelector('div[role="dialog"] div[role="textbox"]') ||
+    document.querySelector('div[role="textbox"]');
+}
+
+function fillTextAndImage(textbox, text, imageUrl) {
+  fillText(textbox, text);
+
+  if (!imageUrl) {
+    return;
+  }
+
+  const restoreText = () => {
+    const activeTextbox = getActiveComposerTextbox() || textbox;
+    if (!pasteText(activeTextbox, text)) {
+      fillText(activeTextbox, text);
+    }
+  };
+
+  fetch(imageUrl)
+    .then(res => res.blob())
+    .then(blob => {
+      let fileInput = findFileInput();
+      if (!fileInput) {
+        const photoBtn = findPhotoBtn();
+        if (photoBtn) {
+          console.log("[Chamber] Photo mode not active, switching to photo mode...");
+          activateElement(photoBtn);
+          setTimeout(() => {
+            fileInput = findFileInput();
+            if (fileInput) {
+              triggerUpload(fileInput, blob);
+              setTimeout(restoreText, 800);
+              return;
+            }
+            console.warn("[Chamber] Photo file input did not render after click.");
+            restoreText();
+          }, 600);
+        } else {
+          console.warn("[Chamber] Photo button not found inside composer container.");
+          restoreText();
+        }
+        return;
+      }
+
+      triggerUpload(fileInput, blob);
+      setTimeout(restoreText, 800);
+    })
+    .catch(err => {
+      console.error("[Chamber] Failed to fetch image blob:", err);
+      restoreText();
+    });
+}
+
+function handleOpenComposerAndFill(text, imageUrl) {
+  const textbox = getActiveComposerTextbox();
+  if (textbox) {
+    fillTextAndImage(textbox, text, imageUrl);
+    return;
+  }
+
   const btn = findComposerButton();
   if (btn) {
     console.log("[Chamber] Found composer button, clicking it...");
-    btn.click();
-    
+    activateElement(btn);
+
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const activeTextbox = findComposerTextbox();
+      const activeTextbox = getActiveComposerTextbox();
       if (activeTextbox) {
         clearInterval(interval);
         setTimeout(() => {
-          handleOpenComposerAndFill(text, imageUrl);
+          fillTextAndImage(activeTextbox, text, imageUrl);
         }, 400); // Buffer for composer dialog to render
       } else if (attempts > 30) {
         clearInterval(interval);
         console.warn("[Chamber] Failed to find composer textbox after clicking.");
-        alert("🛡️ Chamber 已將『轉世聲明文字與卡片圖片』複製至剪貼簿！由於臉書介面更動，我們未能自動開啟發文框。請您手動點擊臉書的『在想些什麼...』，並直接按下 Ctrl+V 貼上即可完美發佈！");
       }
     }, 100);
   } else {
     console.warn("[Chamber] Could not locate any Facebook post composer button.");
-    alert("🛡️ Chamber 已將『轉世聲明文字與卡片圖片』複製至剪貼簿！由於臉書介面更動，未能自動定位發文按鈕。請您手動點擊臉書的『在想些什麼...』，並直接按下 Ctrl+V 貼上即可完美發佈！");
+    alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
   }
 }

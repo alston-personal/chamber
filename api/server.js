@@ -10,6 +10,18 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const {
+  getRegistry,
+  resolveIdentity,
+  registerIdentity,
+  transferIdentity,
+  checkAliasAvailability,
+  normalizeAlias,
+  normalizePlatform,
+  normalizeActorType,
+  platformSlug,
+  stableContentKey,
+} = require("./identity-registry");
 
 const app = express();
 const PORT = 3011;
@@ -77,10 +89,89 @@ router.get("/health", (req, res) => {
   });
 });
 
+// ── Identity registry and alias mapping endpoints ──
+router.get("/identity", async (req, res) => {
+  try {
+    const store = await getRegistry();
+    res.json({ success: true, updatedAt: store.updatedAt, identities: store.identities, aliases: store.aliases });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Failed to read registry" });
+  }
+});
+
+router.get("/identity/resolve", async (req, res) => {
+  try {
+    const alias = normalizeAlias(req.query.alias || req.query.id);
+    if (!alias) {
+      return res.status(400).json({ error: "alias is required" });
+    }
+    const platform = req.query.platform ? normalizePlatform(req.query.platform) : "";
+    const identity = await resolveIdentity({ alias, platform: platform || undefined });
+    if (!identity) {
+      return res.status(404).json({ error: "identity not found" });
+    }
+    return res.json({
+      success: true,
+      alias: identity.alias,
+      platform: identity.platform,
+      platformSlug: identity.platform_slug,
+      actorType: identity.actor_type,
+      actorId: identity.actor_id,
+      displayName: identity.display_name,
+      currentWallet: identity.current_wallet,
+      contentKey: identity.content_key,
+      canonicalUrl: identity.canonical_url,
+      bindingStatus: identity.binding_status,
+      bindingVersion: identity.binding_version,
+      bindingHistory: identity.binding_history || [],
+      transferHistory: identity.transfer_history || [],
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to resolve identity" });
+  }
+});
+
+router.get("/identity/check", async (req, res) => {
+  try {
+    const alias = normalizeAlias(req.query.alias || req.query.id);
+    if (!alias) {
+      return res.status(400).json({ error: "alias is required" });
+    }
+    const result = await checkAliasAvailability({
+      alias,
+      walletAddress: req.query.walletAddress || req.query.wallet || "",
+    });
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to check alias" });
+  }
+});
+
+router.post("/identity/register", async (req, res) => {
+  try {
+    const identity = await registerIdentity(req.body || {});
+    return res.json({ success: true, identity });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to register identity" });
+  }
+});
+
+router.post("/identity/transfer", async (req, res) => {
+  try {
+    const identity = await transferIdentity(req.body || {});
+    return res.json({ success: true, identity });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to transfer identity" });
+  }
+});
+
 // ── POST /backup — main upload endpoint ──
 router.post("/backup", async (req, res) => {
   try {
-    const { fbUserId, content, platform, mediaUrls, privacy, timestamp, isDebug, sourceUrl, boundWallet } = req.body;
+    const { fbUserId, content, platform, mediaUrls, privacy, timestamp, isDebug, sourceUrl, boundWallet, identityAlias, identityActorType, identityActorId, identityDisplayName } = req.body;
     const isDebugMode = isDebug === true || isDebug === "true";
 
     if (!content || content.trim().length === 0) {
@@ -89,12 +180,42 @@ router.post("/backup", async (req, res) => {
 
     // Hash FB user ID for on-chain storage (privacy protection)
     const fbUserIdHash = fbUserId ? hashFbUserId(fbUserId) : "anonymous";
+    const normalizedAlias = identityAlias ? normalizeAlias(identityAlias) : "";
+    const normalizedPlatform = normalizePlatform(platform || "facebook");
+    const normalizedActorType = normalizeActorType(identityActorType || "personal");
+    const identityContentKey = normalizedAlias
+      ? stableContentKey({
+          identityAlias: normalizedAlias,
+          fbUserIdHash,
+          platform: normalizedPlatform,
+          actorType: normalizedActorType,
+          actorId: identityActorId || fbUserId || "default",
+        })
+      : fbUserIdHash;
+    const canonicalUrl = normalizedAlias
+      ? `https://studio.milkcat.org/echo/${normalizedAlias}/${platformSlug(normalizedPlatform)}`
+      : `https://studio.milkcat.org/echo/${fbUserIdHash}/all`;
+
+    if (normalizedAlias && boundWallet) {
+      await registerIdentity({
+        alias: normalizedAlias,
+        platform: normalizedPlatform,
+        actorType: normalizedActorType,
+        actorId: identityActorId || fbUserId || "default",
+        displayName: identityDisplayName || normalizedAlias,
+        walletAddress: boundWallet,
+        fbUserIdHash,
+        proof: req.body.identityProof || "",
+      });
+    }
 
     // Build Arweave payload
     const payload = {
       protocol_version: PROTOCOL_VERSION,
       app_name: APP_NAME,
       fb_user_id_hash: fbUserIdHash,
+      identity_alias: normalizedAlias || null,
+      identity_key: identityContentKey,
       author_wallet: boundWallet || "CUSTODIAL", // store active wallet address (custodial or custom)
       timestamp: timestamp || Math.floor(Date.now() / 1000),
       platform: platform || "facebook",
@@ -128,6 +249,10 @@ router.post("/backup", async (req, res) => {
       if (boundWallet) {
         tags.push({ name: "Author-Wallet", value: boundWallet });
       }
+      if (normalizedAlias) {
+        tags.push({ name: "Identity-Alias", value: normalizedAlias });
+        tags.push({ name: "Identity-Key", value: identityContentKey });
+      }
 
       const receipt = await irys.upload(jsonStr, { tags });
       txId = receipt.id;
@@ -140,8 +265,11 @@ router.post("/backup", async (req, res) => {
       success: true,
       txId,
       arweaveUrl: `https://devnet.irys.xyz/${txId}`,
-      echoUrl: `https://studio.milkcat.org/echo/${fbUserIdHash}/all`,
+      echoUrl: canonicalUrl,
       fbUserIdHash,
+      identityAlias: normalizedAlias || null,
+      identityKey: identityContentKey,
+      canonicalUrl,
       sizeBytes,
     });
   } catch (err) {

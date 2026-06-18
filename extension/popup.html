@@ -291,6 +291,23 @@
 
     <!-- 1. DASHBOARD VIEW -->
     <div id="dashboardView" class="view">
+      <div class="card" style="border-color: rgba(59, 130, 246, 0.28); background: rgba(30, 41, 59, 0.55);">
+        <span class="card-title">🚦 開始前檢查</span>
+        <div class="tip-text" style="font-size: 11px; line-height: 1.5;">
+          先設定並通過暱稱 mapping，系統才會開放一鍵聲明與備份。
+          這樣每個帳號、平台、錢包的對應才不會混掉。
+        </div>
+      </div>
+
+      <!-- Identity Binding Summary -->
+      <div class="card">
+        <span class="card-title">🪪 身份映射</span>
+        <div class="url-wrapper" style="align-items: flex-start; flex-direction: column; gap: 4px;">
+          <span id="identityAliasSummary" class="url-text" style="white-space: normal; line-height: 1.4; overflow: visible; text-overflow: clip;">尚未設定暱稱，請到進階設定建立 mapping。</span>
+          <span id="identityWalletSummary" class="tip-text" style="margin-top: 0;">目前會顯示這個別名對應的錢包與平台。</span>
+        </div>
+      </div>
+
       <!-- Reborn Portal Link Card -->
       <div class="card">
         <span class="card-title">🛡️ 我的去中心化重生時光軸</span>
@@ -306,6 +323,9 @@
       <!-- Reborn Card Generator Card -->
       <div class="card">
         <span class="card-title">🎴 Chamber 轉世聲明設定</span>
+        <div class="tip-text" style="font-size: 11px; line-height: 1.5;">
+          只有完成身份暱稱綁定後，這個按鈕才會啟用。
+        </div>
         <div class="form-group" style="margin-bottom: 0;">
           <textarea id="declarationText" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; color: var(--text-main); font-size: 11px; font-family: sans-serif; resize: vertical; min-height: 80px; outline: none; line-height: 1.4;" placeholder="輸入您的轉世聲明..."></textarea>
         </div>
@@ -330,6 +350,16 @@
       <div class="card">
         <span class="card-title">⚙️ 進階核心設定</span>
         
+        <!-- Identity Alias -->
+        <div class="form-group">
+          <label for="identityAlias">身份暱稱 / 官網別名</label>
+          <input type="text" id="identityAlias" placeholder="例如：abcde">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button id="checkAliasBtn" class="small-btn" type="button">檢查可用性</button>
+            <div id="aliasStatus" class="field-desc" style="flex: 1;">將用於官網短網址，例如 <code>/echo/abcde/fb</code></div>
+          </div>
+        </div>
+
         <!-- Wallet Address -->
         <div class="form-group">
           <label for="walletAddress">自訂 Web3 儲存帳號 (優先使用)</label>

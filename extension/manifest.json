@@ -10,7 +10,8 @@
     "tabs"
   ],
   "host_permissions": [
-    "*://*.facebook.com/*"
+    "*://*.facebook.com/*",
+    "https://studio.milkcat.org/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -15,18 +15,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveBtn = document.getElementById("saveBtn");
   const viewDocsBtn = document.getElementById("viewDocsBtn");
   
+  const identityAliasInput = document.getElementById("identityAlias");
+  const checkAliasBtn = document.getElementById("checkAliasBtn");
+  const aliasStatus = document.getElementById("aliasStatus");
   const walletAddressInput = document.getElementById("walletAddress");
   const walletPrivateKeyInput = document.getElementById("walletPrivateKey");
   const imgurClientIdInput = document.getElementById("imgurClientId");
   const isEncryptionEnabledCheckbox = document.getElementById("isEncryptionEnabled");
   
   const timelineUrlText = document.getElementById("timelineUrlText");
+  const identityAliasSummary = document.getElementById("identityAliasSummary");
+  const identityWalletSummary = document.getElementById("identityWalletSummary");
   const copyTimelineBtn = document.getElementById("copyTimelineBtn");
   const declarationTextarea = document.getElementById("declarationText");
   const genCardBtn = document.getElementById("genCardBtn");
   
   const connectionDot = document.getElementById("connectionDot");
   const connectionBadge = document.getElementById("connectionBadge");
+  let aliasCheckTimer = null;
+  let lastAliasCheckResult = null;
 
   const DEFAULT_DECLARATION = `【本人樂觀開朗之 Web3 轉世聲明】
 
@@ -60,6 +67,119 @@ document.addEventListener("DOMContentLoaded", () => {
     return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
+  function detectPlatform(url) {
+    if (!url) return "facebook";
+    if (url.includes("instagram.com")) return "instagram";
+    if (url.includes("threads.net")) return "threads";
+    if (url.includes("x.com") || url.includes("twitter.com")) return "x";
+    return "facebook";
+  }
+
+  async function checkAliasAvailability(alias, walletAddress) {
+    const url = new URL("https://studio.milkcat.org/chamber-api/identity/check");
+    url.searchParams.set("alias", alias);
+    if (walletAddress) {
+      url.searchParams.set("walletAddress", walletAddress);
+    }
+    const response = await fetch(url.toString());
+    return response.ok ? response.json() : { success: false, error: "check failed" };
+  }
+
+  async function runAliasCheck({ quiet = false } = {}) {
+    const alias = identityAliasInput?.value.trim() || "";
+    if (!alias) {
+      lastAliasCheckResult = null;
+      renderAliasStatus(null);
+      setComposerReady(false, "");
+      return null;
+    }
+
+    if (!quiet && aliasStatus) {
+      aliasStatus.innerText = "正在檢查暱稱是否可用...";
+    }
+    if (checkAliasBtn && !quiet) {
+      checkAliasBtn.disabled = true;
+      checkAliasBtn.innerText = "檢查中...";
+    }
+
+    const walletAddress = walletAddressInput?.value.trim() || "";
+    const result = await checkAliasAvailability(alias, walletAddress);
+    lastAliasCheckResult = result;
+    renderAliasStatus(result);
+
+    if (checkAliasBtn) {
+      checkAliasBtn.disabled = false;
+      checkAliasBtn.innerText = "檢查可用性";
+    }
+
+    const availableToUse = Boolean(result?.success && (result.available || result.ownedByRequester));
+    setComposerReady(availableToUse, alias, { preserveAliasStatus: !availableToUse });
+    return result;
+  }
+
+  function renderAliasStatus(result) {
+    if (!aliasStatus) return;
+    if (!result) {
+      aliasStatus.textContent = "";
+      return;
+    }
+
+    if (result.available) {
+      aliasStatus.innerHTML = `✅ 暱稱可用：<code>${result.alias}</code>`;
+      return;
+    }
+
+    const suggestions = (result.suggestions || []).slice(0, 5);
+    if (suggestions.length) {
+      aliasStatus.innerHTML = `⚠️ 暱稱已被使用，建議：${suggestions.map((s) => `<code>${s.alias}</code>（${s.display}）`).join("、")}`;
+    } else {
+      aliasStatus.innerText = "⚠️ 暱稱已被使用，請改一個名稱。";
+    }
+  }
+
+  function renderIdentitySummary(alias, walletAddress, platform) {
+    if (!identityAliasSummary || !identityWalletSummary) return;
+    if (!alias) {
+      identityAliasSummary.innerText = "尚未設定暱稱，請到進階設定建立 mapping。";
+      identityWalletSummary.innerText = "設定後，這個暱稱會對應到你的錢包與平台。";
+      return;
+    }
+    identityAliasSummary.innerHTML = `暱稱：<code>${alias}</code>｜平台：<code>${platform || "facebook"}</code>`;
+    identityWalletSummary.innerHTML = `錢包：<code>${walletAddress || "託管錢包"}</code>`;
+  }
+
+  function setComposerReady(enabled, alias = "", options = {}) {
+    if (!genCardBtn) return;
+    genCardBtn.disabled = !enabled;
+    genCardBtn.innerText = enabled
+      ? "⚡ 一鍵生成聲明並發佈"
+      : "⚠️ 先設定暱稱再使用";
+    if (!enabled && aliasStatus && !options.preserveAliasStatus) {
+      aliasStatus.innerText = alias
+        ? `先完成暱稱 mapping 才能使用一鍵聲明。現在是：${alias}`
+        : "先完成暱稱 mapping 才能使用一鍵聲明。";
+    }
+  }
+
+  if (checkAliasBtn) {
+    checkAliasBtn.addEventListener("click", () => {
+      runAliasCheck({ quiet: false });
+    });
+  }
+
+  if (identityAliasInput) {
+    identityAliasInput.addEventListener("input", () => {
+      if (aliasCheckTimer) {
+        clearTimeout(aliasCheckTimer);
+      }
+      aliasCheckTimer = setTimeout(() => {
+        runAliasCheck({ quiet: true }).catch((err) => {
+          console.warn("[Chamber] Alias auto-check failed:", err);
+        });
+      }, 500);
+    });
+  }
+
   // 2. Load configurations and handle first-time initialization
   chrome.storage.local.get(["lastFbUserId", "imgurClientId"], (meta) => {
     const userId = meta.lastFbUserId || "default";
@@ -67,6 +187,8 @@ document.addEventListener("DOMContentLoaded", () => {
     
     chrome.storage.local.get(
       [
+        prefix + "identityAlias",
+        prefix + "identityPlatform",
         prefix + "nativeWalletAddress",
         prefix + "nativeWalletPrivateKey",
         prefix + "customWalletAddress",
@@ -76,6 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
         prefix + "lastFbUserIdHash"
       ],
       (data) => {
+        identityAliasInput.value = data[prefix + "identityAlias"] || "";
         let nativeWalletAddress = data[prefix + "nativeWalletAddress"];
         let nativeWalletPrivateKey = data[prefix + "nativeWalletPrivateKey"];
         
@@ -102,6 +225,21 @@ document.addEventListener("DOMContentLoaded", () => {
           isEncryptionEnabledCheckbox.checked = true; // default enabled
         }
 
+        if (data[prefix + "identityAlias"]) {
+          aliasStatus.innerHTML = `已綁定暱稱：<code>${data[prefix + "identityAlias"]}</code>`;
+        }
+        renderIdentitySummary(
+          data[prefix + "identityAlias"] || "",
+          data[prefix + "customWalletAddress"] || nativeWalletAddress,
+          data[prefix + "identityPlatform"] || "facebook"
+        );
+        setComposerReady(Boolean(data[prefix + "identityAlias"]), data[prefix + "identityAlias"] || "");
+        if (data[prefix + "identityAlias"]) {
+          runAliasCheck({ quiet: true }).catch((err) => {
+            console.warn("[Chamber] Initial alias check failed:", err);
+          });
+        }
+
         // Populate Timeline Link
         const lastEchoUrl = data[prefix + "lastEchoUrl"];
         if (lastEchoUrl) {
@@ -118,7 +256,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 3. Save Settings Handler
-  saveBtn.addEventListener("click", () => {
+  saveBtn.addEventListener("click", async () => {
+    const identityAlias = identityAliasInput.value.trim();
     const customWalletAddress = walletAddressInput.value.trim();
     const customWalletPrivateKey = walletPrivateKeyInput.value.trim();
     const imgurClientId = imgurClientIdInput.value.trim();
@@ -127,24 +266,85 @@ document.addEventListener("DOMContentLoaded", () => {
     saveBtn.innerText = "⏳ 儲存中...";
     saveBtn.disabled = true;
 
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
+    chrome.storage.local.get(["lastFbUserId"], async (meta) => {
       const userId = meta.lastFbUserId || "default";
       const prefix = `user_${userId}_`;
+
+      if (!identityAlias) {
+        aliasStatus.innerText = "請先輸入身份暱稱，再儲存。";
+        saveBtn.innerText = "⚠️ 請填暱稱";
+        saveBtn.disabled = false;
+        setComposerReady(false, "");
+        return;
+      }
+
+      const activeTabs = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+      });
+      const activeUrl = activeTabs?.[0]?.url || "";
+      const platform = detectPlatform(activeUrl);
+      const effectiveWallet = customWalletAddress || "";
+      const aliasCheck = await checkAliasAvailability(identityAlias, effectiveWallet);
+      if (!aliasCheck.success) {
+        aliasStatus.innerText = "暱稱檢查失敗，請稍後再試。";
+        saveBtn.innerText = "⚠️ 檢查失敗";
+        saveBtn.disabled = false;
+        setComposerReady(false, identityAlias, { preserveAliasStatus: true });
+        return;
+      }
+
+      if (!aliasCheck.available && !aliasCheck.ownedByRequester) {
+        renderAliasStatus(aliasCheck);
+        saveBtn.innerText = "⚠️ 暱稱被占用";
+        saveBtn.disabled = false;
+        setComposerReady(false, identityAlias, { preserveAliasStatus: true });
+        return;
+      }
+
+      const registerRes = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alias: identityAlias,
+          platform,
+          actorType: platform === "facebook" ? "personal" : "account",
+          actorId: userId,
+          displayName: identityAlias,
+          walletAddress: effectiveWallet || null,
+          proof: "",
+        }),
+      });
+      const registerJson = await registerRes.json();
+      if (!registerRes.ok || !registerJson.success) {
+        renderAliasStatus({ available: false, alias: identityAlias, suggestions: registerJson.suggestions || aliasCheck.suggestions || [] });
+        saveBtn.innerText = "⚠️ 暱稱無法使用";
+        saveBtn.disabled = false;
+        setComposerReady(false, identityAlias, { preserveAliasStatus: true });
+        return;
+      }
       
       const update = { imgurClientId };
+      update[prefix + "identityAlias"] = identityAlias;
+      update[prefix + "identityPlatform"] = platform;
       update[prefix + "customWalletAddress"] = customWalletAddress;
       update[prefix + "customWalletPrivateKey"] = customWalletPrivateKey;
       update[prefix + "isEncryptionEnabled"] = isEncryptionEnabled;
+      update[prefix + "lastEchoUrl"] = "";
+      update[prefix + "lastFbUserIdHash"] = "";
 
       chrome.storage.local.set(update, () => {
         setTimeout(() => {
-          saveBtn.innerText = "💾 儲存成功！";
-          saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+            saveBtn.innerText = "💾 儲存成功！";
+            saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
           
           setTimeout(() => {
             saveBtn.innerText = "💾 儲存並套用";
             saveBtn.style.background = ""; // revert to class gradient
             saveBtn.disabled = false;
+            aliasStatus.innerHTML = `✅ 已綁定 <code>${identityAlias}</code> → <code>${effectiveWallet || "託管錢包"}</code>（${platform}）`;
+            renderIdentitySummary(identityAlias, effectiveWallet || "", platform);
+            lastAliasCheckResult = aliasCheck;
+            setComposerReady(true, identityAlias);
             // Return to dashboard after successful save
             settingsView.classList.add("hidden");
             dashboardView.classList.remove("hidden");
@@ -224,10 +424,12 @@ document.addEventListener("DOMContentLoaded", () => {
     genCardBtn.disabled = true;
 
     try {
-      // 1. Copy the text from the textarea to clipboard
+      // Put the declaration into the clipboard first so the composer can paste it
+      // after the image frame finishes rendering.
       await navigator.clipboard.writeText(textToCopy);
       console.log("[Chamber] Declaration text copied to clipboard.");
 
+      // 1. Copy the text from the textarea to clipboard
       // 2. Fetch or fallback target URL for the QR Code
       const meta = await new Promise((resolve) => {
         chrome.storage.local.get(["lastFbUserId"], resolve);
@@ -239,7 +441,9 @@ document.addEventListener("DOMContentLoaded", () => {
         chrome.storage.local.get([prefix + "lastEchoUrl", prefix + "customWalletAddress", prefix + "nativeWalletAddress"], resolve);
       });
       const activeWallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
-      const timelineUrl = data[prefix + "lastEchoUrl"] || `https://studio.milkcat.org/echo/${activeWallet}/all`;
+      const fallbackTimelineUrl = `https://studio.milkcat.org/echo/${activeWallet}/all`;
+      const storedTimelineUrl = data[prefix + "lastEchoUrl"] || "";
+      const timelineUrl = storedTimelineUrl.includes(activeWallet) ? storedTimelineUrl : fallbackTimelineUrl;
 
       // 3. Create canvas
       const canvas = document.createElement("canvas");
