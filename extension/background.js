@@ -218,6 +218,16 @@ async function processBackupTask(postData, isHistoric) {
 
 // Listen to requests from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "GET_ACTIVE_WALLET_INFO") {
+    chrome.storage.local.get(["lastFbUserId"], (meta) => {
+      const userId = meta.lastFbUserId || "default";
+      getExtensionConfig(userId).then((config) => {
+        sendResponse({ success: true, walletAddress: config.boundWalletAddress });
+      });
+    });
+    return true;
+  }
+
   if (request.action === "BACKUP_POST_DRAFT" || request.action === "BACKUP_HISTORIC_POST") {
     processBackupTask(request.payload, request.action === "BACKUP_HISTORIC_POST")
       .then((res) => {

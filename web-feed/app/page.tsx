@@ -27,32 +27,66 @@ export default function Home() {
   const connectWallet = async () => {
     setIsConnecting(true);
     setShowFallbackBtn(false);
-    setStatusMessage("正在連結 MetaMask...");
-    if (typeof window !== "undefined" && (window as any).ethereum) {
-      try {
-        const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
-        const address = accounts[0];
-        setWalletAddress(address);
-        setStatusMessage("錢包連結成功！正在跳轉至您的個人動態牆...");
-        setTimeout(() => {
-          router.push(`/${address}/all`);
-        }, 1500);
-      } catch (err: any) {
-        console.error("MetaMask connection failed:", err);
-        let errorMsg = err.message || "未知錯誤";
-        if (errorMsg.includes("Unexpected error") || (err.code && String(err.code) === "-32603")) {
-          errorMsg = "MetaMask 傳回未預期錯誤 (-32603)。通常是由於 MetaMask 中有尚未關閉的懸置連線請求，或 MetaMask 尚未輸入密碼解鎖。請打開 MetaMask 插件手動確認，或點選下方按鈕使用測試模擬錢包進入。";
-        } else {
-          errorMsg = "連結失敗: " + errorMsg;
+    setStatusMessage("正在偵測 Chamber 擴充功能與錢包...");
+
+    let extensionActive = false;
+
+    // Set up a listener for the Chamber Extension response
+    const handleExtensionWallet = (event: MessageEvent) => {
+      if (event.data && event.data.source === "chamber-extension" && event.data.type === "EXTENSION_WALLET_RESPONSE") {
+        const extWallet = event.data.walletAddress;
+        if (extWallet) {
+          extensionActive = true;
+          window.removeEventListener("message", handleExtensionWallet);
+          clearTimeout(extensionTimeout);
+          setWalletAddress(extWallet);
+          setStatusMessage("成功藉由 Chamber 擴充功能錢包登入！正在跳轉...");
+          setTimeout(() => {
+            router.push(`/${extWallet}/all`);
+          }, 1500);
+          setIsConnecting(false);
         }
-        setStatusMessage(errorMsg);
-        setShowFallbackBtn(true);
-      } finally {
+      }
+    };
+    
+    window.addEventListener("message", handleExtensionWallet);
+    
+    // Broadcast the query to the extension content script
+    window.postMessage({ source: "echo-portal", type: "GET_EXTENSION_WALLET" }, "*");
+
+    // Fallback to standard MetaMask after 400ms if no extension responds
+    const extensionTimeout = setTimeout(async () => {
+      window.removeEventListener("message", handleExtensionWallet);
+      if (extensionActive) return;
+
+      setStatusMessage("正在連結 MetaMask...");
+      if (typeof window !== "undefined" && (window as any).ethereum) {
+        try {
+          const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
+          const address = accounts[0];
+          setWalletAddress(address);
+          setStatusMessage("錢包連結成功！正在跳轉至您的個人動態牆...");
+          setTimeout(() => {
+            router.push(`/${address}/all`);
+          }, 1500);
+        } catch (err: any) {
+          console.error("MetaMask connection failed:", err);
+          let errorMsg = err.message || "未知錯誤";
+          if (errorMsg.includes("Unexpected error") || (err.code && String(err.code) === "-32603")) {
+            errorMsg = "MetaMask 傳回未預期錯誤 (-32603)。通常是由於 MetaMask 中有尚未關閉的懸置連線請求，或 MetaMask 尚未輸入密碼解鎖。請打開 MetaMask 插件手動確認，或點選下方按鈕使用測試模擬錢包進入。";
+          } else {
+            errorMsg = "連結失敗: " + errorMsg;
+          }
+          setStatusMessage(errorMsg);
+          setShowFallbackBtn(true);
+        } finally {
+          setIsConnecting(false);
+        }
+      } else {
+        connectSandboxWallet();
         setIsConnecting(false);
       }
-    } else {
-      connectSandboxWallet();
-    }
+    }, 400);
   };
 
   // Search/Lookup redirect

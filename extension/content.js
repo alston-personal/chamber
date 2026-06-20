@@ -85,10 +85,31 @@ function isOwnPost(article) {
   }
 }
 
-// 2. Listen to postMessages from inject.js
+// 2. Listen to postMessages from inject.js or Echo portal
 window.addEventListener("message", (event) => {
   // Guard clause for safety and origin validation
   if (event.source !== window) return;
+
+  // Handle Echo Portal requests for active wallet info
+  if (event.data && event.data.source === "echo-portal" && event.data.type === "GET_EXTENSION_WALLET") {
+    chrome.runtime.sendMessage({
+      action: "GET_ACTIVE_WALLET_INFO"
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[Chamber] Background unreachable for wallet query:", chrome.runtime.lastError.message);
+        return;
+      }
+      if (response && response.success && response.walletAddress) {
+        window.postMessage({
+          source: "chamber-extension",
+          type: "EXTENSION_WALLET_RESPONSE",
+          walletAddress: response.walletAddress
+        }, "*");
+      }
+    });
+    return;
+  }
+
   if (event.data && event.data.source === "chamber-graphql-interceptor") {
     // Check message type for user context
     if (event.data.type === "FB_USER_CONTEXT") {
