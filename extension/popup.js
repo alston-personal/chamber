@@ -349,6 +349,20 @@ document.addEventListener("DOMContentLoaded", () => {
         chrome.tabs.query({ active: true, currentWindow: true }, resolve);
       });
       const activeUrl = activeTabs?.[0]?.url || "";
+      
+      const isFb = activeUrl.includes("facebook.com");
+      const isIg = activeUrl.includes("instagram.com");
+      const isThreads = activeUrl.includes("threads.net");
+      const isX = activeUrl.includes("x.com") || activeUrl.includes("twitter.com");
+      const isOnSupportedPlatform = isFb || isIg || isThreads || isX;
+
+      if (!isOnSupportedPlatform && userId === "default") {
+        aliasStatus.innerText = "⚠️ 尚未偵測到您的社群帳號 ID。請先開啟 Facebook 或 Threads 網頁，讓套件在背景偵測您的身份後，再打開此面版進行綁定！";
+        saveBtn.innerText = "⚠️ 未偵測到社群帳號";
+        saveBtn.disabled = false;
+        return;
+      }
+
       const platform = detectPlatform(activeUrl);
       const effectiveWallet = customWalletAddress || "";
       const aliasCheck = await checkAliasAvailability(identityAlias, effectiveWallet);
