@@ -93,8 +93,7 @@ export default function PlatformFeed({
     if (typeof window !== "undefined" && (window as any).ethereum) {
       try {
         setStatusMessage("正在連結 MetaMask...");
-        const provider = new ethers.BrowserProvider((window as any).ethereum);
-        const accounts = await provider.send("eth_requestAccounts", []);
+        const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
         setViewerWallet(accounts[0]);
         setStatusMessage("錢包連結成功！");
         setTimeout(() => setStatusMessage(""), 2000);

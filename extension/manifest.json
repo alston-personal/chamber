@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chamber",
-  "version": "1.0.0",
+  "version": "0.1.4",
   "description": "Chamber - 個人臉書貼文與多媒體安全備份工具",
   "permissions": [
     "storage",
@@ -36,5 +36,11 @@
       "resources": ["inject.js"],
       "matches": ["*://*.facebook.com/*"]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "chamber@milkcat.org",
+      "strict_min_version": "109.0"
+    }
+  }
 }

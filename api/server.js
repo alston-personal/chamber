@@ -43,7 +43,7 @@ app.use(express.json({ limit: "200kb" }));
 const router = express.Router();
 
 // ── Config ──
-const PROTOCOL_VERSION = "2026-v1";
+const PROTOCOL_VERSION = "0.1.4";
 const APP_NAME = "Chamber";
 const PRIVATE_KEY = process.env.CHAMBER_WALLET_PRIVATE_KEY;
 const WALLET_ADDRESS = process.env.CHAMBER_WALLET_ADDRESS;
