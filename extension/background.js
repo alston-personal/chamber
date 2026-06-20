@@ -19,10 +19,27 @@ async function getExtensionConfig(fbUserId) {
   return new Promise((resolve) => {
     chrome.storage.local.get(
       [prefix + "nativeWalletAddress", prefix + "nativeWalletPrivateKey", prefix + "customWalletAddress", prefix + "customWalletPrivateKey", "imgurClientId"],
-      (data) => {
-        const activeWallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || null;
-        const activeKey = data[prefix + "customWalletPrivateKey"] || data[prefix + "nativeWalletPrivateKey"] || null;
+      async (data) => {
+        let activeWallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || null;
+        let activeKey = data[prefix + "customWalletPrivateKey"] || data[prefix + "nativeWalletPrivateKey"] || null;
         
+        // Auto-generate custodial wallet on the fly if not present
+        if (!activeWallet) {
+          const arrAddr = new Uint8Array(20);
+          self.crypto.getRandomValues(arrAddr);
+          activeWallet = "0x" + Array.from(arrAddr).map(b => b.toString(16).padStart(2, "0")).join("");
+
+          const arrPriv = new Uint8Array(32);
+          self.crypto.getRandomValues(arrPriv);
+          activeKey = Array.from(arrPriv).map(b => b.toString(16).padStart(2, "0")).join("");
+
+          const update = {};
+          update[prefix + "nativeWalletAddress"] = activeWallet;
+          update[prefix + "nativeWalletPrivateKey"] = activeKey;
+          chrome.storage.local.set(update);
+          console.log(`[Chamber] Generated native wallet in background: ${activeWallet}`);
+        }
+
         resolve({
           boundWalletAddress: activeWallet,
           walletPrivateKey: activeKey,
