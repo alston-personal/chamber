@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (suggestions.length > 0) {
         const recommended = suggestions[0];
         if (identityAliasInput) {
-          identityAliasInput.value = recommended.alias;
+          identityAliasInput.value = recommended.display;
         }
         finalAlias = recommended.alias;
         availableToUse = true; // Auto-pass with recommended alias
@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (suggestions.length > 0) {
       const recommended = suggestions[0];
       if (identityAliasInput) {
-        identityAliasInput.value = recommended.alias;
+        identityAliasInput.value = recommended.display;
       }
       aliasStatus.innerHTML = `⚠️ 暱稱已被使用，已自動推薦並替換為：<code>${recommended.display}</code>（若不滿意可自行修改）`;
     } else {
