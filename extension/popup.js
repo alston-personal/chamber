@@ -19,6 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const checkAliasBtn = document.getElementById("checkAliasBtn");
   const aliasStatus = document.getElementById("aliasStatus");
   const walletAddressInput = document.getElementById("walletAddress");
+  const toggleAdvancedSettingsBtn = document.getElementById("toggleAdvancedSettingsBtn");
+  const advancedSetupFields = document.getElementById("advancedSetupFields");
   const walletPrivateKeyInput = document.getElementById("walletPrivateKey");
   const imgurClientIdInput = document.getElementById("imgurClientId");
   const isEncryptionEnabledCheckbox = document.getElementById("isEncryptionEnabled");
@@ -34,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const connectionBadge = document.getElementById("connectionBadge");
   let aliasCheckTimer = null;
   let lastAliasCheckResult = null;
+  let hasExistingIdentity = false;
 
   const DEFAULT_DECLARATION = `【本人樂觀開朗之 Web3 轉世聲明】
 
@@ -81,15 +84,36 @@ document.addEventListener("DOMContentLoaded", () => {
     if (walletAddress) {
       url.searchParams.set("walletAddress", walletAddress);
     }
-    const response = await fetch(url.toString());
-    return response.ok ? response.json() : { success: false, error: "check failed" };
+    try {
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: false,
+            error: "身份檢查服務尚未回應，請先完成暱稱設定後再重試。",
+          };
+        }
+        return {
+          success: false,
+          error: "暱稱檢查失敗，請稍後再試。",
+        };
+      }
+      return await response.json();
+    } catch (err) {
+      return {
+        success: false,
+        error: "目前無法連線到身份檢查服務，請稍後再試。",
+      };
+    }
   }
 
   async function runAliasCheck({ quiet = false } = {}) {
     const alias = identityAliasInput?.value.trim() || "";
     if (!alias) {
       lastAliasCheckResult = null;
-      renderAliasStatus(null);
+      if (aliasStatus) {
+        aliasStatus.innerText = "請先填上方暱稱（必填），再檢查是否可用。";
+      }
       setComposerReady(false, "");
       return null;
     }
@@ -124,6 +148,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (result.success === false) {
+      aliasStatus.innerText = result.error || "目前無法確認暱稱可用性。";
+      return;
+    }
+
     if (result.available) {
       aliasStatus.innerHTML = `✅ 暱稱可用：<code>${result.alias}</code>`;
       return;
@@ -131,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const suggestions = (result.suggestions || []).slice(0, 5);
     if (suggestions.length) {
-      aliasStatus.innerHTML = `⚠️ 暱稱已被使用，建議：${suggestions.map((s) => `<code>${s.alias}</code>（${s.display}）`).join("、")}`;
+      aliasStatus.innerHTML = `⚠️ 暱稱已被使用，建議：${suggestions.map((s) => `<code>${s.display}</code>（網址：<code>${s.alias}</code>）`).join("、")}`;
     } else {
       aliasStatus.innerText = "⚠️ 暱稱已被使用，請改一個名稱。";
     }
@@ -148,6 +177,28 @@ document.addEventListener("DOMContentLoaded", () => {
     identityWalletSummary.innerHTML = `錢包：<code>${walletAddress || "託管錢包"}</code>`;
   }
 
+  function setInitialView(hasIdentity) {
+    hasExistingIdentity = Boolean(hasIdentity);
+    if (dashboardView) {
+      dashboardView.classList.toggle("hidden", !hasExistingIdentity);
+    }
+    if (settingsView) {
+      settingsView.classList.toggle("hidden", hasExistingIdentity);
+    }
+    if (backBtn) {
+      backBtn.style.display = hasExistingIdentity ? "" : "none";
+    }
+    if (saveBtn) {
+      saveBtn.innerText = hasExistingIdentity ? "💾 儲存並套用" : "下一步：完成 mapping";
+    }
+    if (toggleAdvancedSettingsBtn) {
+      toggleAdvancedSettingsBtn.style.display = hasExistingIdentity ? "" : "none";
+    }
+    if (advancedSetupFields) {
+      advancedSetupFields.classList.toggle("hidden", !hasExistingIdentity);
+    }
+  }
+
   function setComposerReady(enabled, alias = "", options = {}) {
     if (!genCardBtn) return;
     genCardBtn.disabled = !enabled;
@@ -157,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!enabled && aliasStatus && !options.preserveAliasStatus) {
       aliasStatus.innerText = alias
         ? `先完成暱稱 mapping 才能使用一鍵聲明。現在是：${alias}`
-        : "先完成暱稱 mapping 才能使用一鍵聲明。";
+        : "先填上方暱稱，完成 mapping 後才能使用。";
     }
   }
 
@@ -177,6 +228,15 @@ document.addEventListener("DOMContentLoaded", () => {
           console.warn("[Chamber] Alias auto-check failed:", err);
         });
       }, 500);
+    });
+  }
+
+  if (toggleAdvancedSettingsBtn && advancedSetupFields) {
+    toggleAdvancedSettingsBtn.addEventListener("click", () => {
+      const isHidden = advancedSetupFields.classList.toggle("hidden");
+      toggleAdvancedSettingsBtn.innerHTML = isHidden
+        ? "<span>顯示進階設定</span><span>+</span>"
+        : "<span>隱藏進階設定</span><span>−</span>";
     });
   }
 
@@ -228,6 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data[prefix + "identityAlias"]) {
           aliasStatus.innerHTML = `已綁定暱稱：<code>${data[prefix + "identityAlias"]}</code>`;
         }
+        setInitialView(Boolean(data[prefix + "identityAlias"]));
         renderIdentitySummary(
           data[prefix + "identityAlias"] || "",
           data[prefix + "customWalletAddress"] || nativeWalletAddress,
@@ -251,6 +312,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         declarationTextarea.value = DEFAULT_DECLARATION;
+
+        if (!data[prefix + "identityAlias"]) {
+          aliasStatus.innerText = "第一次使用請先填上方暱稱（必填），完成 mapping 後系統會自動回到首頁。";
+          setComposerReady(false, "");
+          setTimeout(() => identityAliasInput?.focus(), 100);
+        }
       }
     );
   });
@@ -270,12 +337,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const userId = meta.lastFbUserId || "default";
       const prefix = `user_${userId}_`;
 
-      if (!identityAlias) {
-        aliasStatus.innerText = "請先輸入身份暱稱，再儲存。";
-        saveBtn.innerText = "⚠️ 請填暱稱";
-        saveBtn.disabled = false;
-        setComposerReady(false, "");
-        return;
+        if (!identityAlias) {
+          aliasStatus.innerText = "請先輸入上方暱稱（必填），再儲存。";
+          saveBtn.innerText = hasExistingIdentity ? "⚠️ 請填暱稱" : "⚠️ 先填暱稱";
+          saveBtn.disabled = false;
+          setComposerReady(false, "");
+          return;
       }
 
       const activeTabs = await new Promise((resolve) => {
@@ -286,7 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const effectiveWallet = customWalletAddress || "";
       const aliasCheck = await checkAliasAvailability(identityAlias, effectiveWallet);
       if (!aliasCheck.success) {
-        aliasStatus.innerText = "暱稱檢查失敗，請稍後再試。";
+        renderAliasStatus(aliasCheck);
         saveBtn.innerText = "⚠️ 檢查失敗";
         saveBtn.disabled = false;
         setComposerReady(false, identityAlias, { preserveAliasStatus: true });
@@ -345,6 +412,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderIdentitySummary(identityAlias, effectiveWallet || "", platform);
             lastAliasCheckResult = aliasCheck;
             setComposerReady(true, identityAlias);
+            setInitialView(true);
             // Return to dashboard after successful save
             settingsView.classList.add("hidden");
             dashboardView.classList.remove("hidden");

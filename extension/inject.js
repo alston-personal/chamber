@@ -5,7 +5,7 @@
  * targeting Facebook's internal GraphQL mutation flows for post creations.
  */
 (function() {
-  const PROTOCOL_VERSION = "2026-v1";
+  const PROTOCOL_VERSION = "0.1.4";
   console.log("[Chamber] GraphQL network interceptor active.");
 
   // Helper to inspect request parameters and extract post metadata

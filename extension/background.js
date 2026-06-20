@@ -6,7 +6,7 @@
  */
 
 // Schema Constant
-const PROTOCOL_VERSION = "2026-v1";
+const PROTOCOL_VERSION = "0.1.4";
 const APP_NAME = "Chamber";
 
 // Chamber Protocol API Server (on the same VM as the web-feed)

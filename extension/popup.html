@@ -347,16 +347,24 @@
 
     <!-- 2. SETTINGS VIEW -->
     <div id="settingsView" class="view hidden">
+      <div class="card" style="border-color: rgba(96, 165, 250, 0.55); background: rgba(30, 64, 175, 0.22); box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.12), 0 18px 40px -24px rgba(59, 130, 246, 0.55);">
+        <span class="card-title">🧭 首次使用導引</span>
+        <div class="tip-text" style="font-size: 12px; line-height: 1.6; color: #dbeafe;">
+          <strong>第一步請先填上方暱稱（必填）</strong>，再完成錢包 mapping。
+          完成後系統會自動回到正常首頁，之後再次打開就會直接進入儀表板。
+        </div>
+      </div>
+
       <div class="card">
         <span class="card-title">⚙️ 進階核心設定</span>
         
         <!-- Identity Alias -->
-        <div class="form-group">
-          <label for="identityAlias">身份暱稱 / 官網別名</label>
-          <input type="text" id="identityAlias" placeholder="例如：abcde">
+        <div class="form-group" style="border: 1px solid rgba(96, 165, 250, 0.25); background: rgba(15, 23, 42, 0.45); border-radius: 10px; padding: 10px;">
+          <label for="identityAlias">身份暱稱 / 官網別名 <span style="color: #f87171;">*</span></label>
+          <input type="text" id="identityAlias" placeholder="請先填暱稱，例如：sunlake">
           <div style="display: flex; gap: 8px; align-items: center;">
-            <button id="checkAliasBtn" class="small-btn" type="button">檢查可用性</button>
-            <div id="aliasStatus" class="field-desc" style="flex: 1;">將用於官網短網址，例如 <code>/echo/abcde/fb</code></div>
+            <button id="checkAliasBtn" class="small-btn" type="button">檢查暱稱</button>
+            <div id="aliasStatus" class="field-desc" style="flex: 1;">必填。將用於官網短網址，例如 <code>/echo/sunlake/fb</code></div>
           </div>
         </div>
 
@@ -367,32 +375,39 @@
           <div class="field-desc">若留空，系統會優先使用下方的原生備選帳號進行託管備份。</div>
         </div>
 
-        <!-- Native Wallet (Read-only reference) -->
-        <div class="form-group" style="opacity: 0.85;">
-          <label>系統原生備選帳號 (常駐託管)</label>
-          <span id="nativeWalletLabel" style="font-family: monospace; font-size: 11px; color: var(--text-muted); word-break: break-all; background: rgba(15, 23, 42, 0.45); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border);">正在生成...</span>
-        </div>
+        <button id="toggleAdvancedSettingsBtn" class="btn-secondary" type="button" style="justify-content: space-between;">
+          <span>顯示進階設定</span>
+          <span>+</span>
+        </button>
 
-        <!-- Private / Encryption Key -->
-        <div class="form-group">
-          <label for="walletPrivateKey">貼文解密通行鑰 (AES Key)</label>
-          <input type="password" id="walletPrivateKey" placeholder="自動配置本地加密密鑰">
-          <div class="field-desc">用於本地加密限友貼文。已自動生成，您可複製備份供其他瀏覽器解密。</div>
-        </div>
+        <div id="advancedSetupFields" class="hidden" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Native Wallet (Read-only reference) -->
+          <div class="form-group" style="opacity: 0.85;">
+            <label>系統原生備選帳號 (常駐託管)</label>
+            <span id="nativeWalletLabel" style="font-family: monospace; font-size: 11px; color: var(--text-muted); word-break: break-all; background: rgba(15, 23, 42, 0.45); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border);">正在生成...</span>
+          </div>
 
-        <!-- Imgur Client ID -->
-        <div class="form-group">
-          <label for="imgurClientId">Imgur 圖片轉存金鑰 (選填)</label>
-          <input type="text" id="imgurClientId" placeholder="自訂 Imgur Client ID">
-          <div class="field-desc">未填寫時，系統將預設使用系統託管的 Cloudflare R2 備份儲存庫。</div>
-        </div>
+          <!-- Private / Encryption Key -->
+          <div class="form-group">
+            <label for="walletPrivateKey">貼文解密通行鑰 (AES Key)</label>
+            <input type="password" id="walletPrivateKey" placeholder="自動配置本地加密密鑰">
+            <div class="field-desc">用於本地加密限友貼文。已自動生成，您可複製備份供其他瀏覽器解密。</div>
+          </div>
 
-        <!-- Encryption Checkbox -->
-        <div class="checkbox-group">
-          <input type="checkbox" id="isEncryptionEnabled" checked>
-          <label for="isEncryptionEnabled" style="font-size: 11px; font-weight: normal; color: var(--text-main);">
-            啟用限友貼文本地加密上鏈 (AES-GCM)
-          </label>
+          <!-- Imgur Client ID -->
+          <div class="form-group">
+            <label for="imgurClientId">Imgur 圖片轉存金鑰 (選填)</label>
+            <input type="text" id="imgurClientId" placeholder="自訂 Imgur Client ID">
+            <div class="field-desc">未填寫時，系統將預設使用系統託管的 Cloudflare R2 備份儲存庫。</div>
+          </div>
+
+          <!-- Encryption Checkbox -->
+          <div class="checkbox-group">
+            <input type="checkbox" id="isEncryptionEnabled" checked>
+            <label for="isEncryptionEnabled" style="font-size: 11px; font-weight: normal; color: var(--text-main);">
+              啟用限友貼文本地加密上鏈 (AES-GCM)
+            </label>
+          </div>
         </div>
       </div>
 
@@ -404,7 +419,7 @@
     </div>
 
     <div class="footer-note">
-      Chamber Core V1.0.0 • Arweave Devnet
+      Chamber Core V0.1.4 • Arweave Devnet
     </div>
   </div>
   <script src="popup.js"></script>
