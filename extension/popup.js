@@ -129,15 +129,35 @@ document.addEventListener("DOMContentLoaded", () => {
     const walletAddress = walletAddressInput?.value.trim() || "";
     const result = await checkAliasAvailability(alias, walletAddress);
     lastAliasCheckResult = result;
-    renderAliasStatus(result);
+
+    let availableToUse = Boolean(result?.success && (result.available || result.ownedByRequester));
+    let finalAlias = alias;
+
+    if (result?.success && !result.available && !result.ownedByRequester) {
+      const suggestions = result.suggestions || [];
+      if (suggestions.length > 0) {
+        const recommended = suggestions[0];
+        if (identityAliasInput) {
+          identityAliasInput.value = recommended.alias;
+        }
+        finalAlias = recommended.alias;
+        availableToUse = true; // Auto-pass with recommended alias
+        if (aliasStatus) {
+          aliasStatus.innerHTML = `⚠️ 暱稱已被使用，已自動推薦並替換為：<code>${recommended.display}</code>（若不滿意可自行修改）`;
+        }
+      } else {
+        renderAliasStatus(result);
+      }
+    } else {
+      renderAliasStatus(result);
+    }
 
     if (checkAliasBtn) {
       checkAliasBtn.disabled = false;
       checkAliasBtn.innerText = "檢查可用性";
     }
 
-    const availableToUse = Boolean(result?.success && (result.available || result.ownedByRequester));
-    setComposerReady(availableToUse, alias, { preserveAliasStatus: !availableToUse });
+    setComposerReady(availableToUse, finalAlias, { preserveAliasStatus: true });
     return result;
   }
 
@@ -153,14 +173,18 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (result.available) {
+    if (result.available || result.ownedByRequester) {
       aliasStatus.innerHTML = `✅ 暱稱可用：<code>${result.alias}</code>`;
       return;
     }
 
-    const suggestions = (result.suggestions || []).slice(0, 5);
-    if (suggestions.length) {
-      aliasStatus.innerHTML = `⚠️ 暱稱已被使用，建議：${suggestions.map((s) => `<code>${s.display}</code>（網址：<code>${s.alias}</code>）`).join("、")}`;
+    const suggestions = result.suggestions || [];
+    if (suggestions.length > 0) {
+      const recommended = suggestions[0];
+      if (identityAliasInput) {
+        identityAliasInput.value = recommended.alias;
+      }
+      aliasStatus.innerHTML = `⚠️ 暱稱已被使用，已自動推薦並替換為：<code>${recommended.display}</code>（若不滿意可自行修改）`;
     } else {
       aliasStatus.innerText = "⚠️ 暱稱已被使用，請改一個名稱。";
     }
