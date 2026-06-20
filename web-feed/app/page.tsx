@@ -190,7 +190,7 @@ export default function Home() {
               </p>
             </div>
             <a
-              href="/chamber-extension.zip"
+              href="/echo/chamber-extension.zip"
               download="chamber-extension.zip"
               className="mt-6 w-full text-center py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-emerald-50 transition-all duration-200 shadow-md shadow-emerald-900/20"
             >
