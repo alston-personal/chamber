@@ -18,6 +18,9 @@ Stable website download remains `0.6.0` until every release gate below is accept
 | Encryption/access | Per-post AES envelope, whole-timeline auto-unlock, single-post request/grant and 2-of-3 recovery remain platform-neutral | Existing access/recovery tests |
 | Localization | Extension and website retain equal Traditional Chinese and English key sets | Automated |
 | Stable release protection | Candidate build does not overwrite `chamber-extension.zip`, `latest.json`, or versioned 0.6.0 ZIP | Packaging check |
+| Side Panel integration | Simulated authenticated Threads identity drives the live adapter; mapping, selection, payload actor/owner fields, receipt links, recovery route and Esc cleanup are asserted | Live-browser harness |
+| Background pipeline | Threads text and media are AES-encrypted locally; API payload, identity, timestamp, receipt, Echo route and platform-neutral recovery share are asserted without a real upload | Service-worker harness |
+| Echo integration | Deployed Echo with mocked immutable transactions verifies Threads tag filtering, auto-unlock, latest revision, history, focused post, reader request and owner approval | Live-browser harness |
 
 ## Public Threads DOM evidence (2026-08-14)
 
@@ -31,8 +34,25 @@ The candidate adapter was injected into live, rendered public Threads pages in h
 | Video fallback | Live video post produced its own text, canonical URL and one poster; playback-error UI was excluded from body text | Pass |
 | Quote boundary | Outer `@meta` quote selected the outer text; selecting embedded `@zuck` content returned the inner permalink and failed the expected-author check | Pass |
 | Picker lifecycle | Hover produced exactly one outline; click removed overlay; Esc returned `null` and removed banner/outline/click interception | Pass |
+| Side Panel → background contract | Live post selection produced a `BACKUP_HISTORIC_POST` payload with `platform=threads`, the stable Chamber owner ID, Threads actor ID and canonical source URL | Pass |
+| Local encryption | Service Worker encrypted post text and media with a per-post key before the mocked API boundary; plaintext was absent from the request | Pass |
+| Echo lifecycle | Deployed Threads route auto-unlocked the owner post, retained decrypted state during refetch, showed latest/history/focused views, submitted a reader request and approved a per-post envelope | Pass |
 
 Public profile fallback handles are deliberately rejected as authenticated account identity. The Side Panel requires the logged-in Threads profile navigation identity plus the Threads login cookie before mapping or backup can proceed.
+
+Optional harnesses:
+
+```bash
+CHAMBER_PLAYWRIGHT_MODULE=/path/to/playwright \
+CHAMBER_CHROMIUM_EXECUTABLE=/path/to/chromium \
+node scripts/test-threads-sidepanel-live.js
+
+node scripts/test-threads-background.js
+
+CHAMBER_PLAYWRIGHT_MODULE=/path/to/playwright \
+CHAMBER_CHROMIUM_EXECUTABLE=/path/to/chromium \
+node scripts/test-threads-echo-live.js
+```
 
 ## Real Threads browser acceptance
 

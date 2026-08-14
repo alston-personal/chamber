@@ -30,6 +30,12 @@
   };
   const unique = (values) => Array.from(new Set(values.filter(Boolean)));
 
+  function isMoreControl(node) {
+    if (!node || node.getAttribute?.("aria-haspopup")) return false;
+    if (node.querySelector?.('svg[aria-label="More"], svg[aria-label="更多"]')) return false;
+    return MORE_TEXT.test(String(node.innerText || node.textContent || "").trim());
+  }
+
   function postLinksIn(node) {
     return Array.from(node?.querySelectorAll?.(POST_LINK_SELECTOR) || [])
       .map((link) => ({ link, parsed: parsePermalink(link.href) }))
@@ -160,7 +166,7 @@
     const time = container.querySelector('time[datetime]');
     const publishedMs = time?.dateTime ? Date.parse(time.dateTime) : NaN;
     const media = mediaForPost(container);
-    const more = Array.from(container.querySelectorAll('[role="button"], button')).some((node) => MORE_TEXT.test(String(node.innerText || node.textContent || "").trim()));
+    const more = Array.from(container.querySelectorAll('[role="button"], button')).some(isMoreControl);
     const expected = normalizeHandle(expectedHandle);
     return {
       platform: "threads",
@@ -179,7 +185,7 @@
   }
 
   async function expandAndExtract(container, expectedHandle) {
-    const more = Array.from(container.querySelectorAll('[role="button"], button')).find((node) => MORE_TEXT.test(String(node.innerText || node.textContent || "").trim()));
+    const more = Array.from(container.querySelectorAll('[role="button"], button')).find(isMoreControl);
     if (more) {
       more.click();
       await new Promise((resolve) => setTimeout(resolve, 350));
@@ -349,6 +355,7 @@
       return container ? extract(container, expectedHandle, sourceUrl) : null;
     },
     _testStructuredText: structuredText,
-    _testNormalizeHandle: normalizeHandle
+    _testNormalizeHandle: normalizeHandle,
+    _testIsMoreControl: isMoreControl
   };
 })();

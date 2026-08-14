@@ -289,6 +289,8 @@ async function prepareRecoveryVault(userId) {
     scheme: "shamir-2-of-3",
     setId,
     createdAt: exportedAt,
+    ownerUserId: normalizedUserId,
+    // Compatibility field for recovery records created/read by 0.6.x.
     facebookUserId: normalizedUserId,
     ownerAddress: config.boundWalletAddress,
     keyTier: usesCustom ? "custom" : "native",
@@ -351,18 +353,19 @@ async function restoreFromRecoveryVault(suppliedShareB, recoveryCodeC, currentUs
     recoveryShares = [shareB.share, decoded.share];
   }
   if (decoded.setId && decoded.setId !== shareB.setId) throw new Error(t("crypto.shareSetMismatch"));
-  if (currentUserId && currentUserId !== "default" && String(shareB.facebookUserId) !== String(currentUserId)) {
+  const ownerUserId = String(shareB.ownerUserId || shareB.facebookUserId || "");
+  if (currentUserId && currentUserId !== "default" && ownerUserId !== String(currentUserId)) {
     throw new Error(t("crypto.accountMismatch"));
   }
   const ownerSecret = ChamberSecretSharing.combine2of3(recoveryShares);
-  if (await recoveryChecksum(shareB.facebookUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) {
+  if (await recoveryChecksum(ownerUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) {
     throw new Error(t("crypto.checksumFailed"));
   }
-  const prefix = `user_${shareB.facebookUserId}_`;
+  const prefix = `user_${ownerUserId}_`;
   const update = {
     [prefix + (shareB.keyTier === "custom" ? "customWalletAddress" : "nativeWalletAddress")]: shareB.ownerAddress,
     [prefix + (shareB.keyTier === "custom" ? "customWalletPrivateKey" : "nativeWalletPrivateKey")]: ownerSecret,
-    lastFbUserId: String(shareB.facebookUserId),
+    lastFbUserId: ownerUserId,
   };
   if (shareB.identityAlias) update[prefix + "identityAlias"] = shareB.identityAlias;
   await chrome.storage.local.set(update);
@@ -372,7 +375,7 @@ async function restoreFromRecoveryVault(suppliedShareB, recoveryCodeC, currentUs
   }
   // B+C were both exposed during disaster recovery. Prepare a fresh set; Echo
   // replaces B in the same passkey-protected Vault before showing the new C.
-  return { ...(await prepareRecoveryVault(String(shareB.facebookUserId))), accountId: decoded.accountId || "" };
+  return { ...(await prepareRecoveryVault(ownerUserId)), accountId: decoded.accountId || "" };
 }
 
 async function restoreFromLocalAAndVaultB(shareB, currentUserId) {
@@ -383,11 +386,12 @@ async function restoreFromLocalAAndVaultB(shareB, currentUserId) {
   const localShare = data[prefix + "recoveryLocalShare"];
   if (!localShare || Number(localShare.share?.x) !== 1 || localShare.setId !== shareB.setId) throw new Error(t("crypto.localVaultMismatch"));
   const ownerSecret = ChamberSecretSharing.combine2of3([localShare.share, shareB.share]);
-  if (await recoveryChecksum(shareB.facebookUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) throw new Error(t("crypto.localVaultChecksumFailed"));
+  const ownerUserId = String(shareB.ownerUserId || shareB.facebookUserId || "");
+  if (await recoveryChecksum(ownerUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) throw new Error(t("crypto.localVaultChecksumFailed"));
   const update = {
     [prefix + (shareB.keyTier === "custom" ? "customWalletAddress" : "nativeWalletAddress")]: shareB.ownerAddress,
     [prefix + (shareB.keyTier === "custom" ? "customWalletPrivateKey" : "nativeWalletPrivateKey")]: ownerSecret,
-    lastFbUserId: String(shareB.facebookUserId),
+    lastFbUserId: ownerUserId,
   };
   if (shareB.identityAlias) update[prefix + "identityAlias"] = shareB.identityAlias;
   await chrome.storage.local.set(update);
@@ -461,13 +465,13 @@ async function optimizeImageForDevnet(blob, targetBytes = 90 * 1024) {
 }
 
 // Media Fallback Gateway - Fetch image from cache and upload to Imgur/R2
-async function uploadToFallbackStorage(fbCdnUrl, config, postKeyBytes = null) {
-  if (!fbCdnUrl) return "";
+async function uploadToFallbackStorage(mediaSourceUrl, config, postKeyBytes = null) {
+  if (!mediaSourceUrl) return "";
   try {
-    console.log(`[Chamber] Fetching media from cache: ${fbCdnUrl}`);
+    console.log(`[Chamber] Fetching media from cache: ${mediaSourceUrl}`);
     // Fetch with force-cache to hit local memory/disk cache without using fresh data usage
-    const response = await fetch(fbCdnUrl, { cache: "force-cache" });
-    if (!response.ok) throw new Error(`Facebook media fetch failed (${response.status})`);
+    const response = await fetch(mediaSourceUrl, { cache: "force-cache" });
+    if (!response.ok) throw new Error(`Platform media fetch failed (${response.status})`);
     let blob = await response.blob();
 
     console.log(`[Chamber] Media Blob extracted. Size: ${blob.size} bytes. Initiating fallback upload...`);

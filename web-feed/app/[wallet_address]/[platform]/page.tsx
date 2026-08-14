@@ -108,6 +108,23 @@ function normalizeIdentityAlias(value?: string | null) {
   return String(value || "").trim().toLowerCase().replace(/^@/, "");
 }
 
+function preservePostRuntimeState(incoming: PostItem[], current: PostItem[]) {
+  const previousByTx = new Map(current.map((post) => [post.txId, post]));
+  return incoming.map((post) => {
+    const previous = previousByTx.get(post.txId);
+    if (!previous) return post;
+    return {
+      ...post,
+      decryptedContent: previous.decryptedContent,
+      decryptedMedia: previous.decryptedMedia,
+      isDecrypting: previous.isDecrypting,
+      mediaDecryptTotal: previous.mediaDecryptTotal,
+      mediaDecryptCompleted: previous.mediaDecryptCompleted,
+      mediaDecryptFailed: previous.mediaDecryptFailed,
+    };
+  });
+}
+
 export default function PlatformFeed({
   params,
 }: {
@@ -672,7 +689,8 @@ export default function PlatformFeed({
           // Same source URL means the same logical post. Keep only the latest
           // revision by default; `history=true` is the explicit audit view.
           if (focusTxId) {
-            setPosts(fetchedPosts.filter((post) => post.txId === focusTxId));
+            const focused = fetchedPosts.filter((post) => post.txId === focusTxId);
+            setPosts((current) => preservePostRuntimeState(focused, current));
             return;
           }
           const latestBySource = new Map<string, PostItem>();
@@ -695,7 +713,7 @@ export default function PlatformFeed({
           // Devnet is the storage network for the current test release.
           // Legacy Is-Debug tags are not a user-facing visibility boundary.
           if (cancelled) return;
-          setPosts(dedupedPosts);
+          setPosts((current) => preservePostRuntimeState(dedupedPosts, current));
           if (!ownerWallet && dedupedPosts[0]?.payload.author_wallet) setOwnerWallet(dedupedPosts[0].payload.author_wallet);
         } else {
           // Fallback to sample mock database (only in development)

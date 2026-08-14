@@ -210,7 +210,7 @@ recoveryExport?.addEventListener("click", async () => {
     const data = await chrome.storage.local.get([prefix + "identityAlias", prefix + "lastEchoUrl"]);
     const alias = data[prefix + "identityAlias"] || "";
     const target = alias
-      ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/fb?recovery=true`
+      ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?recovery=true`
       : (data[prefix + "lastEchoUrl"] || "https://studio.milkcat.org/echo");
     await chrome.tabs.create({ url: target });
   } catch (error) {
@@ -479,7 +479,7 @@ async function cancelActivePicker() {
       }
     });
   } catch (_) {
-    // The Facebook tab may have navigated while picker mode was active.
+    // The active social tab may have navigated while picker mode was active.
   }
 }
 
@@ -660,7 +660,7 @@ function watchSelectedPost(payload, button, textEl, tab, identity) {
         selectedRefreshTimer = null;
       }
     } catch (_) {
-      // The tab may be navigating or Facebook may temporarily replace the DOM.
+      // The tab may be navigating or the platform may temporarily replace the DOM.
     }
     if (attempts >= 120 && selectedRefreshTimer) {
       clearInterval(selectedRefreshTimer);

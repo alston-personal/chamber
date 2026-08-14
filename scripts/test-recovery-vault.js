@@ -20,6 +20,7 @@ const { split2of3, combine2of3 } = require("../extension/secret-sharing.js");
     format: "chamber-recovery-share-v2",
     scheme: "shamir-2-of-3",
     setId: "set-1",
+    ownerUserId: "threads:123",
     facebookUserId: "123",
     ownerAddress: "0x1111111111111111111111111111111111111111",
     identityAlias: "test",

@@ -14,6 +14,16 @@ assert.deepEqual(
 assert.equal(adapter.parsePermalink("https://www.threads.com/@sunlake"), null);
 assert.equal(adapter.parsePermalink("https://example.com/@sunlake/post/DMabc"), null);
 assert.equal(adapter._testNormalizeHandle(" @SunLake "), "sunlake");
+assert.equal(adapter._testIsMoreControl({
+  innerText: "More",
+  getAttribute: (name) => name === "aria-haspopup" ? "menu" : null,
+  querySelector: () => ({})
+}), false, "overflow menu must not be mistaken for collapsed post text");
+assert.equal(adapter._testIsMoreControl({
+  innerText: "See more",
+  getAttribute: () => null,
+  querySelector: () => null
+}), true, "plain See more text control should be expandable");
 
 const text = (value) => ({ nodeType: 3, nodeValue: value });
 const element = (tagName, children = [], attrs = {}) => ({

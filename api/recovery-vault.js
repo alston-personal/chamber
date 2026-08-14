@@ -70,7 +70,7 @@ function mutate(callback) {
 
 function validateShareB(record) {
   if (record?.format !== "chamber-recovery-share-v2" || record?.scheme !== "shamir-2-of-3" || Number(record?.share?.x) !== 2) throw new Error("Recovery Vault requires Chamber share B");
-  if (!record.setId || !record.ownerAddress || !record.facebookUserId || typeof record.share.data !== "string") throw new Error("Recovery Vault share B is incomplete");
+  if (!record.setId || !record.ownerAddress || !(record.ownerUserId || record.facebookUserId) || typeof record.share.data !== "string") throw new Error("Recovery Vault share B is incomplete");
 }
 
 async function simpleWebAuthn() {
