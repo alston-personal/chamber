@@ -18,7 +18,7 @@ type GuideCopy = {
 const zhTW: GuideCopy = {
   title: "安裝與使用指南", backHome: "← 返回 Echo 首頁", badge: "公開測試版 · Irys Devnet", hero: "從 Facebook 備份第一篇文章",
   intro: "Chamber 會把你明確選取的本人 Facebook 文章先在瀏覽器本機加密，再備份至測試網路。目前支援文字、可取得的圖片／相簿與原文連結；影片只保存文字、影片網址及可取得的封面，不會備份影片檔案。",
-  download: "📥 下載 Chamber Extension 0.5.8", mappingJump: "查看 mapping 步驟",
+  download: "📥 下載 Chamber Extension 0.6.0", mappingJump: "查看 mapping 步驟",
   installTitle: "安裝 Chrome 擴充功能", installIntro: "目前尚未上架 Chrome 線上應用程式商店，因此使用 Chrome 的「載入未封裝項目」安裝。",
   developerNoteTitle: "不需要 Chrome 開發者帳號：", developerNote: "不必註冊開發者、不必支付上架費用。「開發人員模式」只是你自己電腦中 Chrome 擴充功能頁右上角的開關。",
   installSteps: [
@@ -64,7 +64,7 @@ const zhTW: GuideCopy = {
 const en: GuideCopy = {
   title: "Installation & User Guide", backHome: "← Back to Echo", badge: "Closed Alpha · Irys Devnet", hero: "Back up your first Facebook post",
   intro: "Chamber encrypts an explicitly selected post that you authored locally in your browser, then backs it up to the test network. It supports text, available images and albums, and the source link. For video posts, this version stores text, the video URL, and an available poster—not the video file.",
-  download: "📥 Download Chamber Extension 0.5.8", mappingJump: "View mapping steps",
+  download: "📥 Download Chamber Extension 0.6.0", mappingJump: "View mapping steps",
   installTitle: "Install the Chrome Extension", installIntro: "Chamber is not yet in the Chrome Web Store, so the Closed Alpha is installed with Chrome's Load unpacked feature.",
   developerNoteTitle: "No Chrome developer account is required: ", developerNote: "You do not need to register or pay a store fee. Developer mode is only a local switch in Chrome's Extensions page.",
   installSteps: [

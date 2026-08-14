@@ -23,8 +23,7 @@ for (const relativePath of [
 
 const homepage = read("app/page.tsx");
 const guide = read("app/guide/page.tsx");
-assert.match(homepage, /chamber-extension-v0\.5\.8\.zip/, "Stable homepage download must remain pinned to 0.5.8");
-assert.match(guide, /chamber-extension-v0\.5\.8\.zip/, "Stable guide download must remain pinned to 0.5.8");
-assert.ok(!fs.existsSync(path.join(root, "public/releases/chamber-extension-v0.5.9.zip")), "Localization work must not publish a new stable download before release approval");
+assert.match(homepage, /chamber-extension-v0\.6\.0\.zip/, "Stable homepage download must point to 0.6.0");
+assert.match(guide, /chamber-extension-v0\.6\.0\.zip/, "Stable guide download must point to 0.6.0");
 
 console.log("Web i18n routes, UI, locale dates, SEO route coverage, and stable-download guard passed.");

@@ -8,7 +8,7 @@
 ## 📥 步驟 1: 下載並安裝瀏覽器外掛
 
 1.  **下載外掛壓縮檔**：
-    點擊下載並解壓縮固定版本：[chamber-extension-v0.5.8.zip](https://studio.milkcat.org/echo/releases/chamber-extension-v0.5.8.zip)
+    點擊下載並解壓縮固定版本：[chamber-extension-v0.6.0.zip](https://studio.milkcat.org/echo/releases/chamber-extension-v0.6.0.zip)
 2.  **開啟 Chrome 擴充功能頁面**：
     在 Google Chrome 瀏覽器網址列輸入 `chrome://extensions/` 並斷行。
 3.  **啟用開發人員模式**：
@@ -23,7 +23,7 @@
 若要測試最新程式碼，不需要反覆下載 ZIP：
 
 1. 本地開發請直接載入專案內的 `extension/` 資料夾；`python3 scripts/pack-extension.py` 只會產生 `dist/chamber-extension-dev.zip`，不會覆寫官網版本。
-2. 只有完成測試後執行 `python3 scripts/pack-extension.py --release 0.5.8 --promote`，才會建立版本化 ZIP 並更新官網穩定下載別名。
+2. 只有完成測試後執行 `python3 scripts/pack-extension.py --release 0.6.0 --promote`，才會建立版本化 ZIP 並更新官網穩定下載別名。
 2. 在 `chrome://extensions/` 點擊 Chamber 的 **Reload**。
 3. 重新整理已開啟的 Facebook 分頁，讓新的 content script 生效。
 4. 修改程式後重複第 2、3 步。

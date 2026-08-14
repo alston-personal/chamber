@@ -5,10 +5,10 @@
 - `main`：已通過測試、可供封測者下載的穩定程式碼。
 - `develop`：日常開發整合分支；未完成的功能不得直接進入 `main`。
 - `agent/*` 或其他功能分支：單一功能或修正，完成後合併至 `develop`。
-- 官網下載：固定指向版本化檔案，例如 `/echo/releases/chamber-extension-v0.5.8.zip`。
+- 官網下載：固定指向版本化檔案，例如 `/echo/releases/chamber-extension-v0.6.0.zip`。
 - 本機開發包：輸出到 `dist/chamber-extension-dev.zip`，不會改動官網檔案。
 
-目前狀態：官網穩定版仍為 `0.5.8`；`develop` 上的雙語候選版為 `0.6.0`。其自動與人工發佈門檻見 [`docs/i18n-release-checklist.md`](i18n-release-checklist.md)。
+目前狀態：官網穩定版為 `0.6.0`；後續 Threads 支援在 `develop` 開發，不得覆寫該穩定下載。雙語驗證矩陣見 [`docs/i18n-release-checklist.md`](i18n-release-checklist.md)。
 
 ## 日常開發
 

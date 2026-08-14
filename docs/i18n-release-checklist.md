@@ -1,6 +1,6 @@
 # Chamber 0.6.0 Internationalization Release Checklist
 
-Status: release candidate on `develop`; stable website download remains 0.5.8 until this checklist is signed off.
+Status: 0.6.0 was promoted by explicit release authorization on 2026-08-14. Keep using this matrix for real Chrome/Facebook bilingual acceptance and regressions.
 
 ## Supported locales
 
@@ -32,7 +32,7 @@ Expected results:
 - `/echo/en`, `/echo/en/guide`, and `/echo/en/{identity}/{platform}` build successfully.
 - English and Traditional Chinese timeline metadata provide reciprocal `hreflang` links.
 - Backup validation, per-post encryption, reading grants, and 2-of-3 recovery remain unchanged.
-- Stable homepage and guide downloads remain pinned to `chamber-extension-v0.5.8.zip` until promotion is authorized.
+- Stable homepage and guide downloads point to `chamber-extension-v0.6.0.zip` after promotion authorization.
 
 ## Manual verification matrix / 人工驗證矩陣
 
@@ -56,4 +56,4 @@ Perform each row once in Traditional Chinese and once in English.
 
 ## Promotion rule
 
-Do not run `python3 scripts/pack-extension.py --release 0.6.0 --promote`, merge to `main`, create a release tag, deploy the English routes, or update the website download until every manual row above is recorded as passed. Development testing may load `extension/` directly or build an unpromoted ZIP outside `web-feed/public/releases/`.
+For future releases, do not promote, merge to `main`, tag, deploy, or update the stable download without explicit release authorization. Development testing may load `extension/` directly or build an unpromoted ZIP outside `web-feed/public/releases/`.

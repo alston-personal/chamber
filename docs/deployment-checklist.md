@@ -92,8 +92,7 @@ The extension version should be bumped whenever the popup or API flow changes.
 
 Current version target:
 
-- Stable website download: `0.5.8`
-- Internationalization release candidate on `develop`: `0.6.0`
+- Stable website download: `0.6.0`
 
 Check these files for matching version strings:
 
@@ -117,7 +116,7 @@ Version 0.4.0 also requires:
 
 Development builds after 0.5.8 must also run `node scripts/test-i18n.js`; every supported locale must have the same non-empty key set, and all Side Panel `data-i18n` references must resolve.
 
-Version 0.6.0 additionally follows [`docs/i18n-release-checklist.md`](i18n-release-checklist.md). Do not promote its ZIP or change the website's 0.5.8 download before the bilingual manual matrix passes.
+Version 0.6.0 additionally follows [`docs/i18n-release-checklist.md`](i18n-release-checklist.md). It was promoted by explicit release authorization; record remaining real-browser observations in that matrix.
 
 ## 6. Confirm The User Flow
 
