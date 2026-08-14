@@ -815,6 +815,16 @@ async function selectPost() {
     payload.identityActorId = identity.actorId;
     payload.identityActorType = "personal";
     payload.identityDisplayName = identity.actorHandle ? `@${identity.actorHandle}` : (payload.authorName || "");
+    reportSidepanelEvent("sidepanel:picker-selected", {
+      platform,
+      sourceUrl: payload.sourceUrl || "",
+      contentLength: String(payload.textContent || "").length,
+      mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0,
+      albumExpectedCount: payload.media?.albumExpectedCount || null,
+      albumComplete: payload.media?.albumComplete ?? null,
+      videoDetected: payload.media?.videoDetected === true,
+      isOwnAuthor: payload.isOwnAuthor ?? null
+    });
     if (payload.isOwnAuthor !== true) {
       postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.authorUnknownPlatform", { platform: platformName(platform) }) }));
       setStatus(payload.isOwnAuthor === false ? t("picker.notOwner") : t("picker.authorStopped"), true);
@@ -924,6 +934,10 @@ async function selectPost() {
     );
     else if (payload.contentExpanded === false) watchSelectedPost(payload, button, text, tab, identity);
   } catch (error) {
+    reportSidepanelEvent("sidepanel:picker-error", {
+      platform: platform || "unknown",
+      error: error.message || String(error)
+    });
     setStatus(error.message || t("picker.failed"), true);
     postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.failedList") }));
   } finally {
