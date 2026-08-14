@@ -76,6 +76,9 @@ async function main() {
   await panel.exposeFunction("__chamberOpenTab", async (url) => { openedUrl = url; return { id: 2, url }; });
 
   await panel.addInitScript(({ activeUrl }) => {
+    let currentActiveUrl = activeUrl;
+    const tabActivatedListeners = [];
+    const tabUpdatedListeners = [];
     const store = {
       lastFbUserId: "owner-1",
       activeChamberProfileId: "profile-1",
@@ -103,14 +106,16 @@ async function main() {
     globalThis.chrome = {
       runtime: {
         lastError: null,
-        getManifest: () => ({ version: "0.7.0" }),
+        getManifest: () => ({ version: "0.7.1" }),
         sendMessage: (message, callback) => globalThis.__chamberSendMessage(message).then(callback)
       },
       tabs: {
-        query: async () => [{ id: 1, url: activeUrl, active: true }],
-        create: ({ url }) => globalThis.__chamberOpenTab(url)
+        query: async () => [{ id: 1, url: currentActiveUrl, active: true }],
+        create: ({ url }) => globalThis.__chamberOpenTab(url),
+        onActivated: { addListener: (listener) => tabActivatedListeners.push(listener) },
+        onUpdated: { addListener: (listener) => tabUpdatedListeners.push(listener) }
       },
-      cookies: { get: async ({ name }) => name === "ds_user_id" ? { value: "threads-user-1" } : null },
+      cookies: { get: async ({ name }) => ["ds_user_id", "c_user"].includes(name) ? { value: name === "c_user" ? "owner-1" : "threads-user-1" } : null },
       scripting: {
         executeScript: ({ files, func, args = [] }) => globalThis.__chamberExecuteScript({
           files: files || [],
@@ -139,12 +144,23 @@ async function main() {
         onChanged: { addListener: () => {} }
       }
     };
+    globalThis.__chamberSwitchActiveTab = async (url) => {
+      currentActiveUrl = url;
+      const tab = { id: 1, url, active: true };
+      tabUpdatedListeners.forEach((listener) => listener(1, { url, status: "complete" }, tab));
+      tabActivatedListeners.forEach((listener) => listener({ tabId: 1, windowId: 1 }));
+    };
   }, { activeUrl: threadsUrl });
 
   await panel.goto(`file://${path.join(root, "extension/sidepanel.html")}`);
   await panel.waitForFunction(() => document.querySelector("#selectButton")?.textContent?.includes("Threads"));
   assert.equal(await panel.locator("#selectButton").isEnabled(), true, "mapped Threads account should enable selection");
   assert.match(await panel.locator("#profileSelect").inputValue(), /profile-1/);
+
+  await panel.evaluate(() => globalThis.__chamberSwitchActiveTab("https://www.facebook.com/tester"));
+  await panel.waitForFunction(() => document.querySelector("#selectButton")?.textContent?.includes("Facebook"));
+  await panel.evaluate((url) => globalThis.__chamberSwitchActiveTab(url), threadsUrl);
+  await panel.waitForFunction(() => document.querySelector("#selectButton")?.textContent?.includes("Threads"));
 
   await panel.locator("#selectButton").click();
   await threads.waitForSelector(".chamber-picker-banner");

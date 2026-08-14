@@ -1,4 +1,4 @@
-# Chamber 0.7.0 Threads Acceptance Matrix
+# Chamber 0.7.x Threads Acceptance Matrix
 
 Base release: `0.6.0`  
 Candidate platform: Threads (`threads.com`, legacy `threads.net`)  
@@ -77,4 +77,4 @@ Run in both Traditional Chinese and English UI where labels differ. Record the p
 
 ## Release decision
 
-Do not promote 0.7.0 while any data-integrity scenario is pending or failing: exact post identity, own-author verification, complete text, complete declared media, encryption, Echo visibility, or owner auto-unlock. Composer image auto-attachment may fall back to an explicit manual step, but it must never claim the card was attached when it was not.
+Do not promote a 0.7.x candidate while any data-integrity scenario is pending or failing: exact post identity, own-author verification, complete text, complete declared media, encryption, Echo visibility, or owner auto-unlock. Composer image auto-attachment may fall back to an explicit manual step, but it must never claim the card was attached when it was not.

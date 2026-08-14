@@ -28,6 +28,8 @@ const languageSelect = document.getElementById("languageSelect");
 const { t, formatDate } = ChamberI18n;
 let selectedRefreshTimer = null;
 let pickerTabId = null;
+let panelContextKey = "";
+let panelContextRefreshTimer = null;
 
 function renderVersion() {
   versionLabel.textContent = t("version.label", { version: chrome.runtime.getManifest().version });
@@ -499,7 +501,44 @@ async function loadPageInfo() {
   if (currentLabel) currentLabel.textContent = t("backup.currentPlatformNamed", { platform: name });
   if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: name });
   if (platform) selectButton.textContent = t("backup.selectPlatform", { platform: name });
-  await renderProfiles();
+  selectButton.disabled = true;
+  rebornButton.disabled = true;
+  try {
+    await renderProfiles();
+  } catch (error) {
+    setStatus(error.message || t("error.loginPlatform", { platform: name }), true);
+  }
+}
+
+function schedulePanelContextRefresh() {
+  if (panelContextRefreshTimer) clearTimeout(panelContextRefreshTimer);
+  panelContextRefreshTimer = setTimeout(async () => {
+    try {
+      panelContextRefreshTimer = null;
+      const tab = await getActiveTab().catch(() => null);
+      const nextKey = `${tab?.id || ""}:${tab?.url || ""}`;
+      if (nextKey === panelContextKey) return;
+
+      if (pickerTabId && pickerTabId !== tab?.id) await cancelActivePicker();
+      if (selectedRefreshTimer) {
+        clearInterval(selectedRefreshTimer);
+        selectedRefreshTimer = null;
+      }
+      panelContextKey = nextKey;
+      resultEl.replaceChildren();
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), {
+        className: "post-meta",
+        textContent: t("backup.notSelected")
+      }));
+      settingsView.hidden = true;
+      rebornView.hidden = true;
+      backupView.hidden = false;
+      setStatus("");
+      await loadPageInfo();
+    } catch (error) {
+      setStatus(error.message || t("page.unavailable"), true);
+    }
+  }, 80);
 }
 
 async function backupPost(payload, button) {
@@ -960,7 +999,20 @@ async function initializePanel() {
     await ChamberI18n.setLocale(languageSelect.value);
     location.reload();
   });
+  // Chrome keeps a Side Panel document alive while the user moves between
+  // Facebook and Threads. Follow the active tab instead of retaining the
+  // platform and URL that were visible when the panel first opened.
+  chrome.tabs.onActivated?.addListener(schedulePanelContextRefresh);
+  chrome.tabs.onUpdated?.addListener((tabId, changeInfo, updatedTab) => {
+    if (!changeInfo.url && changeInfo.status !== "complete") return;
+    if (updatedTab?.active || tabId === Number(panelContextKey.split(":", 1)[0])) {
+      schedulePanelContextRefresh();
+    }
+  });
+  chrome.windows?.onFocusChanged?.addListener(schedulePanelContextRefresh);
   await loadPageInfo();
+  const tab = await getActiveTab();
+  panelContextKey = `${tab?.id || ""}:${tab?.url || ""}`;
 }
 
 initializePanel().catch(() => {

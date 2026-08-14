@@ -11,7 +11,7 @@ const baseUrl = process.env.CHAMBER_ECHO_BASE_URL || "https://studio.milkcat.org
 const posts = {
   "threads-new": {
     protocol_version: "0.2.0",
-    extension_version: "0.7.0",
+    extension_version: "0.7.1",
     identity_alias: "threadstest",
     identity_key: "threads-content-key",
     author_wallet: "0x1111111111111111111111111111111111111111",
@@ -29,7 +29,7 @@ const posts = {
   },
   "threads-old": {
     protocol_version: "0.2.0",
-    extension_version: "0.7.0",
+    extension_version: "0.7.1",
     identity_alias: "threadstest",
     identity_key: "threads-content-key",
     author_wallet: "0x1111111111111111111111111111111111111111",

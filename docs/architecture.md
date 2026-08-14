@@ -109,7 +109,7 @@ flowchart TB
 ## Notes
 
 - 這份圖描述目前測試版；主網、完整影片備份、使用者付費與跨平台發佈仍屬未來版本。
-- `0.6.0` 是 Facebook 穩定封測基線；Threads 在 `0.7.0` 候選線驗證，真實頁面驗收矩陣見 [`docs/threads-0.7-validation.md`](threads-0.7-validation.md)。
+- `0.6.0` 是 Facebook 穩定封測基線；Threads 在 `0.7.x` 候選線驗證，真實頁面驗收矩陣見 [`docs/threads-0.7-validation.md`](threads-0.7-validation.md)。
 - 資料可攜性、直接交易存取方式與第三方閱讀器最小實作見 [`docs/data-portability.md`](data-portability.md)。
 - Echo mainnet 的官方網站與客戶端不以 DNS 作為最終信任來源。規劃中的 Genesis Anchor 會固定協定身分、治理規則與簽署式 Root Manifest；完整規格與實作里程碑見 [`docs/echo-genesis-root.md`](echo-genesis-root.md)。
 - 如果之後要更細，可以再拆成：

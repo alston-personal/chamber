@@ -26,7 +26,7 @@ The MVP does not implement user-paid storage, platform fees, production-wallet p
 
 ## Candidate: Threads parity on the 0.6.0 contract
 
-Status: `0.7.0` candidate; the stable website download remains `0.6.0` until real Threads acceptance passes.
+Status: `0.7.x` candidate; the stable website download remains `0.6.0` until real Threads acceptance passes.
 
 - Add a replaceable Threads adapter without mixing Threads DOM rules into the Facebook adapter.
 - Reuse one Chamber owner identity, local encryption key hierarchy and 2-of-3 recovery set across Facebook and Threads bindings.

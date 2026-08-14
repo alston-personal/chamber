@@ -10,7 +10,7 @@
 
 目前狀態：官網穩定版為 `0.6.0`；後續 Threads 支援在 `develop` 開發，不得覆寫該穩定下載。雙語驗證矩陣見 [`docs/i18n-release-checklist.md`](i18n-release-checklist.md)。
 
-Threads 開發候選版為 `0.7.0`。可建立版本化 `chamber-extension-v0.7.0.zip` 供人工驗收，但在 [`docs/threads-0.7-validation.md`](threads-0.7-validation.md) 的資料完整性項目通過前，不得使用 `--promote`、不得修改穩定 alias，也不得把 `latest.json` 從 0.6.0 移走。
+Threads 開發候選線為 `0.7.x`。可建立版本化 ZIP 供人工驗收，但在 [`docs/threads-0.7-validation.md`](threads-0.7-validation.md) 的資料完整性項目通過前，不得使用 `--promote`、不得修改穩定 alias，也不得把 `latest.json` 從 0.6.0 移走。
 
 ## 日常開發
 
