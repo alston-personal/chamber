@@ -4,9 +4,13 @@ import React, { useState } from "react";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useI18n } from "@/components/locale-provider";
 
 export default function Home() {
   const router = useRouter();
+  const { locale, t } = useI18n();
+  const guideHref = locale === "en" ? "/en/guide" : "/guide";
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -21,7 +25,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("chamber_logged_in_wallet", address);
     }
-    setStatusMessage("連結成功！正在跳轉至您的個人動態牆...");
+    setStatusMessage(t("home.connectSuccess"));
     setIsModalOpen(false);
     setTimeout(() => {
       router.push(`/${address}/all`);
@@ -29,7 +33,7 @@ export default function Home() {
   };
 
   const connectSandboxWallet = () => {
-    setStatusMessage("啟動安全模擬錢包...");
+    setStatusMessage(t("home.sandboxStarting"));
     const mockAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
     setWalletAddress(mockAddress);
     enterWithWallet(mockAddress);
@@ -37,7 +41,7 @@ export default function Home() {
 
   const connectMetaMask = async () => {
     setIsConnecting(true);
-    setStatusMessage("正在連結 MetaMask...");
+    setStatusMessage(t("home.metamaskConnecting"));
     if (typeof window !== "undefined" && (window as any).ethereum) {
       try {
         const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
@@ -46,11 +50,11 @@ export default function Home() {
         enterWithWallet(address);
       } catch (err: any) {
         console.error("MetaMask connection failed:", err);
-        let errorMsg = err.message || "未知錯誤";
+        let errorMsg = err.message || t("home.unknownError");
         if (errorMsg.includes("Unexpected error") || (err.code && String(err.code) === "-32603")) {
-          errorMsg = "MetaMask 傳回未預期錯誤 (-32603)。通常是由於 MetaMask 中有尚未關閉的懸置連線請求。請打開 MetaMask 插件手動確認，或點選下方按鈕使用測試模擬錢包進入。";
+          errorMsg = t("home.metamaskPending");
         } else {
-          errorMsg = "連結失敗: " + errorMsg;
+          errorMsg = t("home.connectFailed", { error: errorMsg });
         }
         setStatusMessage(errorMsg);
         setShowFallbackBtn(true);
@@ -66,7 +70,7 @@ export default function Home() {
   const connectWallet = async () => {
     setIsConnecting(true);
     setShowFallbackBtn(false);
-    setStatusMessage("正在偵測 Chamber 擴充功能與錢包...");
+    setStatusMessage(t("home.detecting"));
     setDetectedExtWallet("");
 
     let extensionActive = false;
@@ -81,7 +85,7 @@ export default function Home() {
           clearTimeout(extensionTimeout);
           setDetectedExtWallet(extWallet);
           setIsModalOpen(true);
-          setStatusMessage("已偵測到 Chamber 擴充功能錢包！請在彈窗中選擇連結方式。");
+          setStatusMessage(t("home.extensionDetected"));
           setIsConnecting(false);
         }
       }
@@ -99,7 +103,7 @@ export default function Home() {
 
       // No extension detected, open modal to let user connect MetaMask or read-only mode
       setIsModalOpen(true);
-      setStatusMessage("未偵測到 Chamber 擴充功能外掛，請選擇其它連結方式。");
+      setStatusMessage(t("home.extensionMissing"));
       setIsConnecting(false);
     }, 400);
   };
@@ -132,23 +136,24 @@ export default function Home() {
               <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-indigo-200 to-purple-300 bg-clip-text text-transparent">
                 Chamber Protocol
               </h1>
-              <p className="text-[9px] text-slate-500 font-mono">去中心化社交迴響室</p>
+              <p className="text-[9px] text-slate-500 font-mono">{t("home.subtitle")}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href="/guide"
+              href={guideHref}
               className="hidden sm:inline-flex text-xs font-semibold text-slate-300 hover:text-white px-3 py-2.5 rounded-full hover:bg-slate-900 transition-colors"
             >
-              安裝與使用指南
+              {t("common.guide")}
             </Link>
             <button
               onClick={connectWallet}
               disabled={isConnecting}
               className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-full shadow-lg shadow-indigo-600/30 transition-all duration-200"
             >
-              {walletAddress ? "已連結錢包" : "連結錢包登入"}
+              {walletAddress ? t("home.walletConnected") : t("home.connectWallet")}
             </button>
+            <LanguageSwitcher compact routeAware />
           </div>
         </div>
       </header>
@@ -165,7 +170,7 @@ export default function Home() {
                 onClick={connectSandboxWallet}
                 className="mt-3 inline-block text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-all duration-200"
               >
-                ⚡ 使用測試模擬錢包直接進入
+                {t("home.useSandbox")}
               </button>
             )}
           </div>
@@ -174,12 +179,10 @@ export default function Home() {
         {/* Hero Headline */}
         <div className="text-center max-w-2xl mb-12">
           <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-slate-50 to-indigo-200 bg-clip-text text-transparent mb-4 leading-tight">
-            您的社交數據，由您永久掌控
+            {t("home.hero")}
           </h2>
           <p className="text-sm md:text-base text-slate-400 leading-relaxed">
-            Chamber 目前提供 Facebook 本人文章的加密備份測試。
-            文字與支援的圖片會先在瀏覽器本機加密，再寫入 Irys Devnet；
-            擁有者登入後會自動解鎖，也能在 Echo 核准其他 Chamber 使用者閱讀指定單篇，不必交出復原金鑰。
+            {t("home.heroBody")}
           </p>
         </div>
 
@@ -192,16 +195,16 @@ export default function Home() {
               <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4 font-bold text-lg">
                 🔑
               </div>
-              <h3 className="text-base font-bold text-slate-100 mb-2">開啟私密 Echo</h3>
+              <h3 className="text-base font-bold text-slate-100 mb-2">{t("home.privateEcho")}</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Chamber 擴充功能在本機完成身分驗證與 AES 解密；擁有者與獲准讀者登入後由 Echo 自動解鎖。
+                {t("home.privateEchoBody")}
               </p>
             </div>
             <button
               onClick={connectWallet}
               className="mt-6 w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-950 hover:bg-slate-800 border border-slate-850 hover:border-indigo-500 text-indigo-300 transition-all duration-200"
             >
-              連結並開啟
+              {t("home.connectOpen")}
             </button>
           </div>
 
@@ -211,9 +214,9 @@ export default function Home() {
               <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4 font-bold text-lg">
                 🔍
               </div>
-              <h3 className="text-base font-bold text-slate-100 mb-2">追蹤創作者</h3>
+              <h3 className="text-base font-bold text-slate-100 mb-2">{t("home.followCreator")}</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                輸入創作者註冊的 Web3 暱稱或其錢包地址，直接讀取其永久備份在去中心化網路上的文章動態。
+                {t("home.followCreatorBody")}
               </p>
             </div>
             <form onSubmit={handleSearchSubmit} className="mt-6 flex gap-2">
@@ -221,14 +224,14 @@ export default function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="暱稱 (例如: sunlake)"
+                placeholder={t("home.aliasPlaceholder")}
                 className="flex-1 bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 text-slate-200"
               />
               <button
                 type="submit"
                 className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-purple-50 rounded-xl text-xs font-semibold transition-all"
               >
-                進入
+                {t("common.enter")}
               </button>
             </form>
           </div>
@@ -239,9 +242,9 @@ export default function Home() {
               <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4 font-bold text-lg">
                 📦
               </div>
-              <h3 className="text-base font-bold text-slate-100 mb-2">下載瀏覽器擴充功能</h3>
+              <h3 className="text-base font-bold text-slate-100 mb-2">{t("home.download")}</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                安裝後從側欄明確選取自己的 Facebook 文章，再備份文字、支援的圖片與原文連結。
+                {t("home.downloadBody")}
               </p>
             </div>
             <a
@@ -249,13 +252,13 @@ export default function Home() {
               download="chamber-extension-v0.5.8.zip"
               className="mt-6 w-full text-center py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-emerald-50 transition-all duration-200 shadow-md shadow-emerald-900/20"
             >
-              📥 下載 Extension 0.5.8（封測版）
+              {t("home.downloadButton")}
             </a>
             <Link
-              href="/guide"
+              href={guideHref}
               className="mt-3 text-center text-xs font-semibold text-emerald-300 hover:text-emerald-200 hover:underline"
             >
-              先看安裝與使用指南 →
+              {t("home.readGuide")}
             </Link>
           </div>
 
@@ -263,31 +266,31 @@ export default function Home() {
 
         {/* Protocol Visual Architecture Diagram */}
         <section className="w-full max-w-3xl p-8 bg-slate-900/20 border border-slate-900 rounded-3xl backdrop-blur-sm">
-          <h3 className="text-sm font-bold text-slate-300 text-center mb-6">Chamber 去中心化社交架構流程</h3>
+          <h3 className="text-sm font-bold text-slate-300 text-center mb-6">{t("home.flow")}</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
             
             <div className="p-4 bg-slate-950/40 border border-slate-900 rounded-2xl">
               <div className="text-indigo-400 text-xs font-bold font-mono mb-1">01 / Select</div>
-              <h4 className="text-xs font-bold text-slate-200 mb-1">明確選取文章</h4>
-              <p className="text-[10px] text-slate-500">使用者在 Facebook 頁面選取一篇自己的文章，避免備份錯篇。</p>
+              <h4 className="text-xs font-bold text-slate-200 mb-1">{t("home.select")}</h4>
+              <p className="text-[10px] text-slate-500">{t("home.selectBody")}</p>
             </div>
 
             <div className="p-4 bg-slate-950/40 border border-slate-900 rounded-2xl">
               <div className="text-indigo-400 text-xs font-bold font-mono mb-1">02 / Encrypt</div>
-              <h4 className="text-xs font-bold text-slate-200 mb-1">本機加密</h4>
-              <p className="text-[10px] text-slate-500">文字與圖片在擴充功能內以 AES-GCM 加密，金鑰留在使用者端。</p>
+              <h4 className="text-xs font-bold text-slate-200 mb-1">{t("home.encrypt")}</h4>
+              <p className="text-[10px] text-slate-500">{t("home.encryptBody")}</p>
             </div>
 
             <div className="p-4 bg-slate-950/40 border border-slate-900 rounded-2xl">
               <div className="text-indigo-400 text-xs font-bold font-mono mb-1">03 / Write-Through</div>
-              <h4 className="text-xs font-bold text-slate-200 mb-1">API 寫入上鏈</h4>
-              <p className="text-[10px] text-slate-500">目前測試版透過 Chamber API 寫入 Irys Devnet，主網尚未啟用。</p>
+              <h4 className="text-xs font-bold text-slate-200 mb-1">{t("home.write")}</h4>
+              <p className="text-[10px] text-slate-500">{t("home.writeBody")}</p>
             </div>
 
             <div className="p-4 bg-slate-950/40 border border-slate-900 rounded-2xl">
               <div className="text-indigo-400 text-xs font-bold font-mono mb-1">04 / Echo Portal</div>
-              <h4 className="text-xs font-bold text-slate-200 mb-1">去中心化動態牆</h4>
-              <p className="text-[10px] text-slate-500">Echo 自動向 Chamber 擴充功能請求本機解密，並集中處理單篇閱讀申請。</p>
+              <h4 className="text-xs font-bold text-slate-200 mb-1">{t("home.echoPortal")}</h4>
+              <p className="text-[10px] text-slate-500">{t("home.echoPortalBody")}</p>
             </div>
 
           </div>
@@ -298,8 +301,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-8 border-t border-indigo-950/20 text-center text-xs text-slate-650 font-mono font-sans">
         <p>© 2026 Chamber Protocol • studio.milkcat.org/echo</p>
-        <Link href="/guide" className="inline-block mt-2 text-indigo-400 hover:text-indigo-300 hover:underline">
-          安裝與使用指南
+        <Link href={guideHref} className="inline-block mt-2 text-indigo-400 hover:text-indigo-300 hover:underline">
+          {t("common.guide")}
         </Link>
       </footer>
 
@@ -314,10 +317,10 @@ export default function Home() {
               ✕
             </button>
             <h3 className="text-lg font-bold text-slate-100 mb-2 flex items-center gap-2">
-              🔑 選擇連結錢包
+              🔑 {t("home.chooseWallet")}
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              選擇登入時光軸的 Web3 錢包，以讀取去中心化文章並解密私密備份。
+              {t("home.chooseWalletBody")}
             </p>
 
             <div className="space-y-4">
@@ -327,10 +330,10 @@ export default function Home() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      Chamber 擴充功能錢包
+                      {t("home.extensionWallet")}
                     </span>
                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
-                      已偵測到
+                      {t("home.detected")}
                     </span>
                   </div>
                   <p className="text-xs font-mono text-slate-300 mb-3 truncate">
@@ -340,13 +343,13 @@ export default function Home() {
                     onClick={() => enterWithWallet(detectedExtWallet)}
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
                   >
-                    使用此外掛錢包進入
+                    {t("home.useExtensionWallet")}
                   </button>
                 </div>
               ) : (
                 <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl">
                   <p className="text-xs text-slate-500 text-center py-2">
-                    未偵測到 Chamber 擴充功能外掛 (若您已安裝請解鎖)
+                    {t("home.extensionUnlockHint")}
                   </p>
                 </div>
               )}
@@ -360,10 +363,10 @@ export default function Home() {
                   <span className="text-lg">🦊</span>
                   <div>
                     <h4 className="text-xs font-bold text-slate-200 group-hover:text-indigo-300 transition-colors">
-                      MetaMask / 瀏覽器錢包
+                      {t("home.browserWallet")}
                     </h4>
                     <p className="text-[10px] text-slate-500 leading-relaxed">
-                      調用瀏覽器擴充錢包以進行多帳號切換與連結
+                      {t("home.browserWalletBody")}
                     </p>
                   </div>
                 </div>
@@ -379,10 +382,10 @@ export default function Home() {
                   <span className="text-lg">⚡</span>
                   <div>
                     <h4 className="text-xs font-bold text-slate-200 group-hover:text-indigo-300 transition-colors">
-                      模擬安全錢包 (Sandbox)
+                      {t("home.sandboxWallet")}
                     </h4>
                     <p className="text-[10px] text-slate-500 leading-relaxed">
-                      免安裝錢包，使用沙盒模擬帳戶直接登入體驗
+                      {t("home.sandboxWalletBody")}
                     </p>
                   </div>
                 </div>
@@ -393,7 +396,7 @@ export default function Home() {
             {/* Divider */}
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-800"></span></div>
-              <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-slate-900 px-2 text-slate-500 font-mono">或</span></div>
+              <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-slate-900 px-2 text-slate-500 font-mono">{t("home.or")}</span></div>
             </div>
 
             {/* Read-only Query */}
@@ -402,14 +405,14 @@ export default function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="輸入創作者別名或錢包地址 (唯讀模式)"
+                placeholder={t("home.readOnlyPlaceholder")}
                 className="flex-1 bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-200"
               />
               <button
                 type="submit"
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-semibold transition-all"
               >
-                進入
+                {t("common.enter")}
               </button>
             </form>
           </div>
