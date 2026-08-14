@@ -39,6 +39,7 @@
     textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid #334155; border-radius: 9px; background: #111827; color: #e2e8f0; font: inherit; font-size: 12px; line-height: 1.55; }
     .top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .language-picker { width: auto; min-width: 118px; padding: 6px 8px; border: 1px solid #334155; border-radius: 8px; background: #111827; color: #e2e8f0; font-size: 11px; }
+    .platform-picker { width: 100%; margin: 6px 0 12px; padding: 9px; border: 1px solid #475569; border-radius: 8px; background: #111827; color: #e2e8f0; font-size: 12px; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -57,6 +58,11 @@
   </div>
   <div id="backupView">
   <div class="card">
+    <label class="label" for="platformSelect" data-i18n="platform.label">備份平台</label>
+    <select id="platformSelect" class="platform-picker">
+      <option value="facebook">Facebook</option>
+      <option value="threads">Threads</option>
+    </select>
     <div id="currentPlatformLabel" class="label" data-i18n="backup.currentPlatformTab">目前社群平台分頁（不是備份內容）</div>
     <div id="pageUrl" data-i18n="backup.loading">讀取中...</div>
   </div>

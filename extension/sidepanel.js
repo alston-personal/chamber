@@ -25,11 +25,13 @@ const recoveryExport = document.getElementById("recoveryExport");
 const recoveryStatus = document.getElementById("recoveryStatus");
 const versionLabel = document.getElementById("versionLabel");
 const languageSelect = document.getElementById("languageSelect");
+const platformSelect = document.getElementById("platformSelect");
 const { t, formatDate } = ChamberI18n;
 let selectedRefreshTimer = null;
 let pickerTabId = null;
 let panelContextKey = "";
 let panelContextRefreshTimer = null;
+let preferredActiveTabId = null;
 
 function renderVersion() {
   versionLabel.textContent = t("version.label", { version: chrome.runtime.getManifest().version });
@@ -460,8 +462,37 @@ async function sendTabMessageWithRecovery(tabId, message) {
 }
 
 async function getActiveTab() {
-  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return tabs[0];
+  if (preferredActiveTabId != null && chrome.tabs.get) {
+    try {
+      const preferred = await chrome.tabs.get(preferredActiveTabId);
+      if (preferred?.active) return preferred;
+    } catch (_) {
+      preferredActiveTabId = null;
+    }
+  }
+  const current = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (current[0]) return current[0];
+  const active = await chrome.tabs.query({ active: true });
+  return active.find((tab) => platformForTab(tab)) || active[0];
+}
+
+async function activatePlatformTab(platform) {
+  const patterns = platform === "threads"
+    ? ["*://*.threads.com/*", "*://*.threads.net/*"]
+    : ["*://*.facebook.com/*"];
+  let tabs = await chrome.tabs.query({ currentWindow: true, url: patterns });
+  if (!tabs.length) tabs = await chrome.tabs.query({ url: patterns });
+  const tab = tabs.sort((a, b) => Number(b.active) - Number(a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+  if (!tab?.id) {
+    const created = await chrome.tabs.create({ url: platform === "threads" ? "https://www.threads.com/" : "https://www.facebook.com/", active: true });
+    preferredActiveTabId = created?.id ?? null;
+  } else {
+    preferredActiveTabId = tab.id;
+    if (tab.windowId != null && chrome.windows?.update) await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: true });
+  }
+  panelContextKey = "";
+  schedulePanelContextRefresh();
 }
 
 async function cancelActivePicker() {
@@ -496,6 +527,7 @@ async function loadPageInfo() {
   pageUrlEl.textContent = tab?.url || t("page.unavailable");
   const platform = platformForTab(tab);
   const name = platformName(platform || "facebook");
+  if (platform && platformSelect) platformSelect.value = platform;
   const currentLabel = document.getElementById("currentPlatformLabel");
   const promptLabel = document.getElementById("selectPromptLabel");
   if (currentLabel) currentLabel.textContent = t("backup.currentPlatformNamed", { platform: name });
@@ -1003,13 +1035,18 @@ async function initializePanel() {
   // Facebook and Threads. Follow the active tab instead of retaining the
   // platform and URL that were visible when the panel first opened.
   chrome.tabs.onActivated?.addListener(schedulePanelContextRefresh);
+  chrome.tabs.onActivated?.addListener(({ tabId }) => { preferredActiveTabId = tabId; });
   chrome.tabs.onUpdated?.addListener((tabId, changeInfo, updatedTab) => {
     if (!changeInfo.url && changeInfo.status !== "complete") return;
+    if (updatedTab?.active) preferredActiveTabId = tabId;
     if (updatedTab?.active || tabId === Number(panelContextKey.split(":", 1)[0])) {
       schedulePanelContextRefresh();
     }
   });
   chrome.windows?.onFocusChanged?.addListener(schedulePanelContextRefresh);
+  platformSelect?.addEventListener("change", () => {
+    activatePlatformTab(platformSelect.value).catch((error) => setStatus(error.message, true));
+  });
   await loadPageInfo();
   const tab = await getActiveTab();
   panelContextKey = `${tab?.id || ""}:${tab?.url || ""}`;

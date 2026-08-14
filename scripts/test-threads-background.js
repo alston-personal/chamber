@@ -60,7 +60,7 @@ const context = vm.createContext({
   chrome: {
     sidePanel: { setPanelBehavior: async () => {} },
     runtime: {
-      getManifest: () => ({ version: "0.7.1" }),
+      getManifest: () => ({ version: "0.7.2" }),
       onMessage: { addListener: (value) => { listener = value; } }
     },
     storage: {

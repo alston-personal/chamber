@@ -77,8 +77,25 @@ async function main() {
 
   await panel.addInitScript(({ activeUrl }) => {
     let currentActiveUrl = activeUrl;
+    let currentActiveId = 1;
     const tabActivatedListeners = [];
     const tabUpdatedListeners = [];
+    const knownTabs = [
+      { id: 1, windowId: 1, url: activeUrl, active: true, lastAccessed: 2 },
+      { id: 2, windowId: 1, url: "https://www.facebook.com/tester", active: false, lastAccessed: 1 }
+    ];
+    const matchesPattern = (url, pattern) => {
+      const host = new URL(url).hostname;
+      if (pattern.includes("threads.com")) return host === "threads.com" || host.endsWith(".threads.com");
+      if (pattern.includes("threads.net")) return host === "threads.net" || host.endsWith(".threads.net");
+      if (pattern.includes("facebook.com")) return host === "facebook.com" || host.endsWith(".facebook.com");
+      return false;
+    };
+    const setActive = (tabId) => {
+      currentActiveId = tabId;
+      knownTabs.forEach((tab) => { tab.active = tab.id === tabId; });
+      currentActiveUrl = knownTabs.find((tab) => tab.id === tabId)?.url || currentActiveUrl;
+    };
     const store = {
       lastFbUserId: "owner-1",
       activeChamberProfileId: "profile-1",
@@ -106,11 +123,26 @@ async function main() {
     globalThis.chrome = {
       runtime: {
         lastError: null,
-        getManifest: () => ({ version: "0.7.1" }),
+        getManifest: () => ({ version: "0.7.2" }),
         sendMessage: (message, callback) => globalThis.__chamberSendMessage(message).then(callback)
       },
       tabs: {
-        query: async () => [{ id: 1, url: currentActiveUrl, active: true }],
+        query: async (query = {}) => {
+          if (query.url) {
+            const patterns = Array.isArray(query.url) ? query.url : [query.url];
+            return knownTabs.filter((tab) => patterns.some((pattern) => matchesPattern(tab.url, pattern)));
+          }
+          if (query.active) return knownTabs.filter((tab) => tab.active);
+          return knownTabs.slice();
+        },
+        get: async (tabId) => knownTabs.find((tab) => tab.id === tabId),
+        update: async (tabId, changes) => {
+          if (changes.active) setActive(tabId);
+          const tab = knownTabs.find((item) => item.id === tabId);
+          tabUpdatedListeners.forEach((listener) => listener(tabId, { status: "complete" }, tab));
+          tabActivatedListeners.forEach((listener) => listener({ tabId, windowId: 1 }));
+          return tab;
+        },
         create: ({ url }) => globalThis.__chamberOpenTab(url),
         onActivated: { addListener: (listener) => tabActivatedListeners.push(listener) },
         onUpdated: { addListener: (listener) => tabUpdatedListeners.push(listener) }
@@ -146,9 +178,10 @@ async function main() {
     };
     globalThis.__chamberSwitchActiveTab = async (url) => {
       currentActiveUrl = url;
-      const tab = { id: 1, url, active: true };
-      tabUpdatedListeners.forEach((listener) => listener(1, { url, status: "complete" }, tab));
-      tabActivatedListeners.forEach((listener) => listener({ tabId: 1, windowId: 1 }));
+      const tab = knownTabs.find((item) => item.url === url) || { id: currentActiveId, windowId: 1, url, active: true };
+      setActive(tab.id);
+      tabUpdatedListeners.forEach((listener) => listener(tab.id, { url, status: "complete" }, tab));
+      tabActivatedListeners.forEach((listener) => listener({ tabId: tab.id, windowId: 1 }));
     };
   }, { activeUrl: threadsUrl });
 
@@ -159,7 +192,7 @@ async function main() {
 
   await panel.evaluate(() => globalThis.__chamberSwitchActiveTab("https://www.facebook.com/tester"));
   await panel.waitForFunction(() => document.querySelector("#selectButton")?.textContent?.includes("Facebook"));
-  await panel.evaluate((url) => globalThis.__chamberSwitchActiveTab(url), threadsUrl);
+  await panel.locator("#platformSelect").selectOption("threads");
   await panel.waitForFunction(() => document.querySelector("#selectButton")?.textContent?.includes("Threads"));
 
   await panel.locator("#selectButton").click();
