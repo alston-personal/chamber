@@ -2,6 +2,8 @@
 
 This checklist verifies the current Chamber test release across the extension, API, and Echo.
 
+The closed-alpha deployment remains Web2-distributed. Before mainnet, the separate Genesis Root of Trust checklist in [`docs/echo-genesis-root.md`](echo-genesis-root.md) must be completed; a checksum served by the same website is not sufficient proof of official identity.
+
 ## 1. Confirm The Code On Disk
 
 Make sure the live server is using the current repo version:

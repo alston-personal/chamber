@@ -33,3 +33,7 @@ python3 scripts/pack-extension.py --release 0.5.8 --promote
 7. 提交 release commit、建立 Git tag，最後才部署官網。
 
 `--promote` 是唯一允許覆寫相容下載檔 `web-feed/public/chamber-extension.zip` 的流程。只執行一般打包不會影響已發佈版本。
+
+## Mainnet 前的發佈升級
+
+目前封測仍由官網提供版本化檔案與 SHA-256。Mainnet 前，release 流程必須再加入候選 Root Manifest、治理多簽、Genesis ancestry 驗證、manifest 發佈及可驗證 rollback；完整規格見 [`docs/echo-genesis-root.md`](echo-genesis-root.md)。在該流程完成前，不得把 `latest.json` 或 DNS 當成 Echo 的 canonical root of trust。

@@ -69,3 +69,5 @@ The query result supplies transaction IDs; each transaction can then be fetched 
 The stored ciphertext and media are independently retrievable today. Echo remains the only completed user-facing reader, and the current Extension bridge intentionally answers only pages on `studio.milkcat.org`; arbitrary websites cannot silently ask it to decrypt owner data.
 
 True application independence therefore requires a compatible reader that implements the schema and cryptography above, plus an explicit owner-controlled key import or authorization flow. A standalone/offline Chamber reader and a versioned public protocol schema are release requirements before mainnet—not prerequisites for proving that the raw Web3 transaction is accessible without Echo.
+
+The standalone reader must eventually discover and authenticate its own official release through the Echo Genesis Root of Trust rather than trusting DNS or the current website's `latest.json`. See [`docs/echo-genesis-root.md`](echo-genesis-root.md).

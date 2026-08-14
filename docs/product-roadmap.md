@@ -56,6 +56,19 @@ The existing raw transfer endpoint is intentionally closed until this coordinato
 - Keep direct gateway and GraphQL discovery instructions independent from Echo routes.
 - Define migration rules so a reader can support older protocol versions without depending on the current Echo implementation.
 
+## Required before mainnet: Echo Genesis Root of Trust
+
+Status: planned — specification recorded in [`docs/echo-genesis-root.md`](echo-genesis-root.md).
+
+- Publish an immutable Genesis Anchor transaction containing Echo's protocol identity, specification commitment, initial Root Manifest commitment and threshold-governance rules.
+- Replace the unsigned Web2 `latest.json` trust model with immutable, predecessor-linked Root Manifests signed by the required governance threshold.
+- Put content-addressed website, Extension, documentation, explorer and standalone-reader artifacts in each manifest; never place the complete mutable website directly in genesis.
+- Pin the Genesis Anchor in Chamber Extension and the standalone reader so DNS and gateways remain replaceable aliases rather than the source of official identity.
+- Implement governance-key rotation, manifest revocation, deliberate rollback and downgrade/replay protection before mainnet.
+- Demonstrate independent recovery of the official frontend and clients without `studio.milkcat.org` or GitHub.
+
+Implementation order is G0 specification/threat model, G1 devnet anchor, G2 independent verifier, G3 signed release pipeline, G4 rotation/revocation/rollback rehearsal, and G5 mainnet commitment.
+
 ## Deferred: full-quality paid backups
 
 Status: Future version — explicitly out of MVP scope.
