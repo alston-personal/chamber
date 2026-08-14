@@ -24,10 +24,21 @@ const settingsBack = document.getElementById("settingsBack");
 const recoveryExport = document.getElementById("recoveryExport");
 const recoveryStatus = document.getElementById("recoveryStatus");
 const versionLabel = document.getElementById("versionLabel");
+const languageSelect = document.getElementById("languageSelect");
+const { t, formatDate } = ChamberI18n;
 let selectedRefreshTimer = null;
 let pickerTabId = null;
 
-versionLabel.textContent = `Chamber Core V${chrome.runtime.getManifest().version} · 測試版 · 測試網`;
+function renderVersion() {
+  versionLabel.textContent = t("version.label", { version: chrome.runtime.getManifest().version });
+}
+
+function validationMessage(validation, payload) {
+  const key = validation?.code === "AUTHOR_NOT_CONFIRMED" && payload?.isOwnAuthor === false
+    ? "validation.NOT_OWNER"
+    : `validation.${validation?.code || "CONTENT_REQUIRED"}`;
+  return t(key);
+}
 
 function bytesToHex(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -38,7 +49,7 @@ async function activeFacebookIdentity() {
   const cookie = tab?.url?.includes("facebook.com")
     ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
     : null;
-  if (!cookie?.value) throw new Error("請先開啟並登入 Facebook。 ");
+  if (!cookie?.value) throw new Error(t("error.loginFacebook"));
   return { userId: cookie.value, prefix: `user_${cookie.value}_` };
 }
 
@@ -66,8 +77,8 @@ async function refreshRecoveryStatus() {
     const { prefix } = await activeFacebookIdentity();
     const data = await chrome.storage.local.get([prefix + "recoveryExportedAt", prefix + "recoveryLocalShare", prefix + "recoveryExportConfirmedVersion"]);
     recoveryStatus.textContent = data[prefix + "recoveryExportedAt"] && data[prefix + "recoveryLocalShare"] && data[prefix + "recoveryExportConfirmedVersion"] === "2-of-3-vault-v1"
-      ? `✅ Recovery Vault 已於 ${new Date(data[prefix + "recoveryExportedAt"]).toLocaleString()} 完成設定。`
-      : "⚠️ 尚未完成 Recovery Vault；備份仍可進行，但移除 Extension 前應先設定復原。";
+      ? t("recovery.complete", { date: formatDate(data[prefix + "recoveryExportedAt"], { dateStyle: "medium", timeStyle: "short" }) })
+      : t("recovery.incomplete");
   } catch (error) {
     recoveryStatus.textContent = error.message;
   }
@@ -97,7 +108,7 @@ async function getActiveProfile() {
   if (!profiles.length) {
     const alias = data[prefix + "identityAlias"] || "";
     const wallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || "";
-    const first = { id: profileId(), name: alias || "我的 Chamber 帳號", alias, walletAddress: wallet, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const first = { id: profileId(), name: alias || t("account.defaultName"), alias, walletAddress: wallet, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     profiles = [first];
     activeId = first.id;
     await chrome.storage.local.set({ chamberProfiles: profiles, activeChamberProfileId: activeId });
@@ -132,7 +143,7 @@ async function renderProfiles() {
   profiles.forEach((profile) => {
     const option = document.createElement("option");
     option.value = profile.id;
-    option.textContent = profile.alias ? `${profile.name} · ${profile.alias}` : `${profile.name} · 尚未 mapping`;
+    option.textContent = profile.alias ? `${profile.name} · ${profile.alias}` : `${profile.name} · ${t("account.unmapped")}`;
     profileSelect.appendChild(option);
   });
   profileSelect.value = activeId;
@@ -140,9 +151,9 @@ async function renderProfiles() {
   const mapped = Boolean(active?.alias);
   selectButton.disabled = !mapped;
   rebornButton.disabled = !mapped;
-  selectButton.title = mapped ? "在 Facebook 選取文章" : "請先完成 Chamber mapping";
+  selectButton.title = mapped ? t("account.selectTitle") : t("account.mappingRequiredTitle");
   if (!mapped) {
-    setStatus("目前 Chamber 帳號尚未 mapping，請先開啟帳號設定。", true);
+    setStatus(t("account.mappingRequired"), true);
   }
 }
 
@@ -170,7 +181,7 @@ recoveryExport?.addEventListener("click", async () => {
       : (data[prefix + "lastEchoUrl"] || "https://studio.milkcat.org/echo");
     await chrome.tabs.create({ url: target });
   } catch (error) {
-    recoveryStatus.textContent = `無法開啟 Echo：${error.message}`;
+    recoveryStatus.textContent = t("recovery.openFailed", { error: error.message });
   }
 });
 
@@ -194,14 +205,14 @@ async function showReborn() {
   const profile = state.profiles.find((item) => item.id === state.activeId);
   if (!profile?.alias) {
     showSettings();
-    settingsAliasStatus.textContent = "請先完成暱稱 mapping，再建立轉世聲明。";
+    settingsAliasStatus.textContent = t("reborn.mappingRequired");
     return;
   }
   backupView.hidden = true;
   settingsView.hidden = true;
   rebornView.hidden = false;
-  if (!rebornText.value.trim()) rebornText.value = ChamberDeclaration.DEFAULT_TEXT;
-  rebornStatus.textContent = `將使用 Chamber 身分 @${profile.alias}`;
+  if (!rebornText.value.trim()) rebornText.value = ChamberDeclaration.getDefaultText();
+  rebornStatus.textContent = t("reborn.identity", { alias: profile.alias });
 }
 
 declarationButton?.addEventListener("click", showSettings);
@@ -212,18 +223,18 @@ rebornBack?.addEventListener("click", showBackup);
 rebornGenerate?.addEventListener("click", async () => {
   const text = rebornText.value.trim();
   if (!text) {
-    rebornStatus.textContent = "請先填寫轉世聲明內容。";
+    rebornStatus.textContent = t("reborn.empty");
     return;
   }
   rebornGenerate.disabled = true;
-  rebornGenerate.textContent = "正在產生轉世卡...";
+  rebornGenerate.textContent = t("reborn.generating");
   try {
     const tab = await getActiveTab();
-    if (!tab?.id || !tab.url?.includes("facebook.com")) throw new Error("請先開啟 Facebook 分頁再產生轉世聲明。");
+    if (!tab?.id || !tab.url?.includes("facebook.com")) throw new Error(t("reborn.facebookRequired"));
     await activeFacebookIdentity();
     const state = await getActiveProfile();
     const profile = state.profiles.find((item) => item.id === state.activeId);
-    if (!profile?.alias) throw new Error("請先完成 Chamber 暱稱 mapping。");
+    if (!profile?.alias) throw new Error(t("reborn.aliasRequired"));
     const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/fb`;
     const card = await ChamberDeclaration.generateCard({ timelineUrl, alias: profile.alias });
 
@@ -240,31 +251,31 @@ rebornGenerate?.addEventListener("click", async () => {
       action: "OPEN_FB_COMPOSER_AND_FILL",
       payload: { text, imageUrl: card.dataUrl },
     });
-    rebornStatus.textContent = "✅ 已產生轉世卡並開啟 Facebook 發文框；請確認內容後自行發佈。";
+    rebornStatus.textContent = t("reborn.success");
   } catch (error) {
-    rebornStatus.textContent = `無法產生：${error.message}`;
+    rebornStatus.textContent = t("reborn.failed", { error: error.message });
   } finally {
     rebornGenerate.disabled = false;
-    rebornGenerate.textContent = "⚡ 產生轉世卡並開啟發文框";
+    rebornGenerate.textContent = t("reborn.generate");
   }
 });
 settingsCheck?.addEventListener("click", async () => {
   const alias = settingsAlias.value.trim();
   if (!alias) {
-    settingsAliasStatus.textContent = "請先輸入身份暱稱。";
+    settingsAliasStatus.textContent = t("alias.required");
     return;
   }
   settingsCheck.disabled = true;
-  settingsAliasStatus.textContent = "檢查中...";
+  settingsAliasStatus.textContent = t("alias.checking");
   try {
     const url = new URL("https://studio.milkcat.org/chamber-api/identity/check");
     url.searchParams.set("alias", alias);
     if (settingsWallet.value.trim()) url.searchParams.set("walletAddress", settingsWallet.value.trim());
     const response = await fetch(url);
     const data = await response.json();
-    settingsAliasStatus.textContent = data.available || data.ownedByRequester ? "✅ 暱稱可以使用。" : "⚠️ 暱稱已被使用，請更換。";
+    settingsAliasStatus.textContent = data.available || data.ownedByRequester ? t("alias.available") : t("alias.taken");
   } catch (error) {
-    settingsAliasStatus.textContent = `檢查失敗：${error.message}`;
+    settingsAliasStatus.textContent = t("alias.checkFailed", { error: error.message });
   } finally {
     settingsCheck.disabled = false;
   }
@@ -272,28 +283,28 @@ settingsCheck?.addEventListener("click", async () => {
 
 settingsSave?.addEventListener("click", async () => {
   const alias = settingsAlias.value.trim();
-  if (!alias) { settingsAliasStatus.textContent = "請先輸入身份暱稱。"; return; }
+  if (!alias) { settingsAliasStatus.textContent = t("alias.required"); return; }
   settingsSave.disabled = true;
-  settingsSave.textContent = "儲存中...";
+  settingsSave.textContent = t("alias.saving");
   try {
     const tab = await getActiveTab();
     const cookie = tab?.url?.includes("facebook.com")
       ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
       : null;
-    if (!cookie?.value) throw new Error("請先開啟 Facebook，才能綁定帳號。");
+    if (!cookie?.value) throw new Error(t("alias.facebookRequired"));
     const wallet = settingsWallet.value.trim();
     const checkUrl = new URL("https://studio.milkcat.org/chamber-api/identity/check");
     checkUrl.searchParams.set("alias", alias);
     if (wallet) checkUrl.searchParams.set("walletAddress", wallet);
     const checkResponse = await fetch(checkUrl);
     const check = await checkResponse.json();
-    if (!check.success || (!check.available && !check.ownedByRequester)) throw new Error("暱稱已被使用或無法使用。");
+    if (!check.success || (!check.available && !check.ownedByRequester)) throw new Error(t("alias.invalid"));
     const registerResponse = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ alias, platform: "facebook", actorType: "personal", actorId: cookie.value, displayName: alias, walletAddress: wallet || null, proof: "" })
     });
     const registered = await registerResponse.json();
-    if (!registerResponse.ok || !registered.success) throw new Error(registered.error || "mapping 儲存失敗。");
+    if (!registerResponse.ok || !registered.success) throw new Error(registered.error || t("alias.mappingSaveFailed"));
     const prefix = `user_${cookie.value}_`;
     const state = await getActiveProfile();
     const profile = state.profiles.find((item) => item.id === state.activeId);
@@ -306,14 +317,14 @@ settingsSave?.addEventListener("click", async () => {
       [prefix + "customWalletAddress"]: wallet,
       chamberProfiles: state.profiles
     });
-    settingsAliasStatus.textContent = `✅ 已完成 mapping：${alias}`;
+    settingsAliasStatus.textContent = t("alias.mapped", { alias });
     await renderProfiles();
     showBackup();
   } catch (error) {
-    settingsAliasStatus.textContent = error.message || "儲存失敗";
+    settingsAliasStatus.textContent = error.message || t("alias.saveFailed");
   } finally {
     settingsSave.disabled = false;
-    settingsSave.textContent = "儲存並套用";
+    settingsSave.textContent = t("settings.save");
   }
 });
 
@@ -327,10 +338,10 @@ switchAccountButton?.addEventListener("click", async () => {
     await chrome.storage.local.set({ lastFbUserId: cookie.value });
   }
   resultEl.replaceChildren();
-  postListEl.innerHTML = '<div class="post-meta">已重新讀取目前 Facebook 帳號；若要換帳號，請先在 Facebook 登出／登入。</div>';
+  postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("account.refreshed") }));
   setStatus(cookie?.value
-    ? "已重新讀取目前 Facebook 帳號；若要換帳號，請先在 Facebook 登出／登入後再按此按鈕。"
-    : "已清除本機帳號上下文；請先在 Facebook 登出／登入，再重新掃描。");
+    ? t("account.refreshHelp")
+    : t("account.contextCleared"));
   await loadPageInfo();
 });
 const DEV_ERROR_ENDPOINT = "https://studio.milkcat.org/chamber-api/dev-errors";
@@ -432,14 +443,14 @@ document.addEventListener("keydown", (event) => {
 
 async function loadPageInfo() {
   const tab = await getActiveTab();
-  pageUrlEl.textContent = tab?.url || "無法讀取目前頁面";
+  pageUrlEl.textContent = tab?.url || t("page.unavailable");
   await renderProfiles();
 }
 
 async function backupPost(payload, button) {
   if (selectedRefreshTimer) { clearInterval(selectedRefreshTimer); selectedRefreshTimer = null; }
   button.disabled = true;
-  setStatus("正在備份選取的文章到 Web3...");
+  setStatus(t("backup.inProgress"));
   reportSidepanelEvent("sidepanel:backup-start", {
     sourceUrl: payload.sourceUrl || "",
     contentLength: String(payload.textContent || payload.content || "").length,
@@ -448,7 +459,7 @@ async function backupPost(payload, button) {
   });
   try {
     const validation = ChamberMvpValidation.validateBackupPayload(payload);
-    if (!validation.ok) throw new Error(validation.message);
+    if (!validation.ok) throw new Error(validationMessage(validation, payload));
     const { userId, prefix } = await activeFacebookIdentity();
     await ensureNativeOwnerKey(userId);
     const profileState = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"]);
@@ -456,7 +467,7 @@ async function backupPost(payload, button) {
       ? profileState.chamberProfiles.find((profile) => profile.id === profileState.activeChamberProfileId)
       : null;
     if (activeProfile && !activeProfile.alias) {
-      throw new Error(`Chamber 帳號「${activeProfile.name}」尚未完成 mapping，請先開啟帳號設定。`);
+      throw new Error(t("backup.accountUnmapped", { name: activeProfile.name }));
     }
     const recoveryState = await chrome.storage.local.get([prefix + "recoveryExportedAt", prefix + "recoveryLocalShare", prefix + "recoveryExportConfirmedVersion"]);
     const recoveryMissing = !recoveryState[prefix + "recoveryExportedAt"] || !recoveryState[prefix + "recoveryLocalShare"] || recoveryState[prefix + "recoveryExportConfirmedVersion"] !== "2-of-3-vault-v1";
@@ -464,14 +475,14 @@ async function backupPost(payload, button) {
       action: "BACKUP_HISTORIC_POST",
       payload
     });
-    if (!result?.success) throw new Error(result?.error || "備份失敗");
+    if (!result?.success) throw new Error(result?.error || t("backup.failed"));
     if (!result.txId || !result.arweaveUrl) {
-      throw new Error("API 回傳成功但沒有交易 ID，未確認已寫入 Web3");
+      throw new Error(t("backup.missingTx"));
     }
 
     setStatus(recoveryMissing
-      ? "備份成功；尚未設定 Recovery Vault。請在方便時完成金鑰復原設定。"
-      : "備份成功");
+      ? t("backup.successRecoveryPending")
+      : t("backup.success"));
     reportSidepanelEvent("sidepanel:backup-success", {
       sourceUrl: payload.sourceUrl || "",
       txId: result.txId,
@@ -480,7 +491,7 @@ async function backupPost(payload, button) {
       contentLength: String(payload.textContent || payload.content || "").length,
       mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0
     });
-    button.textContent = "✅ 已備份";
+    button.textContent = t("backup.done");
     const focusedEchoUrl = (result.echoUrl || "").startsWith("http") ? result.echoUrl : `https://studio.milkcat.org${result.echoUrl || ""}`;
     const timelineEchoUrl = (() => {
       try {
@@ -497,35 +508,35 @@ async function backupPost(payload, button) {
     link.href = focusedEchoUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = "查看這篇備份";
+    link.textContent = t("backup.viewPost");
     const timelineLink = document.createElement("a");
     timelineLink.href = timelineEchoUrl;
     timelineLink.target = "_blank";
     timelineLink.rel = "noopener noreferrer";
-    timelineLink.textContent = "查看完整 Echo 時光牆";
+    timelineLink.textContent = t("backup.viewTimeline");
     links.append(link, timelineLink);
     if (recoveryMissing) {
       const recoveryNotice = document.createElement("div");
       recoveryNotice.className = "danger-note";
-      recoveryNotice.textContent = "尚未設定 2-of-3 Recovery Vault。這不影響本次備份，但若移除擴充功能，可能無法解密。";
+      recoveryNotice.textContent = t("backup.recoveryNotice");
       const recoveryButton = document.createElement("button");
       recoveryButton.type = "button";
       recoveryButton.className = "secondary-action";
-      recoveryButton.textContent = "🛡️ 前往 Echo 設定金鑰復原";
+      recoveryButton.textContent = t("backup.openRecovery");
       recoveryButton.addEventListener("click", async () => {
         try {
           const url = new URL(timelineEchoUrl);
           url.searchParams.set("recovery", "true");
           await chrome.tabs.create({ url: url.href });
         } catch (error) {
-          recoveryNotice.textContent = `無法開啟 Echo：${error.message}`;
+          recoveryNotice.textContent = t("recovery.openFailed", { error: error.message });
         }
       });
       links.append(recoveryNotice, recoveryButton);
     }
     const tx = document.createElement("div");
     tx.className = "post-meta";
-    tx.textContent = `交易已建立：${result.txId.slice(0, 12)}…`;
+    tx.textContent = t("backup.transactionCreated", { tx: result.txId.slice(0, 12) });
     resultEl.replaceChildren(links, tx);
   } catch (error) {
     reportSidepanelEvent("sidepanel:backup-error", {
@@ -534,10 +545,10 @@ async function backupPost(payload, button) {
       contentLength: String(payload.textContent || payload.content || "").length,
       mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0
     });
-    setStatus(error.message || "備份失敗", true);
+    setStatus(error.message || t("backup.failed"), true);
     button.disabled = false;
   } finally {
-    if (button.textContent !== "✅ 已備份") button.disabled = false;
+    if (button.textContent !== t("backup.done")) button.disabled = false;
   }
 }
 
@@ -560,19 +571,19 @@ function watchSelectedPost(payload, button, textEl, tab) {
         refreshed.mediaUrls?.length !== payload.mediaUrls?.length;
       if (!changed) return;
       Object.assign(payload, refreshed);
-      textEl.textContent = payload.textContent || "✅ 已選取文章（Facebook 未提供文字內容）";
+      textEl.textContent = payload.textContent || t("post.selectedNoText");
       const validation = ChamberMvpValidation.validateBackupPayload(payload);
       if (validation.ok) {
         button.disabled = false;
-        button.textContent = "🔒 備份這篇";
+        button.textContent = t("post.backupButton");
         button.onclick = () => backupPost(payload, button);
-        setStatus("文章內容已更新，可以備份。", false);
+        setStatus(t("post.updated"), false);
         clearInterval(selectedRefreshTimer);
         selectedRefreshTimer = null;
       } else if (validation.code === "SOURCE_URL_REQUIRED") {
         button.disabled = true;
-        button.textContent = "⚠️ 找不到文章永久連結";
-        setStatus(validation.message, true);
+        button.textContent = t("post.missingPermalinkButton");
+        setStatus(validationMessage(validation, payload), true);
         clearInterval(selectedRefreshTimer);
         selectedRefreshTimer = null;
       }
@@ -589,17 +600,17 @@ function watchSelectedPost(payload, button, textEl, tab) {
 async function loadPosts() {
   const tab = await getActiveTab();
   if (!tab?.id || !tab.url?.includes("facebook.com")) {
-    postListEl.innerHTML = '<div class="post-meta">目前先支援 Facebook 頁面。</div>';
+    postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.facebookOnly") }));
     return;
   }
   const profileState = await getActiveProfile();
   const activeProfile = profileState.profiles.find((profile) => profile.id === profileState.activeId);
   if (!activeProfile?.alias) {
-    postListEl.innerHTML = '<div class="post-meta">目前 Chamber 帳號尚未 mapping，請先完成設定後再掃描。</div>';
+    postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.mappingBeforeScan") }));
     await renderProfiles();
     return;
   }
-  postListEl.innerHTML = '<div class="post-meta">掃描文章中...</div>';
+  postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.scanning") }));
   try {
     const injected = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -652,38 +663,38 @@ async function loadPosts() {
       }))
     };
     if (!response?.success || !response.posts?.length) {
-      postListEl.innerHTML = '<div class="post-meta">目前畫面找不到文章，請捲動 Facebook 後重新掃描。</div>';
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.noneVisible") }));
       return;
     }
     postListEl.replaceChildren();
     const scanMeta = document.createElement("div");
     scanMeta.className = "post-meta";
-    scanMeta.textContent = `已掃描 ${response.posts.length} 篇（${new Date().toLocaleTimeString()}）`;
+    scanMeta.textContent = t("post.scanCount", { count: response.posts.length, time: formatDate(new Date(), { timeStyle: "medium" }) });
     postListEl.appendChild(scanMeta);
     response.posts.forEach((post, index) => {
       const card = document.createElement("div");
       card.className = "post";
       const text = document.createElement("div");
       text.className = "post-text";
-      text.textContent = `${index + 1}. ${post.textContent || "（圖片／影片貼文）"}`;
+      text.textContent = `${index + 1}. ${post.textContent || t("post.mediaOnly")}`;
       if (post.media?.primary_fb_cdn) {
         const thumb = document.createElement("img");
         thumb.className = "post-thumb";
         thumb.src = post.media.primary_fb_cdn;
-        thumb.alt = "貼文圖片預覽";
+        thumb.alt = t("post.imagePreview");
         card.appendChild(thumb);
       }
       const meta = document.createElement("div");
       meta.className = "post-meta";
-      meta.textContent = post.sourceUrl ? "已偵測到這篇文章的 permalink" : "目前頁面中的文章";
+      meta.textContent = post.sourceUrl ? t("post.permalinkDetected") : t("post.currentPage");
       const button = document.createElement("button");
-      button.textContent = "🔒 備份這篇";
+      button.textContent = t("post.backupButton");
       button.addEventListener("click", () => backupPost(post, button));
       card.append(text, meta, button);
       postListEl.appendChild(card);
     });
   } catch (error) {
-    postListEl.innerHTML = `<div class="post-meta">無法讀取文章：${error.message}</div>`;
+    postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.readFailed", { error: error.message }) }));
   }
 }
 
@@ -692,22 +703,22 @@ async function selectPost() {
   const profileState = await getActiveProfile();
   const activeProfile = profileState.profiles.find((profile) => profile.id === profileState.activeId);
   if (!activeProfile?.alias) {
-    setStatus("目前 Chamber 帳號尚未 mapping，無法選取或備份文章。", true);
-    postListEl.innerHTML = '<div class="post-meta">請先按「開啟 Chamber 帳號設定」完成 alias mapping。</div>';
+    setStatus(t("picker.unmapped"), true);
+    postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.openSettings") }));
     await renderProfiles();
     return;
   }
   const tab = await getActiveTab();
   if (!tab?.id || !tab.url?.includes("facebook.com")) {
-    setStatus("目前先支援 Facebook 頁面。", true);
+    setStatus(t("post.facebookOnly"), true);
     return;
   }
   pickerTabId = tab.id;
   selectButton.disabled = false;
-  selectButton.textContent = "✕ 取消選取文章";
+  selectButton.textContent = t("backup.cancelSelect");
   resultEl.replaceChildren();
-  postListEl.innerHTML = '<div class="post-meta">請回到 Facebook，點選要備份的文章...</div>';
-  setStatus("請在 Facebook 點一下要備份的文章。\n留言不會被選取。");
+  postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.clickPost") }));
+  setStatus(t("picker.instructions"));
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-facebook.js"] });
     const injected = await chrome.scripting.executeScript({
@@ -717,15 +728,15 @@ async function selectPost() {
     });
     const payload = injected?.[0]?.result;
     if (!payload) {
-      postListEl.innerHTML = '<div class="post-meta">已取消選取，請重新按「在 Facebook 選取文章」。</div>';
-      setStatus("已退出文章選取模式");
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.canceledList") }));
+      setStatus(t("picker.canceled"));
       return;
     }
     const cookie = await chrome.cookies.get({ url: tab.url, name: "c_user" });
     payload.fbUserId = cookie?.value || null;
     if (payload.isOwnAuthor !== true) {
-      postListEl.innerHTML = '<div class="post-meta">無法確認這是本人文章，為避免誤備份已停止。請從自己的 Facebook 個人頁或明確顯示本人作者的文章重新選取。</div>';
-      setStatus(payload.isOwnAuthor === false ? "無法備份非本人文章" : "無法確認文章作者，已停止備份", true);
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.authorUnknown") }));
+      setStatus(payload.isOwnAuthor === false ? t("picker.notOwner") : t("picker.authorStopped"), true);
       reportSidepanelEvent("sidepanel:author-check-blocked", {
         sourceUrl: payload.sourceUrl || "",
         authorName: payload.authorName || "",
@@ -739,22 +750,22 @@ async function selectPost() {
     card.className = "post";
     const text = document.createElement("div");
     text.className = "post-text";
-    text.textContent = payload.textContent || "✅ 已選取文章（Facebook 未提供文字內容）";
+    text.textContent = payload.textContent || t("post.selectedNoText");
     if (payload.media.primary_fb_cdn) {
       const thumb = document.createElement("img");
       thumb.className = "post-thumb";
       thumb.src = payload.media.primary_fb_cdn;
-      thumb.alt = "已選取的文章圖片";
+      thumb.alt = t("picker.selectedImage");
       card.appendChild(thumb);
     }
     const button = document.createElement("button");
-    button.textContent = "🔒 備份這篇";
+    button.textContent = t("post.backupButton");
     let canBackup = false;
     const validation = ChamberMvpValidation.validateBackupPayload(payload);
     if (!ChamberMvpValidation.isValidFacebookPostUrl(payload.sourceUrl)) {
       button.disabled = true;
-      button.textContent = "⚠️ 找不到文章永久連結";
-      setStatus(validation.message, true);
+      button.textContent = t("post.missingPermalinkButton");
+      setStatus(validationMessage(validation, payload), true);
       reportSidepanelEvent("sidepanel:source-url-blocked", {
         sourceUrl: payload.sourceUrl || "",
         sourceCandidates: Array.isArray(payload.sourceCandidates) ? payload.sourceCandidates.slice(0, 30) : [],
@@ -763,19 +774,19 @@ async function selectPost() {
       });
     } else if (payload.media?.album && payload.media?.albumComplete === false) {
       button.disabled = true;
-      button.textContent = "⚠️ 相簿尚未完整載入";
+      button.textContent = t("picker.albumIncompleteButton");
       const countText = payload.media.albumExpectedCount
         ? `${payload.media.albumLoadedCount || payload.mediaUrls?.length || 0} / ${payload.media.albumExpectedCount}`
-        : `${payload.media.albumLoadedCount || payload.mediaUrls?.length || 0} 張`;
-      setStatus(`相簿目前只取得 ${countText}，已停止備份，請重新選取後再試。`, true);
+        : t("picker.albumCount", { count: payload.media.albumLoadedCount || payload.mediaUrls?.length || 0 });
+      setStatus(t("picker.albumIncomplete", { count: countText }), true);
     } else if (payload.contentExpanded === false) {
       button.disabled = true;
-      button.textContent = "⚠️ 文字尚未完整展開";
-      setStatus("Facebook 沒有成功展開「查看更多」，請先在 Facebook 展開後再選取", true);
+      button.textContent = t("picker.textCollapsedButton");
+      setStatus(t("picker.textCollapsed"), true);
     } else if (!payload.textContent && !payload.mediaUrls?.length && !payload.media?.videoDetected) {
       button.disabled = true;
-      button.textContent = "⚠️ 沒有文字或媒體，無法備份";
-      setStatus("已選取文章，但 Facebook 尚未提供可備份內容", true);
+      button.textContent = t("picker.emptyButton");
+      setStatus(t("picker.empty"), true);
     } else {
       // Text is optional. Photo albums, reels and image-only posts may have
       // an empty caption; a valid media URL is sufficient content.
@@ -785,17 +796,26 @@ async function selectPost() {
     const meta = document.createElement("div");
     meta.className = "post-meta";
     const albumMeta = payload.media?.album
-      ? ` · 相簿 ${payload.media.albumLoadedCount || payload.mediaUrls?.length || 0}${payload.media.albumExpectedCount ? ` / ${payload.media.albumExpectedCount}` : ""} 張${payload.media.albumComplete === false ? "（未完整）" : ""}`
+      ? t("picker.albumMeta", {
+          loaded: payload.media.albumLoadedCount || payload.mediaUrls?.length || 0,
+          expected: payload.media.albumExpectedCount ? t("picker.albumExpected", { expected: payload.media.albumExpectedCount }) : "",
+          incomplete: payload.media.albumComplete === false ? t("picker.incomplete") : ""
+        })
       : "";
     const videoMeta = payload.media?.videoDetected
-      ? ` · 影片${payload.media.videoSourceType === "stream" ? "（目前僅保證文字、原文連結與可取得的封面）" : ""}`
+      ? t("picker.video", { note: payload.media.videoSourceType === "stream" ? t("picker.videoNote") : "" })
       : "";
-    meta.textContent = `${payload.authorName || "作者未知"} · ${payload.publishedAt ? new Date(payload.publishedAt * 1000).toLocaleString() : "發文時間未知"}${albumMeta}${videoMeta}`;
+    meta.textContent = t("picker.meta", {
+      author: payload.authorName || t("picker.unknownAuthor"),
+      date: payload.publishedAt ? formatDate(payload.publishedAt * 1000, { dateStyle: "medium", timeStyle: "short" }) : t("picker.unknownTime"),
+      album: albumMeta,
+      video: videoMeta
+    });
     card.append(text, meta);
     if (payload.media?.videoDetected) {
       const videoLimit = document.createElement("div");
       videoLimit.className = "video-limit-note";
-      videoLimit.textContent = "⚠️ 目前版本不會備份影片檔；只保存本文、Facebook 影片網址與可取得的封面。";
+      videoLimit.textContent = t("picker.videoLimit");
       card.appendChild(videoLimit);
     }
     if (payload.sourceUrl) {
@@ -803,31 +823,31 @@ async function selectPost() {
       source.href = payload.sourceUrl;
       source.target = "_blank";
       source.rel = "noopener noreferrer";
-      source.textContent = "查看這篇原文";
+      source.textContent = t("picker.viewSource");
       source.style.cssText = "display:block;margin:6px 0;color:#93c5fd;font-size:11px;overflow-wrap:anywhere";
       card.appendChild(source);
     } else {
       const missing = document.createElement("div");
       missing.className = "post-meta";
-      missing.textContent = "Facebook 尚未提供這篇文章的 permalink";
+      missing.textContent = t("picker.noPermalink");
       card.appendChild(missing);
     }
     card.appendChild(button);
     postListEl.appendChild(card);
     if (canBackup) setStatus(
       payload.media?.videoDetected
-        ? "影片文章已選取；本次備份包含文字、原文連結與可取得的封面，不包含影片檔。"
+        ? t("picker.videoReady")
         : payload.media?.album
-          ? `相簿已完整取得 ${payload.media.albumLoadedCount || payload.mediaUrls.length} 張，可以備份。`
-          : "文章已選取，可以備份。"
+          ? t("picker.albumReady", { count: payload.media.albumLoadedCount || payload.mediaUrls.length })
+          : t("picker.ready")
     );
     else if (payload.contentExpanded === false) watchSelectedPost(payload, button, text, tab);
   } catch (error) {
-    setStatus(error.message || "無法選取文章", true);
-    postListEl.innerHTML = '<div class="post-meta">選取失敗，請再試一次。</div>';
+    setStatus(error.message || t("picker.failed"), true);
+    postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.failedList") }));
   } finally {
     pickerTabId = null;
-    selectButton.textContent = "🎯 在 Facebook 選取文章";
+    selectButton.textContent = t("backup.select");
     await renderProfiles();
   }
 }
@@ -837,7 +857,18 @@ selectButton.addEventListener("click", () => {
   else selectPost();
 });
 
-loadPageInfo().catch(() => {
-  pageUrlEl.textContent = "無法讀取目前頁面";
+async function initializePanel() {
+  await ChamberI18n.init();
+  languageSelect.value = ChamberI18n.getLocale();
+  renderVersion();
+  languageSelect.addEventListener("change", async () => {
+    await ChamberI18n.setLocale(languageSelect.value);
+    location.reload();
+  });
+  await loadPageInfo();
+}
+
+initializePanel().catch(() => {
+  pageUrlEl.textContent = t("page.unavailable");
 });
 // Do not guess a post on panel open. The user must explicitly select one.

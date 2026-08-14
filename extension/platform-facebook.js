@@ -1,4 +1,5 @@
 (() => {
+  const t = (key, variables) => globalThis.ChamberI18n?.t?.(key, variables) || key;
   const messageSelector = 'div[data-ad-preview="message"], div[data-testid="post_message"], div[data-ad-comet-preview="message"]';
   const textSelector = '[dir="auto"]';
   // Facebook uses different canonical links for feed posts, photos,
@@ -378,16 +379,16 @@
       return { urls: Array.from(collected), complete, loadedCount: collected.size, expectedCount };
     }
 
-    const approved = window.confirm(
-      `Chamber 偵測到這篇文章包含相簿${expectedCount ? `（約 ${expectedCount} 張）` : ''}。\n\n接下來會自動開啟 Facebook 相簿並逐張載入，期間請不要點擊頁面。是否繼續？`
-    );
+    const approved = window.confirm(t("facebook.albumConfirm", {
+      approx: expectedCount ? t("facebook.albumApprox", { count: expectedCount }) : ""
+    }));
     if (!approved) {
       return { urls: Array.from(collected), complete: false, loadedCount: collected.size, expectedCount, cancelled: true };
     }
 
     try {
       globalThis.__chamberAlbumAutomation = true;
-      onProgress(`Chamber：正在開啟相簿${expectedCount ? `（0 / ${expectedCount}）` : ''}…`);
+      onProgress(t("facebook.albumOpening", { progress: expectedCount ? ` (0 / ${expectedCount})` : "" }));
       trigger.click();
       const findDialog = () => Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]'))
         .filter(isVisible)
@@ -410,7 +411,7 @@
           const url = element.currentSrc || element.src || '';
           if (url && !url.startsWith('blob:') && !url.startsWith('data:')) collected.add(url);
         }
-        onProgress(`Chamber：正在載入相簿 ${collected.size}${expectedCount ? ` / ${expectedCount}` : ''} 張…`);
+        onProgress(t("facebook.albumLoading", { loaded: collected.size, expected: expectedCount ? ` / ${expectedCount}` : "" }));
       };
       const closeDialog = async () => {
         const currentDialog = findDialog() || dialog;
@@ -706,10 +707,10 @@
         document.documentElement.appendChild(style);
         const banner = document.createElement("div");
         banner.className = "chamber-picker-banner";
-        banner.textContent = "Chamber：請移到主文章文字或圖片上（按 Esc 取消）";
+        banner.textContent = t("facebook.pickerHover");
         banner.style.pointerEvents = "auto";
         banner.style.cursor = "pointer";
-        banner.title = "取消選取";
+        banner.title = t("facebook.pickerCancel");
         banner.addEventListener("click", () => cancel(), true);
         document.documentElement.appendChild(banner);
         let highlighted = null;
@@ -741,8 +742,8 @@
           highlighted?.classList.remove("chamber-picker-target");
           highlighted = next;
           banner.textContent = highlighted
-            ? "Chamber：已鎖定這篇主文章，點一下確認（按 Esc 取消）"
-            : "Chamber：請移到主文章文字或圖片上（按 Esc 取消）";
+            ? t("facebook.pickerLocked")
+            : t("facebook.pickerHover");
           highlighted?.classList.add("chamber-picker-target");
         };
         const onKey = (event) => {
@@ -776,7 +777,7 @@
             media: localMedia(liveStory) || info.media
           };
           const firstPayload = extract(liveInfo, pageUrl);
-          banner.textContent = "Chamber：正在載入相簿照片，請稍候…";
+          banner.textContent = t("facebook.albumPleaseWait");
           const album = await collectAlbumMedia(
             liveStory,
             firstPayload?.mediaUrls || [],

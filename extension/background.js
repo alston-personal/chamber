@@ -8,7 +8,16 @@
 // Schema Constant
 const PROTOCOL_VERSION = "0.2.0";
 const APP_NAME = "Chamber";
-importScripts("mvp-validation.js", "secret-sharing.js");
+importScripts("i18n.js", "mvp-validation.js", "secret-sharing.js");
+ChamberI18n.init(null).catch(() => {});
+const t = (key, variables) => ChamberI18n.t(key, variables);
+
+function validationMessage(validation, payload) {
+  const key = validation?.code === "AUTHOR_NOT_CONFIRMED" && payload?.isOwnAuthor === false
+    ? "validation.NOT_OWNER"
+    : `validation.${validation?.code || "CONTENT_REQUIRED"}`;
+  return t(key);
+}
 
 if (chrome.sidePanel) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
@@ -233,7 +242,7 @@ async function restoreSharingIdentityFromRecovery(envelope, ownerSecret, prefix)
     base64ToBytes(envelope.ciphertext)
   );
   const identity = JSON.parse(new TextDecoder().decode(plaintext));
-  if (!identity.publicKey || !identity.privateKey || !identity.keyId) throw new Error("分享金鑰復原資料不完整");
+  if (!identity.publicKey || !identity.privateKey || !identity.keyId) throw new Error(t("crypto.sharingIncomplete"));
   await chrome.storage.local.set({
     [prefix + "sharingPublicKey"]: identity.publicKey,
     [prefix + "sharingPrivateKey"]: identity.privateKey,
@@ -253,16 +262,16 @@ function decodeRecoveryCode(value) {
     const encoded = normalized.slice("CHAMBER-C1.".length).replace(/-/g, "+").replace(/_/g, "/");
     const padded = encoded + "=".repeat((4 - (encoded.length % 4)) % 4);
     const parsed = JSON.parse(new TextDecoder().decode(base64ToBytes(padded)));
-    if (!parsed.setId || Number(parsed.share?.x) !== 3 || !parsed.share?.data) throw new Error("緊急復原碼 C 格式不正確");
+    if (!parsed.setId || Number(parsed.share?.x) !== 3 || !parsed.share?.data) throw new Error(t("crypto.codeInvalid"));
     return parsed;
   }
-  throw new Error("緊急復原碼 C 格式不正確");
+  throw new Error(t("crypto.codeInvalid"));
 }
 
 async function prepareRecoveryVault(userId) {
-  if (!globalThis.ChamberSecretSharing) throw new Error("2-of-3 復原模組尚未載入");
+  if (!globalThis.ChamberSecretSharing) throw new Error(t("crypto.moduleMissing"));
   const normalizedUserId = String(userId || "").trim();
-  if (!normalizedUserId || normalizedUserId === "default") throw new Error("請先在 Facebook 登入後重新開啟 Echo");
+  if (!normalizedUserId || normalizedUserId === "default") throw new Error(t("crypto.facebookLoginRequired"));
   const prefix = `user_${normalizedUserId}_`;
   const config = await getExtensionConfig(normalizedUserId);
   const storage = await chrome.storage.local.get([prefix + "customWalletAddress", prefix + "customWalletPrivateKey", prefix + "identityAlias"]);
@@ -300,7 +309,7 @@ async function finalizeRecoveryVault(userId, setId, accountId) {
   const prefix = `user_${userId}_`;
   const data = await chrome.storage.local.get([prefix + "recoveryPendingLocalShare", prefix + "recoveryPendingShareC"]);
   if (data[prefix + "recoveryPendingLocalShare"]?.setId !== setId || Number(data[prefix + "recoveryPendingShareC"]?.x) !== 3) {
-    throw new Error("復原份額版本已變更，請重新設定");
+    throw new Error(t("crypto.shareVersionChanged"));
   }
   await chrome.storage.local.set({
     [prefix + "recoveryLocalShare"]: data[prefix + "recoveryPendingLocalShare"],
@@ -313,7 +322,7 @@ async function finalizeRecoveryVault(userId, setId, accountId) {
 async function confirmRecoveryVault(userId, setId) {
   const prefix = `user_${userId}_`;
   const data = await chrome.storage.local.get([prefix + "recoveryLocalShare", prefix + "recoveryPendingExportAt"]);
-  if (data[prefix + "recoveryLocalShare"]?.setId !== setId) throw new Error("復原份額版本已變更，請重新設定");
+  if (data[prefix + "recoveryLocalShare"]?.setId !== setId) throw new Error(t("crypto.shareVersionChanged"));
   await chrome.storage.local.set({
     [prefix + "recoveryExportedAt"]: data[prefix + "recoveryPendingExportAt"] || new Date().toISOString(),
     [prefix + "recoveryExportConfirmedVersion"]: "2-of-3-vault-v1",
@@ -334,16 +343,16 @@ async function restoreFromRecoveryVault(suppliedShareB, recoveryCodeC, currentUs
     shareB = localShare;
     recoveryShares = [localShare.share, decoded.share];
   } else {
-    if (shareB?.format !== "chamber-recovery-share-v2" || ![1, 2].includes(Number(shareB?.share?.x))) throw new Error("Recovery Vault 的份額 B 無效");
+    if (shareB?.format !== "chamber-recovery-share-v2" || ![1, 2].includes(Number(shareB?.share?.x))) throw new Error(t("crypto.vaultBInvalid"));
     recoveryShares = [shareB.share, decoded.share];
   }
-  if (decoded.setId && decoded.setId !== shareB.setId) throw new Error("復原碼 C 與復原份額不屬於同一組");
+  if (decoded.setId && decoded.setId !== shareB.setId) throw new Error(t("crypto.shareSetMismatch"));
   if (currentUserId && currentUserId !== "default" && String(shareB.facebookUserId) !== String(currentUserId)) {
-    throw new Error("復原資料與目前登入的 Facebook 帳號不符");
+    throw new Error(t("crypto.accountMismatch"));
   }
   const ownerSecret = ChamberSecretSharing.combine2of3(recoveryShares);
   if (await recoveryChecksum(shareB.facebookUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) {
-    throw new Error("復原校驗失敗，份額可能不匹配或已損壞");
+    throw new Error(t("crypto.checksumFailed"));
   }
   const prefix = `user_${shareB.facebookUserId}_`;
   const update = {
@@ -363,14 +372,14 @@ async function restoreFromRecoveryVault(suppliedShareB, recoveryCodeC, currentUs
 }
 
 async function restoreFromLocalAAndVaultB(shareB, currentUserId) {
-  if (!currentUserId || currentUserId === "default") throw new Error("請先登入對應的 Facebook 帳號");
-  if (shareB?.format !== "chamber-recovery-share-v2" || Number(shareB?.share?.x) !== 2) throw new Error("Vault 份額 B 無效");
+  if (!currentUserId || currentUserId === "default") throw new Error(t("crypto.facebookAccountRequired"));
+  if (shareB?.format !== "chamber-recovery-share-v2" || Number(shareB?.share?.x) !== 2) throw new Error(t("crypto.vaultBInvalid"));
   const prefix = `user_${currentUserId}_`;
   const data = await chrome.storage.local.get([prefix + "recoveryLocalShare", prefix + "recoveryVaultAccountId"]);
   const localShare = data[prefix + "recoveryLocalShare"];
-  if (!localShare || Number(localShare.share?.x) !== 1 || localShare.setId !== shareB.setId) throw new Error("本機 A 與 Vault B 不屬於同一組");
+  if (!localShare || Number(localShare.share?.x) !== 1 || localShare.setId !== shareB.setId) throw new Error(t("crypto.localVaultMismatch"));
   const ownerSecret = ChamberSecretSharing.combine2of3([localShare.share, shareB.share]);
-  if (await recoveryChecksum(shareB.facebookUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) throw new Error("A＋B 復原校驗失敗");
+  if (await recoveryChecksum(shareB.facebookUserId, shareB.ownerAddress, ownerSecret) !== shareB.checksum) throw new Error(t("crypto.localVaultChecksumFailed"));
   const update = {
     [prefix + (shareB.keyTier === "custom" ? "customWalletAddress" : "nativeWalletAddress")]: shareB.ownerAddress,
     [prefix + (shareB.keyTier === "custom" ? "customWalletPrivateKey" : "nativeWalletPrivateKey")]: ownerSecret,
@@ -550,7 +559,7 @@ async function processBackupTask(postData, isHistoric) {
   const prefix = `user_${userId}_`;
   if (isHistoric) {
     const validation = ChamberMvpValidation.validateBackupPayload(postData);
-    if (!validation.ok) throw new Error(validation.message);
+    if (!validation.ok) throw new Error(validationMessage(validation, postData));
   }
   const config = await getExtensionConfig(fbUserId);
   const postKeyBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -583,7 +592,7 @@ async function processBackupTask(postData, isHistoric) {
   ].filter(Boolean);
   const isVideoLinkBackup = postData.media?.videoDetected === true;
   const content = postData.textContent || postData.content ||
-    (isVideoLinkBackup ? "[Facebook 影片貼文]" : (mediaUrls.length > 0 ? "[Facebook 圖片貼文]" : ""));
+    (isVideoLinkBackup ? t("media.facebookVideoPost") : (mediaUrls.length > 0 ? t("media.facebookImagePost") : ""));
   for (const [mediaIndex, url] of mediaUrls.entries()) {
     if (url && url.startsWith("http")) {
       let fallback;
@@ -597,9 +606,9 @@ async function processBackupTask(postData, isHistoric) {
           continue;
         }
         const detail = /not enough balance|\b402\b/i.test(error.message || "")
-          ? "測試網儲存額度不足"
-          : (error.message || "媒體上傳失敗");
-        throw new Error(`第 ${mediaIndex + 1}/${mediaUrls.length} 張圖片上傳失敗：${detail}`);
+          ? t("media.devnetQuota")
+          : (error.message || t("media.uploadFailed"));
+        throw new Error(t("media.imageUploadFailed", { current: mediaIndex + 1, total: mediaUrls.length, detail }));
       }
       if (fallback) {
         const item = typeof fallback === "string" ? { url: fallback, encrypted: false } : fallback;
@@ -614,7 +623,7 @@ async function processBackupTask(postData, isHistoric) {
     }
   }
   if (!isVideoLinkBackup && mediaUrls.length > 0 && fallbackUrls.length !== mediaUrls.length) {
-    throw new Error("圖片／影片未成功上傳，已停止備份，避免產生沒有媒體的假成功資料");
+    throw new Error(t("media.noSuccessfulUpload"));
   }
 
   // 2. Build API payload (custodial mode — server handles wallet signing)

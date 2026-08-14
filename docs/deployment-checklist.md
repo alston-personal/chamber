@@ -114,6 +114,8 @@ Version 0.4.0 also requires:
 - Extension-local share A, Passkey-protected encrypted Recovery Vault share B, and user-held offline emergency code C
 - same-device A+C restore and replacement-device Passkey+B+C restore both verified
 
+Development builds after 0.5.8 must also run `node scripts/test-i18n.js`; every supported locale must have the same non-empty key set, and all Side Panel `data-i18n` references must resolve.
+
 ## 6. Confirm The User Flow
 
 After deploy:

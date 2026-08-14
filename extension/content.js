@@ -6,6 +6,8 @@
  */
 
 const CHAMBER_DEV_ERROR_ENDPOINT = "https://studio.milkcat.org/chamber-api/dev-errors";
+ChamberI18n.init().catch(() => {});
+const t = (key, variables) => ChamberI18n.t(key, variables);
 
 function reportChamberError(error, context = "content") {
   fetch(CHAMBER_DEV_ERROR_ENDPOINT, {
@@ -40,7 +42,7 @@ function webAuthnBufferToBase64Url(value) {
 }
 
 async function createNativePasskey(optionsJSON) {
-  if (!navigator.credentials?.create) throw new Error("此瀏覽器不支援 Passkey");
+  if (!navigator.credentials?.create) throw new Error(t("passkey.unsupported"));
   const publicKey = {
     ...optionsJSON,
     challenge: webAuthnBase64UrlToBuffer(optionsJSON.challenge),
@@ -51,10 +53,10 @@ async function createNativePasskey(optionsJSON) {
     }))
   };
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new DOMException("Passkey 建立逾時", "AbortError")), 60_000);
+  const timeoutId = setTimeout(() => controller.abort(new DOMException(t("passkey.createTimeout"), "AbortError")), 60_000);
   try {
     const credential = await navigator.credentials.create({ publicKey, signal: controller.signal });
-    if (!credential) throw new Error("Passkey 建立未完成");
+    if (!credential) throw new Error(t("passkey.createIncomplete"));
     const response = credential.response;
     const result = {
       id: credential.id,
@@ -87,7 +89,7 @@ async function createNativePasskey(optionsJSON) {
 }
 
 async function authenticateNativePasskey(optionsJSON) {
-  if (!navigator.credentials?.get) throw new Error("此瀏覽器不支援 Passkey");
+  if (!navigator.credentials?.get) throw new Error(t("passkey.unsupported"));
   const publicKey = {
     ...optionsJSON,
     challenge: webAuthnBase64UrlToBuffer(optionsJSON.challenge),
@@ -97,10 +99,10 @@ async function authenticateNativePasskey(optionsJSON) {
     }))
   };
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new DOMException("Passkey 驗證逾時", "AbortError")), 60_000);
+  const timeoutId = setTimeout(() => controller.abort(new DOMException(t("passkey.verifyTimeout"), "AbortError")), 60_000);
   try {
     const credential = await navigator.credentials.get({ publicKey, signal: controller.signal });
-    if (!credential) throw new Error("Passkey 驗證未完成");
+    if (!credential) throw new Error(t("passkey.verifyIncomplete"));
     const response = credential.response;
     return {
       id: credential.id,
@@ -329,7 +331,7 @@ window.addEventListener("message", (event) => {
           type: responseType,
           requestId: event.data.requestId || "",
           success: false,
-          error: error?.name === "AbortError" ? "Passkey 操作已取消或逾時" : String(error?.message || error)
+          error: error?.name === "AbortError" ? t("passkey.canceled") : String(error?.message || error)
         }, "https://studio.milkcat.org");
       });
     return;
@@ -356,7 +358,7 @@ window.addEventListener("message", (event) => {
         source: "chamber-extension",
         type: recoveryActions[event.data.type],
         requestId: event.data.requestId || "",
-        ...(response || { success: false, error: chrome.runtime.lastError?.message || "Chamber Extension 無回應" })
+        ...(response || { success: false, error: chrome.runtime.lastError?.message || t("extension.noResponse") })
       }, "https://studio.milkcat.org");
     });
     return;
@@ -545,13 +547,13 @@ function findPostActionRow(article) {
 function handleBackupClick(btn, postEl) {
   const data = getFacebookPostData(postEl);
   if (!data.textContent && !data.media.primary_fb_cdn) {
-    alert("無法偵測到貼文內容或媒體網址！");
+    alert(t("legacy.noPost"));
     return;
   }
 
   data.fbUserId = getFacebookUserId(); // Scrape and attach user ID
 
-  btn.innerText = "⏳ 備份中...";
+  btn.innerText = t("legacy.backingUp");
   btn.disabled = true;
   btn.style.background = "#9ca3af";
 
@@ -560,12 +562,12 @@ function handleBackupClick(btn, postEl) {
     payload: data
   }, (response) => {
     if (chrome.runtime.lastError) {
-      alert("備份失敗：擴充功能背景服務不可用！");
-      btn.innerText = "🔒 備份至 Web3";
+      alert(t("legacy.backgroundUnavailable"));
+      btn.innerText = t("legacy.backup");
       btn.disabled = false;
       btn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
     } else if (response && response.success) {
-      btn.innerText = "✅ 已備份至 Arweave";
+      btn.innerText = t("legacy.backedUp");
       btn.style.background = "linear-gradient(135deg, #10b981, #059669)";
       const echoUrl = response.echoUrl || "";
       if (echoUrl && btn.parentElement && !btn.parentElement.querySelector(".chamber-echo-link")) {
@@ -574,14 +576,14 @@ function handleBackupClick(btn, postEl) {
         link.href = echoUrl.startsWith("http") ? echoUrl : `https://studio.milkcat.org${echoUrl}`;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.textContent = "查看 Echo 時光軸";
+        link.textContent = t("legacy.viewEcho");
         link.style.cssText = "display:block;margin-top:4px;color:#93c5fd;font-size:11px;text-decoration:underline;";
         btn.parentElement.appendChild(link);
       }
       console.log("[Chamber] Historic post successfully processed:", response.txId);
     } else {
-      alert("備份失敗: " + (response ? response.error : "未知錯誤"));
-      btn.innerText = "🔒 備份至 Web3";
+      alert(t("legacy.failed", { error: response ? response.error : t("legacy.unknownError") }));
+      btn.innerText = t("legacy.backup");
       btn.disabled = false;
       btn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
     }
@@ -630,7 +632,7 @@ function processDOM() {
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
       </svg>
-      備份至 Web3
+      ${t("legacy.backup").replace(/^🔒\s*/, "")}
     `;
 
     btn.addEventListener("click", (e) => {
@@ -720,7 +722,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const payload = getCurrentPostForSidePanel();
     sendResponse(payload
       ? { success: true, payload }
-      : { success: false, error: "目前畫面找不到最外層文章，請把文章捲到畫面中央再試。" });
+      : { success: false, error: t("facebook.outerPostMissing") });
     return false;
   }
   if (request.action === "LIST_VISIBLE_POSTS") {
@@ -1051,6 +1053,6 @@ function handleOpenComposerAndFill(text, imageUrl) {
     }, 100);
   } else {
     console.warn("[Chamber] Could not locate any Facebook post composer button.");
-    alert("請先點擊臉書的『建立貼文』，我們將為您自動帶入圖文！");
+    alert(t("facebook.openComposer"));
   }
 }

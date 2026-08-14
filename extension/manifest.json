@@ -23,7 +23,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.facebook.com/*", "https://studio.milkcat.org/*"],
-      "js": ["content.js"],
+      "js": ["i18n.js", "content.js"],
       "run_at": "document_end"
     }
   ],
