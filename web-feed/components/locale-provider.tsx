@@ -18,7 +18,9 @@ export function LocaleProvider({ children, initialLocale = "zh-TW", autoDetect =
   useEffect(() => {
     if (!autoDetect) return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    updateLocale(normalizeLocale(stored || window.navigator.language));
+    const detectedLocale = normalizeLocale(stored || window.navigator.language);
+    const timer = window.setTimeout(() => updateLocale(detectedLocale), 0);
+    return () => window.clearTimeout(timer);
   }, [autoDetect]);
 
   useEffect(() => {

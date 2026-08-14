@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:i18n": "node ../scripts/test-web-i18n.js",
     "pack-extension": "python3 ../scripts/pack-extension.py",
     "release-extension": "python3 ../scripts/pack-extension.py --release"
   },

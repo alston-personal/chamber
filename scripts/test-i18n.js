@@ -24,6 +24,13 @@ require("../extension/i18n.js");
     assert.ok(zhKeys.includes(key), `sidepanel.html references missing locale key: ${key}`);
   }
 
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../extension/manifest.json"), "utf8"));
+  assert.equal(manifest.default_locale, "zh_TW");
+  assert.equal(manifest.name, "__MSG_extensionName__");
+  assert.equal(manifest.description, "__MSG_extensionDescription__");
+  const chromeLocales = ["zh_TW", "en"].map((locale) => JSON.parse(fs.readFileSync(path.join(__dirname, `../extension/_locales/${locale}/messages.json`), "utf8")));
+  assert.deepEqual(Object.keys(chromeLocales[1]).sort(), Object.keys(chromeLocales[0]).sort(), "Chrome locale catalogs must contain the same keys");
+
   await i18n.setLocale("en", null);
   assert.equal(i18n.getLocale(), "en");
   assert.equal(i18n.t("settings.save"), "Save and apply");
