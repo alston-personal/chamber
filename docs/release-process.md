@@ -8,6 +8,8 @@
 - 官網下載：固定指向版本化檔案，例如 `/echo/releases/chamber-extension-v0.5.8.zip`。
 - 本機開發包：輸出到 `dist/chamber-extension-dev.zip`，不會改動官網檔案。
 
+目前狀態：官網穩定版仍為 `0.5.8`；`develop` 上的雙語候選版為 `0.6.0`。其自動與人工發佈門檻見 [`docs/i18n-release-checklist.md`](i18n-release-checklist.md)。
+
 ## 日常開發
 
 ```bash
@@ -26,7 +28,7 @@ Chrome 開發測試仍建議直接載入 `extension/`。上述 ZIP 只供檢查�
 5. 明確發佈並更新官網下載：
 
 ```bash
-python3 scripts/pack-extension.py --release 0.5.8 --promote
+python3 scripts/pack-extension.py --release <manifest-version> --promote
 ```
 
 6. 驗證版本化 ZIP、`releases/latest.json`、官網下載與 ZIP 內的 `manifest.json`。
