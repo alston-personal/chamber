@@ -74,7 +74,7 @@ async function rawPlatformIdentity(tab = null) {
     func: () => globalThis.ChamberThreadsPlatform?.getAccountContext?.() || null
   });
   const account = injected?.[0]?.result;
-  if (!cookie?.value || !account?.handle) throw new Error(t("error.loginPlatform", { platform: "Threads" }));
+  if (!cookie?.value || !account?.handle || account.profilePageOnly) throw new Error(t("error.loginPlatform", { platform: "Threads" }));
   return { platform, actorId: cookie.value, actorHandle: account.handle, tab };
 }
 

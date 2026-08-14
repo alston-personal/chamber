@@ -19,6 +19,21 @@ Stable website download remains `0.6.0` until every release gate below is accept
 | Localization | Extension and website retain equal Traditional Chinese and English key sets | Automated |
 | Stable release protection | Candidate build does not overwrite `chamber-extension.zip`, `latest.json`, or versioned 0.6.0 ZIP | Packaging check |
 
+## Public Threads DOM evidence (2026-08-14)
+
+The candidate adapter was injected into live, rendered public Threads pages in headless Chromium rather than being tested only against handwritten fixtures. This does not replace logged-in owner acceptance, but it verifies the current production DOM boundary.
+
+| Live structure | Evidence | Result |
+|---|---|---|
+| Profile feed | 10 posts from `@threads` each resolved to one canonical permalink, author, timestamp and isolated body | Pass |
+| Direct post page | Header permalink duplicates no longer win over the actual post card; `Related threads` and replies are excluded | Pass |
+| Multi-image | Live 3-, 4- and 5-image posts reported matching expected/loaded counts and complete carousels | Pass |
+| Video fallback | Live video post produced its own text, canonical URL and one poster; playback-error UI was excluded from body text | Pass |
+| Quote boundary | Outer `@meta` quote selected the outer text; selecting embedded `@zuck` content returned the inner permalink and failed the expected-author check | Pass |
+| Picker lifecycle | Hover produced exactly one outline; click removed overlay; Esc returned `null` and removed banner/outline/click interception | Pass |
+
+Public profile fallback handles are deliberately rejected as authenticated account identity. The Side Panel requires the logged-in Threads profile navigation identity plus the Threads login cookie before mapping or backup can proceed.
+
 ## Real Threads browser acceptance
 
 Run in both Traditional Chinese and English UI where labels differ. Record the post URL/type and a screenshot for every failure.

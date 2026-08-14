@@ -4,6 +4,7 @@
   const POST_LINK_SELECTOR = 'a[href*="/post/"]';
   const ACTION_TEXT = /^(like|reply|repost|quote|share|send|more|follow|following|liked|replies|likes|views|讚|回覆|轉發|引用|分享|傳送|更多|追蹤|查看翻譯)$/i;
   const MORE_TEXT = /^(more|see more|顯示更多|查看更多)$/i;
+  const PLAYBACK_ERROR_TEXT = /^(?:sorry,?\s+we(?:'|\u2019)?re having trouble playing this video\.?|learn more)$/i;
   const baseHref = () => typeof location !== "undefined" ? location.href : "https://www.threads.com/";
 
   function parsePermalink(value) {
@@ -75,6 +76,7 @@
     const nested = new Set(Array.from(container.querySelectorAll(POST_LINK_SELECTOR))
       .map((link) => postContainerFor(link))
       .filter((node) => node && node !== container && container.contains(node)));
+    const timeLabels = new Set(Array.from(container.querySelectorAll("time")).map((node) => String(node.innerText || node.textContent || "").trim()).filter(Boolean));
     const candidates = Array.from(container.querySelectorAll('[dir="auto"]')).filter((node) => {
       if (!visible(node) || Array.from(nested).some((nestedPost) => nestedPost.contains(node))) return false;
       if (node.querySelector('[dir="auto"]')) return false;
@@ -82,7 +84,10 @@
       const text = String(node.innerText || node.textContent || "").trim();
       const profileLink = node.closest('a[href^="/@"]');
       if (profileLink && normalizeHandle(new URL(profileLink.href, baseHref()).pathname.split("/")[1]) === normalizeHandle(parsed.author)) return false;
-      return text && !ACTION_TEXT.test(text) && normalizeHandle(text) !== normalizeHandle(parsed.author) && !/^\d+[smhdw]$/i.test(text);
+      const enclosingLink = node.closest("a[href]");
+      if (enclosingLink && /\/search(?:\?|$)/i.test(enclosingLink.getAttribute("href") || "")) return false;
+      return text && !ACTION_TEXT.test(text) && !PLAYBACK_ERROR_TEXT.test(text) && !timeLabels.has(text)
+        && normalizeHandle(text) !== normalizeHandle(parsed.author) && !/^\d+[smhdw]$/i.test(text);
     });
     const lines = [];
     for (const node of candidates) {
@@ -93,8 +98,8 @@
   }
 
   function nestedPostContainers(container) {
-    return Array.from(container.querySelectorAll('article, [role="article"]'))
-      .filter((node) => node !== container && postLinksIn(node).length && container.contains(node));
+    return unique(postLinksIn(container).map(({ link }) => postContainerFor(link)))
+      .filter((node) => node && node !== container && container.contains(node));
   }
 
   function expectedMediaCount(container) {
@@ -110,7 +115,10 @@
 
   function mediaForPost(container) {
     const urls = [];
-    let videoDetected = false;
+    let videoDetected = Array.from(container.querySelectorAll('[aria-label], [title]')).some((node) => {
+      const label = `${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""}`;
+      return /video playback|play video|pause video|播放影片|暫停影片/i.test(label);
+    });
     const nested = nestedPostContainers(container);
     for (const node of Array.from(container.querySelectorAll('img, video'))) {
       if (nested.some((quoted) => quoted.contains(node))) continue;
@@ -141,9 +149,12 @@
     };
   }
 
-  function extract(container, expectedHandle) {
+  function extract(container, expectedHandle, preferredSourceUrl = "") {
     const candidates = postLinksIn(container);
-    const own = candidates.find(({ link }) => postContainerFor(link) === container) || candidates[0];
+    const preferred = parsePermalink(preferredSourceUrl);
+    const own = (preferred && candidates.find(({ parsed }) => parsed.shortcode === preferred.shortcode))
+      || candidates.find(({ link }) => postContainerFor(link) === container)
+      || candidates[0];
     if (!own) return null;
     const parsed = own.parsed;
     const time = container.querySelector('time[datetime]');
@@ -208,8 +219,20 @@
   function findBySource(sourceUrl) {
     const wanted = parsePermalink(sourceUrl)?.shortcode;
     if (!wanted) return null;
-    const link = Array.from(document.querySelectorAll(POST_LINK_SELECTOR)).find((item) => parsePermalink(item.href)?.shortcode === wanted);
-    return link ? postContainerFor(link) : null;
+    const containers = unique(Array.from(document.querySelectorAll(POST_LINK_SELECTOR))
+      .filter((item) => parsePermalink(item.href)?.shortcode === wanted)
+      .map((link) => postContainerFor(link)));
+    const scored = containers.filter(Boolean).map((container) => {
+      const identities = unique(postLinksIn(container).map(({ parsed }) => parsed.shortcode));
+      const hasTime = Boolean(container.querySelector("time[datetime]"));
+      const hasBody = Array.from(container.querySelectorAll('[dir="auto"], img, video')).some(visible);
+      const controls = container.querySelectorAll('button, [role="button"]').length;
+      return {
+        container,
+        score: (hasTime ? 1000 : 0) + (hasBody ? 300 : 0) + Math.min(controls, 8) * 10 - Math.max(identities.length - 1, 0) * 40
+      };
+    }).sort((a, b) => b.score - a.score);
+    return scored[0]?.container || null;
   }
 
   function getAccountContext() {
@@ -323,7 +346,7 @@
     startPicker,
     refreshSelected(pageUrl, sourceUrl, selectedText, expectedHandle) {
       const container = findBySource(sourceUrl);
-      return container ? extract(container, expectedHandle) : null;
+      return container ? extract(container, expectedHandle, sourceUrl) : null;
     },
     _testStructuredText: structuredText,
     _testNormalizeHandle: normalizeHandle
