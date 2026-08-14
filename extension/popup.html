@@ -136,9 +136,20 @@
       transition: all 0.2s;
     }
 
-    .small-btn:hover {
+    .small-btn:not(:disabled):hover {
       background: rgba(99, 102, 241, 0.3);
       color: #ffffff;
+    }
+
+    .small-btn:disabled,
+    .btn-primary:disabled,
+    .btn-accent:disabled,
+    .btn-secondary:disabled {
+      cursor: not-allowed;
+      opacity: 0.38;
+      filter: grayscale(0.65);
+      box-shadow: none;
+      transform: none;
     }
 
     .tip-text {
@@ -210,7 +221,7 @@
       gap: 6px;
     }
 
-    .btn-primary:hover {
+    .btn-primary:not(:disabled):hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
       filter: brightness(1.1);
@@ -229,17 +240,17 @@
       transition: all 0.2s;
     }
 
-    .btn-accent:hover {
+    .btn-accent:not(:disabled):hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
       filter: brightness(1.1);
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
+      background: rgba(79, 70, 229, 0.18);
+      border: 1px solid rgba(129, 140, 248, 0.65);
       border-radius: 8px;
-      color: var(--text-main);
+      color: #e0e7ff;
       padding: 8px;
       font-size: 12px;
       font-weight: 600;
@@ -251,8 +262,10 @@
       gap: 4px;
     }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
+    .btn-secondary:not(:disabled):hover {
+      background: rgba(79, 70, 229, 0.38);
+      border-color: #a5b4fc;
+      color: #ffffff;
     }
 
     /* Views */
@@ -320,23 +333,11 @@
         </div>
       </div>
 
-      <!-- Reborn Card Generator Card -->
-      <div class="card">
-        <span class="card-title">🎴 Chamber 轉世聲明設定</span>
-        <div class="tip-text" style="font-size: 11px; line-height: 1.5;">
-          只有完成身份暱稱綁定後，這個按鈕才會啟用。
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <textarea id="declarationText" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; color: var(--text-main); font-size: 11px; font-family: sans-serif; resize: vertical; min-height: 80px; outline: none; line-height: 1.4;" placeholder="輸入您的轉世聲明..."></textarea>
-        </div>
-        <button id="genCardBtn" class="btn-accent">⚡ 一鍵生成聲明並發佈</button>
-      </div>
-
       <!-- Footer Buttons -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <button id="toSettingsBtn" class="btn-secondary">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          進階設定
+          帳號設定
         </button>
         <button id="viewDocsBtn" class="btn-secondary">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -408,6 +409,14 @@
               啟用限友貼文本地加密上鏈 (AES-GCM)
             </label>
           </div>
+
+          <div class="checkbox-group" style="border-top: 1px solid rgba(96, 165, 250, 0.18); padding-top: 10px;">
+            <input type="checkbox" id="isDebugMode" checked>
+            <label for="isDebugMode" style="font-size: 11px; font-weight: normal; color: var(--text-main);">
+              開發 Debug 模式（使用 Web3 測試網）
+              <span class="field-desc" style="display:block; margin-top:3px;">開啟時不會寫入正式網；關閉後才會要求伺服器啟用正式網。</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -419,7 +428,7 @@
     </div>
 
     <div class="footer-note">
-      Chamber Core V0.1.4 • Arweave Devnet
+      Chamber Core V0.5.8 • Facebook 備份 MVP · Devnet
     </div>
   </div>
   <script src="popup.js"></script>

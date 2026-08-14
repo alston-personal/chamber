@@ -8,6 +8,10 @@ node_modules/
 .next/
 **/build/
 **/out/
+/dist/
+
+# Old local release artifacts. Published releases live under public/releases/.
+/web-feed/public/chamber-extension-v*.zip
 
 # Environment configurations containing secrets (CRITICAL)
 .env

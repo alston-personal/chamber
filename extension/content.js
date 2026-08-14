@@ -5,6 +5,135 @@
  * scrapes historical post data, and relays intercepted GraphQL events to background.js.
  */
 
+const CHAMBER_DEV_ERROR_ENDPOINT = "https://studio.milkcat.org/chamber-api/dev-errors";
+
+function reportChamberError(error, context = "content") {
+  fetch(CHAMBER_DEV_ERROR_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source: context,
+      message: String(error?.message || error || "Unknown error").slice(0, 2000),
+      stack: String(error?.stack || "").slice(0, 6000),
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      extensionVersion: chrome.runtime.getManifest().version
+    }),
+    keepalive: true
+  }).catch(() => {});
+}
+
+function webAuthnBase64UrlToBuffer(value) {
+  const base64 = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0)).buffer;
+}
+
+function webAuthnBufferToBase64Url(value) {
+  const bytes = new Uint8Array(value);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function createNativePasskey(optionsJSON) {
+  if (!navigator.credentials?.create) throw new Error("此瀏覽器不支援 Passkey");
+  const publicKey = {
+    ...optionsJSON,
+    challenge: webAuthnBase64UrlToBuffer(optionsJSON.challenge),
+    user: { ...optionsJSON.user, id: webAuthnBase64UrlToBuffer(optionsJSON.user.id) },
+    excludeCredentials: optionsJSON.excludeCredentials?.map((credential) => ({
+      ...credential,
+      id: webAuthnBase64UrlToBuffer(credential.id)
+    }))
+  };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(new DOMException("Passkey 建立逾時", "AbortError")), 60_000);
+  try {
+    const credential = await navigator.credentials.create({ publicKey, signal: controller.signal });
+    if (!credential) throw new Error("Passkey 建立未完成");
+    const response = credential.response;
+    const result = {
+      id: credential.id,
+      rawId: webAuthnBufferToBase64Url(credential.rawId),
+      response: {
+        attestationObject: webAuthnBufferToBase64Url(response.attestationObject),
+        clientDataJSON: webAuthnBufferToBase64Url(response.clientDataJSON),
+        transports: typeof response.getTransports === "function" ? response.getTransports() : []
+      },
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment || undefined
+    };
+    if (typeof response.getPublicKeyAlgorithm === "function") {
+      try { result.response.publicKeyAlgorithm = response.getPublicKeyAlgorithm(); } catch (_) {}
+    }
+    if (typeof response.getPublicKey === "function") {
+      try {
+        const publicKeyBytes = response.getPublicKey();
+        if (publicKeyBytes) result.response.publicKey = webAuthnBufferToBase64Url(publicKeyBytes);
+      } catch (_) {}
+    }
+    if (typeof response.getAuthenticatorData === "function") {
+      try { result.response.authenticatorData = webAuthnBufferToBase64Url(response.getAuthenticatorData()); } catch (_) {}
+    }
+    return result;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function authenticateNativePasskey(optionsJSON) {
+  if (!navigator.credentials?.get) throw new Error("此瀏覽器不支援 Passkey");
+  const publicKey = {
+    ...optionsJSON,
+    challenge: webAuthnBase64UrlToBuffer(optionsJSON.challenge),
+    allowCredentials: optionsJSON.allowCredentials?.map((credential) => ({
+      ...credential,
+      id: webAuthnBase64UrlToBuffer(credential.id)
+    }))
+  };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(new DOMException("Passkey 驗證逾時", "AbortError")), 60_000);
+  try {
+    const credential = await navigator.credentials.get({ publicKey, signal: controller.signal });
+    if (!credential) throw new Error("Passkey 驗證未完成");
+    const response = credential.response;
+    return {
+      id: credential.id,
+      rawId: webAuthnBufferToBase64Url(credential.rawId),
+      response: {
+        authenticatorData: webAuthnBufferToBase64Url(response.authenticatorData),
+        clientDataJSON: webAuthnBufferToBase64Url(response.clientDataJSON),
+        signature: webAuthnBufferToBase64Url(response.signature),
+        userHandle: response.userHandle ? webAuthnBufferToBase64Url(response.userHandle) : undefined
+      },
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment || undefined
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+window.addEventListener("error", (event) => {
+  const source = String(event.filename || "");
+  if (source.startsWith("chrome-extension://") || source.includes("extension")) {
+    reportChamberError(event.error || event.message, "content:error");
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const source = String(event.reason?.stack || event.reason?.fileName || "");
+  if (source.includes("chrome-extension://") || source.includes("extension")) {
+    reportChamberError(event.reason, "content:unhandledrejection");
+  }
+});
+
 // 1. Inject inject.js into the page's main context
 function injectNetworkHook() {
   try {
@@ -22,6 +151,7 @@ injectNetworkHook();
 // Global variables for active user context from inject.js
 let currentFbUserId = null;
 let currentFbAccountId = null;
+let lastDomDiagnosticAt = 0;
 
 // Helper to extract currently logged-in Facebook User ID
 function getFacebookUserId() {
@@ -50,6 +180,7 @@ function isOwnPost(article) {
                          article.querySelector('a[role="link"]');
     if (!authorLinkEl) return false;
 
+    const authorLinks = Array.from(article.querySelectorAll('a[role="link"], a[href]'));
     const authorHref = authorLinkEl.href || "";
     
     // Resolve active user/page ID
@@ -62,7 +193,7 @@ function isOwnPost(article) {
     }
 
     // 1. Direct ID match in URL
-    if (authorHref.includes(activeId)) {
+    if (authorHref.includes(activeId) || authorLinks.some((link) => (link.href || "").includes(activeId))) {
       return true;
     }
 
@@ -75,6 +206,18 @@ function isOwnPost(article) {
     // 3. Current URL matching (timeline owner check)
     const currentUrl = window.location.href;
     if (currentUrl.includes("/profile.php?id=" + activeId) || currentUrl.includes("/" + activeId)) {
+      return true;
+    }
+
+    // On a vanity profile URL (for example /idiotforg), Facebook often omits
+    // the numeric author ID from article links. Treat posts on a profile page
+    // as belonging to that profile; feed pages remain author-link guarded.
+    const profilePath = window.location.pathname.split("/").filter(Boolean)[0] || "";
+    const nonProfilePaths = new Set([
+      "home", "watch", "groups", "marketplace", "notifications", "messages",
+      "reels", "search", "gaming", "events", "friends", "story.php"
+    ]);
+    if (profilePath && !nonProfilePaths.has(profilePath) && !window.location.pathname.startsWith("/profile.php")) {
       return true;
     }
 
@@ -92,6 +235,7 @@ window.addEventListener("message", (event) => {
 
   // Handle Echo Portal requests for active wallet info
   if (event.data && event.data.source === "echo-portal" && event.data.type === "GET_EXTENSION_WALLET") {
+    if (location.origin !== "https://studio.milkcat.org") return;
     chrome.runtime.sendMessage({
       action: "GET_ACTIVE_WALLET_INFO"
     }, (response) => {
@@ -103,9 +247,117 @@ window.addEventListener("message", (event) => {
         window.postMessage({
           source: "chamber-extension",
           type: "EXTENSION_WALLET_RESPONSE",
-          walletAddress: response.walletAddress
-        }, "*");
+          requestId: event.data.requestId || "",
+          walletAddress: response.walletAddress,
+          identityAlias: response.identityAlias || "",
+          identityDisplayName: response.identityDisplayName || response.identityAlias || "",
+          sharingPublicKey: response.sharingPublicKey || null,
+          sharingKeyId: response.sharingKeyId || "",
+          accessCapability: response.accessCapability || ""
+        }, "https://studio.milkcat.org");
       }
+    });
+    return;
+  }
+
+  if (event.data && event.data.source === "echo-portal" && event.data.type === "DECRYPT_ECHO_CONTENT") {
+    if (location.origin !== "https://studio.milkcat.org") return;
+    chrome.runtime.sendMessage({
+      action: "DECRYPT_OWNER_DATA",
+      ciphertext: event.data.ciphertext || "",
+      iv: event.data.iv || "",
+      mode: event.data.mode || "text",
+      ownerKeyEnvelope: event.data.ownerKeyEnvelope || null,
+      recipientKeyEnvelope: event.data.recipientKeyEnvelope || null
+    }, (response) => {
+      if (chrome.runtime.lastError) return;
+      window.postMessage({
+        source: "chamber-extension",
+        type: "DECRYPT_ECHO_CONTENT_RESPONSE",
+        requestId: event.data.requestId || "",
+        success: Boolean(response?.success),
+        plaintext: response?.plaintext || "",
+        data: response?.data || "",
+        error: response?.error || ""
+      }, "https://studio.milkcat.org");
+    });
+    return;
+  }
+
+  if (event.data && event.data.source === "echo-portal" && event.data.type === "CREATE_ECHO_READING_GRANT") {
+    if (location.origin !== "https://studio.milkcat.org") return;
+    chrome.runtime.sendMessage({
+      action: "CREATE_RECIPIENT_GRANT",
+      ownerKeyEnvelope: event.data.ownerKeyEnvelope || null,
+      recipientPublicKey: event.data.recipientPublicKey || null,
+      recipientKeyId: event.data.recipientKeyId || ""
+    }, (response) => {
+      if (chrome.runtime.lastError) return;
+      window.postMessage({
+        source: "chamber-extension",
+        type: "CREATE_ECHO_READING_GRANT_RESPONSE",
+        requestId: event.data.requestId || "",
+        success: Boolean(response?.success),
+        recipientKeyEnvelope: response?.recipientKeyEnvelope || null,
+        error: response?.error || ""
+      }, "https://studio.milkcat.org");
+    });
+    return;
+  }
+
+  const nativePasskeyActions = {
+    NATIVE_PASSKEY_REGISTER: createNativePasskey,
+    NATIVE_PASSKEY_AUTHENTICATE: authenticateNativePasskey
+  };
+  if (event.data && event.data.source === "echo-portal" && nativePasskeyActions[event.data.type]) {
+    if (location.origin !== "https://studio.milkcat.org") return;
+    const responseType = `${event.data.type}_RESPONSE`;
+    nativePasskeyActions[event.data.type](event.data.optionsJSON || {})
+      .then((credential) => {
+        window.postMessage({
+          source: "chamber-extension",
+          type: responseType,
+          requestId: event.data.requestId || "",
+          success: true,
+          credential
+        }, "https://studio.milkcat.org");
+      })
+      .catch((error) => {
+        reportChamberError(error, `content:${event.data.type.toLowerCase()}`);
+        window.postMessage({
+          source: "chamber-extension",
+          type: responseType,
+          requestId: event.data.requestId || "",
+          success: false,
+          error: error?.name === "AbortError" ? "Passkey 操作已取消或逾時" : String(error?.message || error)
+        }, "https://studio.milkcat.org");
+      });
+    return;
+  }
+
+  const recoveryActions = {
+    PREPARE_RECOVERY_VAULT: "PREPARE_RECOVERY_VAULT_RESPONSE",
+    FINALIZE_RECOVERY_VAULT: "FINALIZE_RECOVERY_VAULT_RESPONSE",
+    CONFIRM_RECOVERY_VAULT: "CONFIRM_RECOVERY_VAULT_RESPONSE",
+    RESTORE_RECOVERY_VAULT: "RESTORE_RECOVERY_VAULT_RESPONSE",
+    GET_RECOVERY_VAULT_STATUS: "GET_RECOVERY_VAULT_STATUS_RESPONSE",
+    RESTORE_RECOVERY_AB: "RESTORE_RECOVERY_AB_RESPONSE"
+  };
+  if (event.data && event.data.source === "echo-portal" && recoveryActions[event.data.type]) {
+    if (location.origin !== "https://studio.milkcat.org") return;
+    chrome.runtime.sendMessage({
+      action: event.data.type,
+      setId: event.data.setId || "",
+      accountId: event.data.accountId || "",
+      shareB: event.data.shareB || null,
+      recoveryCodeC: event.data.recoveryCodeC || ""
+    }, (response) => {
+      window.postMessage({
+        source: "chamber-extension",
+        type: recoveryActions[event.data.type],
+        requestId: event.data.requestId || "",
+        ...(response || { success: false, error: chrome.runtime.lastError?.message || "Chamber Extension 無回應" })
+      }, "https://studio.milkcat.org");
     });
     return;
   }
@@ -115,6 +367,16 @@ window.addEventListener("message", (event) => {
     if (event.data.type === "FB_USER_CONTEXT") {
       currentFbUserId = event.data.data.userId;
       currentFbAccountId = event.data.data.accountId;
+      // Keep personal Facebook USER_ID stable for storage/mapping. ACCOUNT_ID
+      // can differ between page/account contexts and would split one mapping
+      // into multiple storage namespaces.
+      const activeId = currentFbUserId || currentFbAccountId;
+      if (activeId) {
+        chrome.storage.local.set({
+          lastFbUserId: activeId,
+          lastFbAccountId: currentFbAccountId || ""
+        });
+      }
       console.log("[Chamber] Active FB user context loaded:", currentFbUserId, currentFbAccountId);
       return;
     }
@@ -172,6 +434,27 @@ styleTag.textContent = `
     align-items: center;
     margin: 5px 16px;
   }
+  .chamber-action-slot {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 4px;
+  }
+  .chamber-action-slot .chamber-backup-btn {
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: transparent;
+    color: #65676b;
+    box-shadow: none;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  .chamber-action-slot .chamber-backup-btn:hover {
+    background: #f0f2f5;
+    color: #1877f2;
+    transform: none;
+    box-shadow: none;
+  }
 `;
 document.head.appendChild(styleTag);
 
@@ -181,16 +464,22 @@ function getFacebookPostData(postEl) {
   // - Message block: div[data-ad-preview="message"], div[data-testid="post_message"]
   // - Fallbacks: div[dir="auto"] inside posts
   let textContent = "";
-  const msgEl = postEl.querySelector('div[data-ad-preview="message"]') || 
+  const msgEl = postEl.querySelector('div[data-ad-preview="message"]') ||
                 postEl.querySelector('div[data-testid="post_message"]') ||
-                postEl.querySelector('div[dir="auto"]');
+                postEl.querySelector('div[data-ad-comet-preview="message"]') ||
+                Array.from(postEl.querySelectorAll('div[dir="auto"]')).find((el) => {
+                  const owner = el.closest('div[role="article"]');
+                  return owner === postEl;
+                });
   if (msgEl) {
     textContent = msgEl.innerText || msgEl.textContent || "";
   }
 
   // Find images containing fbcdn urls or standard image blocks
   let primaryFbCdn = "";
-  const imgEl = postEl.querySelector('img[src*="fbcdn.net"]');
+  const imgEl = Array.from(postEl.querySelectorAll('img[src*="fbcdn.net"]')).find((el) => {
+    return el.closest('div[role="article"]') === postEl;
+  });
   if (imgEl) {
     primaryFbCdn = imgEl.src;
   }
@@ -234,6 +523,25 @@ function getFacebookPostData(postEl) {
   };
 }
 
+function findPostActionRow(article) {
+  const candidates = [];
+  const actionButtons = Array.from(article.querySelectorAll('[role="button"], button'));
+  actionButtons.forEach((button) => {
+    let node = button.parentElement;
+    for (let depth = 0; node && depth < 5; depth++, node = node.parentElement) {
+      const text = (node.innerText || node.textContent || "").trim();
+      const hasLike = /讚|Like/i.test(text);
+      const hasComment = /留言|評論|Comment/i.test(text);
+      const hasShare = /分享|Share/i.test(text);
+      if (hasLike && hasComment && hasShare) {
+        candidates.push({ node, depth });
+      }
+    }
+  });
+  candidates.sort((a, b) => a.depth - b.depth);
+  return candidates[0]?.node || null;
+}
+
 function handleBackupClick(btn, postEl) {
   const data = getFacebookPostData(postEl);
   if (!data.textContent && !data.media.primary_fb_cdn) {
@@ -259,6 +567,17 @@ function handleBackupClick(btn, postEl) {
     } else if (response && response.success) {
       btn.innerText = "✅ 已備份至 Arweave";
       btn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+      const echoUrl = response.echoUrl || "";
+      if (echoUrl && btn.parentElement && !btn.parentElement.querySelector(".chamber-echo-link")) {
+        const link = document.createElement("a");
+        link.className = "chamber-echo-link";
+        link.href = echoUrl.startsWith("http") ? echoUrl : `https://studio.milkcat.org${echoUrl}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "查看 Echo 時光軸";
+        link.style.cssText = "display:block;margin-top:4px;color:#93c5fd;font-size:11px;text-decoration:underline;";
+        btn.parentElement.appendChild(link);
+      }
       console.log("[Chamber] Historic post successfully processed:", response.txId);
     } else {
       alert("備份失敗: " + (response ? response.error : "未知錯誤"));
@@ -270,27 +589,39 @@ function handleBackupClick(btn, postEl) {
 }
 
 function processDOM() {
+  // Inline controls are intentionally disabled in v0.2.0. Historical backup
+  // is controlled from the Chamber side panel, outside Facebook's DOM.
+  return;
+
   // Scan for typical Facebook timeline articles / posts containers
   const articles = document.querySelectorAll('div[role="article"]');
+  let ownCount = 0;
+  let injectedCount = 0;
   articles.forEach((article) => {
     // Check if we already injected a button for this article to prevent duplication
     if (article.dataset.chamberInjected) return;
+    // Nested role=article nodes are Facebook comments/replies, not posts.
+    if (article.parentElement?.closest('div[role="article"]')) return;
 
     // 1. Exclude obvious comment/reply blocks while keeping post cards broad enough
+    const hasPostContent = article.querySelector('div[data-ad-preview="message"], div[data-testid="post_message"], div[data-ad-comet-preview="message"], img, video');
+    if (!hasPostContent) return;
+
     const heading = article.querySelector('div[data-testid="UserContentHeader"]') ||
                     article.querySelector('h2') ||
-                    article.querySelector('div[data-ad-preview="message"]') ||
-                    article.querySelector('div[data-testid="post_message"]') ||
-                    article.querySelector('div[dir="auto"]');
-    if (!heading) return;
+                    article.querySelector('h3') ||
+                    article.querySelector('a[role="link"]');
 
     // 2. Exclude other users' posts to prevent abuse/stealing
     if (!isOwnPost(article)) return;
+    ownCount++;
 
     article.dataset.chamberInjected = "true";
+    injectedCount++;
 
     const container = document.createElement("div");
-    container.className = "chamber-btn-container";
+    const actionRow = findPostActionRow(article);
+    container.className = actionRow ? "chamber-action-slot" : "chamber-btn-container";
 
     const btn = document.createElement("button");
     btn.className = "chamber-backup-btn";
@@ -309,9 +640,64 @@ function processDOM() {
     });
 
     container.appendChild(btn);
-    const anchor = heading.parentNode || article;
-    anchor.insertBefore(container, heading.nextSibling || null);
+    if (actionRow) {
+      actionRow.appendChild(container);
+    } else if (heading?.parentNode) {
+      heading.parentNode.insertBefore(container, heading.nextSibling || null);
+    } else {
+      article.insertBefore(container, article.firstChild || null);
+    }
   });
+
+  if (articles.length > 0 && injectedCount === 0 && Date.now() - lastDomDiagnosticAt > 5000) {
+    lastDomDiagnosticAt = Date.now();
+    reportChamberError({
+      message: "No historic backup button injected",
+      stack: JSON.stringify({
+        articleCount: articles.length,
+        ownCount,
+        userId: getFacebookUserId(),
+        url: window.location.href
+      })
+    }, "content:dom-scan");
+  }
+}
+
+function getCurrentPostForSidePanel() {
+  const candidates = Array.from(document.querySelectorAll('div[role="article"]'))
+    .filter((article) => !article.parentElement?.closest('div[role="article"]'))
+    .filter((article) => {
+      const rect = article.getBoundingClientRect();
+      const hasContent = article.querySelector('div[data-ad-preview="message"], div[data-testid="post_message"], div[data-ad-comet-preview="message"], img, video');
+      return Boolean(hasContent) && rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => {
+    const aRect = a.getBoundingClientRect();
+    const bRect = b.getBoundingClientRect();
+    const aCenter = (aRect.top + aRect.bottom) / 2;
+    const bCenter = (bRect.top + bRect.bottom) / 2;
+    return Math.abs(aCenter - window.innerHeight / 2) - Math.abs(bCenter - window.innerHeight / 2);
+  });
+
+  const data = getFacebookPostData(candidates[0]);
+  if (!data.textContent && !data.media.primary_fb_cdn) return null;
+  data.fbUserId = getFacebookUserId();
+  return data;
+}
+
+function listVisiblePostsForSidePanel() {
+  return Array.from(document.querySelectorAll('div[role="article"]'))
+    .filter((article) => !article.parentElement?.closest('div[role="article"]'))
+    .filter((article) => {
+      const rect = article.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < window.innerHeight &&
+        article.querySelector('div[data-ad-preview="message"], div[data-testid="post_message"], div[data-ad-comet-preview="message"], img, video');
+    })
+    .map((article) => getFacebookPostData(article))
+    .filter((post) => post.textContent || post.media.primary_fb_cdn)
+    .slice(0, 10);
 }
 
 // 5. Initialize MutationObserver to watch for dynamically loaded feed articles
@@ -330,6 +716,17 @@ setTimeout(processDOM, 3000);
 
 // 6. Listen to messages from popup.js for composer auto-fill automation
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "CAPTURE_CURRENT_POST") {
+    const payload = getCurrentPostForSidePanel();
+    sendResponse(payload
+      ? { success: true, payload }
+      : { success: false, error: "目前畫面找不到最外層文章，請把文章捲到畫面中央再試。" });
+    return false;
+  }
+  if (request.action === "LIST_VISIBLE_POSTS") {
+    sendResponse({ success: true, posts: listVisiblePostsForSidePanel() });
+    return false;
+  }
   if (request.action === "OPEN_FB_COMPOSER_AND_FILL") {
     handleOpenComposerAndFill(request.payload.text, request.payload.imageUrl);
     sendResponse({ success: true });
@@ -436,16 +833,24 @@ function findComposerTextbox(container = document) {
 function findPhotoBtn() {
   const selectors = [
     'div[role="dialog"] div[role="button"]',
+    'div[role="dialog"] button',
     'div[role="dialog"] i',
     'div[role="main"] div[role="button"]',
+    'div[role="main"] button',
     'div[role="button"]',
+    'button',
     'i'
   ];
   for (const selector of selectors) {
     const elements = document.querySelectorAll(selector);
     for (const el of elements) {
-      const label = el.getAttribute('aria-label') || el.innerText || "";
-      if (label.includes("相片") || label.includes("影片") || label.includes("Photo") || label.includes("Video")) {
+      const label = [
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        el.getAttribute('data-tooltip-content'),
+        el.innerText
+      ].filter(Boolean).join(" ");
+      if (/相片|照片|影片|Photo|Video|photo|video/i.test(label)) {
         return el.closest('div[role="button"]') || el;
       }
     }
@@ -454,7 +859,28 @@ function findPhotoBtn() {
 }
 
 function findFileInput() {
-  return document.querySelector('div[role="dialog"] input[type="file"]');
+  // Facebook may mount the input outside the composer dialog, and it is often
+  // intentionally hidden. Do not use visibility/size checks here.
+  return document.querySelector('input[type="file"][accept*="image"]') ||
+    document.querySelector('input[type="file"]');
+}
+
+function waitForFileInput(timeoutMs = 5000) {
+  const existing = findFileInput();
+  if (existing) return Promise.resolve(existing);
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const poll = () => {
+      const input = findFileInput();
+      if (input || Date.now() - startedAt >= timeoutMs) {
+        resolve(input || null);
+        return;
+      }
+      setTimeout(poll, 100);
+    };
+    poll();
+  });
 }
 
 function triggerUpload(fileInput, blob) {
@@ -572,16 +998,15 @@ function fillTextAndImage(textbox, text, imageUrl) {
         if (photoBtn) {
           console.log("[Chamber] Photo mode not active, switching to photo mode...");
           activateElement(photoBtn);
-          setTimeout(() => {
-            fileInput = findFileInput();
-            if (fileInput) {
-              triggerUpload(fileInput, blob);
+          waitForFileInput().then((input) => {
+            if (input) {
+              triggerUpload(input, blob);
               setTimeout(restoreText, 800);
               return;
             }
             console.warn("[Chamber] Photo file input did not render after click.");
             restoreText();
-          }, 600);
+          });
         } else {
           console.warn("[Chamber] Photo button not found inside composer container.");
           restoreText();

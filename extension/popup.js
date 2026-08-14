@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const walletPrivateKeyInput = document.getElementById("walletPrivateKey");
   const imgurClientIdInput = document.getElementById("imgurClientId");
   const isEncryptionEnabledCheckbox = document.getElementById("isEncryptionEnabled");
+  const isDebugModeCheckbox = document.getElementById("isDebugMode");
   
   const timelineUrlText = document.getElementById("timelineUrlText");
   const identityAliasSummary = document.getElementById("identityAliasSummary");
@@ -37,6 +38,82 @@ document.addEventListener("DOMContentLoaded", () => {
   let aliasCheckTimer = null;
   let lastAliasCheckResult = null;
   let hasExistingIdentity = false;
+  const openSettingsDirectly = new URLSearchParams(window.location.search).get("view") === "settings";
+
+  function reportMappingDiagnostic(details) {
+    fetch("https://studio.milkcat.org/chamber-api/dev-errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "popup:mapping-state",
+        message: JSON.stringify(details).slice(0, 6000),
+        extensionVersion: chrome.runtime.getManifest().version,
+        timestamp: new Date().toISOString()
+      })
+    }).catch(() => {});
+  }
+
+  function restoreIdentityFromServer(userId, accountId, callback) {
+    const actorIds = [userId, accountId]
+      .filter(Boolean)
+      .filter((id, index, values) => values.indexOf(id) === index);
+    const tryNext = (index) => {
+      if (index >= actorIds.length) {
+        callback(false);
+        return;
+      }
+      const actorId = actorIds[index];
+      fetch(`https://studio.milkcat.org/chamber-api/identity/by-actor?platform=facebook&actorId=${encodeURIComponent(actorId)}`)
+        .then((response) => response.ok ? response.json() : null)
+        .then((identity) => {
+          if (!identity?.success || !identity.alias) {
+            tryNext(index + 1);
+            return;
+          }
+          const prefix = `user_${userId}_`;
+          const canonicalUrl = identity.canonicalUrl?.startsWith("http")
+            ? identity.canonicalUrl
+            : `https://studio.milkcat.org${identity.canonicalUrl || ""}`;
+          const update = {
+            [prefix + "identityAlias"]: identity.alias,
+            [prefix + "identityPlatform"]: identity.platform || "facebook",
+            [prefix + "lastEchoUrl"]: canonicalUrl
+          };
+          chrome.storage.local.set(update, () => {
+            console.log(`[Chamber] Restored identity mapping from server: ${identity.alias}`);
+            callback(true);
+          });
+        })
+        .catch(() => tryNext(index + 1));
+    };
+    tryNext(0);
+  }
+
+  function normalizeEchoUrl(url) {
+    if (!url) return "";
+    return url.startsWith("http") ? url : `https://studio.milkcat.org${url}`;
+  }
+
+  function resolvePopupUserContext(meta, callback) {
+    if (meta.lastFbUserId) {
+      callback(meta.lastFbUserId, meta.lastFbAccountId || "");
+      return;
+    }
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeUrl = tabs?.[0]?.url || "";
+      if (!activeUrl.includes("facebook.com")) {
+        callback("default", "");
+        return;
+      }
+      chrome.cookies.get({ url: activeUrl, name: "c_user" }, (cookie) => {
+        const userId = cookie?.value || "default";
+        if (userId !== "default") {
+          chrome.storage.local.set({ lastFbUserId: userId });
+        }
+        callback(userId, "");
+      });
+    });
+  }
 
   const DEFAULT_DECLARATION = `【本人樂觀開朗之 Web3 轉世聲明】
 
@@ -204,10 +281,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function setInitialView(hasIdentity) {
     hasExistingIdentity = Boolean(hasIdentity);
     if (dashboardView) {
-      dashboardView.classList.toggle("hidden", !hasExistingIdentity);
+      dashboardView.classList.toggle("hidden", openSettingsDirectly || !hasExistingIdentity);
     }
     if (settingsView) {
-      settingsView.classList.toggle("hidden", hasExistingIdentity);
+      settingsView.classList.toggle("hidden", !openSettingsDirectly && hasExistingIdentity);
     }
     if (backBtn) {
       backBtn.style.display = hasExistingIdentity ? "" : "none";
@@ -264,25 +341,209 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function migrateDefaultSettingsIfNeeded(userId, callback) {
+    if (!userId || userId === "default") {
+      callback();
+      return;
+    }
+    const defaultPrefix = "user_default_";
+    const newPrefix = `user_${userId}_`;
+
+    chrome.storage.local.get([defaultPrefix + "identityAlias"], (res) => {
+      const defaultAlias = res[defaultPrefix + "identityAlias"];
+      if (!defaultAlias) {
+        callback();
+        return;
+      }
+      chrome.storage.local.get([newPrefix + "identityAlias"], (newRes) => {
+        if (newRes[newPrefix + "identityAlias"]) {
+          callback();
+          return;
+        }
+
+        console.log(`[Chamber] Migrating default settings to user_${userId}`);
+        const keys = [
+          "identityAlias",
+          "identityPlatform",
+          "nativeWalletAddress",
+          "nativeWalletPrivateKey",
+          "customWalletAddress",
+          "customWalletPrivateKey",
+          "isEncryptionEnabled",
+          "lastEchoUrl",
+          "lastFbUserIdHash"
+        ];
+        chrome.storage.local.get(keys.map(k => defaultPrefix + k), (defaultData) => {
+          const update = {};
+          keys.forEach(k => {
+            const val = defaultData[defaultPrefix + k];
+            if (val !== undefined) {
+              update[newPrefix + k] = val;
+            }
+          });
+          chrome.storage.local.set(update, () => {
+            const alias = update[newPrefix + "identityAlias"];
+            const platform = update[newPrefix + "identityPlatform"] || "facebook";
+            const customWallet = update[newPrefix + "customWalletAddress"];
+            const nativeWallet = update[newPrefix + "nativeWalletAddress"];
+            const wallet = customWallet || nativeWallet || "";
+
+            fetch("https://studio.milkcat.org/chamber-api/identity/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                alias,
+                platform,
+                actorType: platform === "facebook" ? "personal" : "account",
+                actorId: userId,
+                displayName: alias,
+                walletAddress: wallet || null,
+                proof: ""
+              })
+            }).then(r => r.json()).then(data => {
+              console.log("[Chamber] Migrated identity registration response:", data);
+            }).catch(err => {
+              console.error("[Chamber] Migrated identity registration failed:", err);
+            }).finally(() => {
+              callback();
+            });
+          });
+        });
+      });
+    });
+  }
+
+  // A Facebook account can expose USER_ID and ACCOUNT_ID at different times.
+  // Older builds therefore may have saved the same mapping under a different
+  // user_* namespace. If there is exactly one existing identity mapping, move
+  // it to the currently detected user instead of asking the user to map again.
+  function migrateAnyExistingIdentityIfNeeded(userId, accountId, callback) {
+    if (!userId || userId === "default") {
+      callback();
+      return;
+    }
+
+    const currentPrefix = `user_${userId}_`;
+    chrome.storage.local.get(null, (allData) => {
+      reportMappingDiagnostic({
+        userId,
+        accountId,
+        currentPrefix,
+        mappingKeys: Object.keys(allData)
+          .filter((key) => key === "identityAlias" || /identityAlias$/.test(key))
+          .map((key) => key.replace(/identityAlias$/, "identityAlias")),
+        hasCurrentMapping: Boolean(allData[currentPrefix + "identityAlias"]),
+        hasLegacyMapping: Boolean(allData.identityAlias)
+      });
+      if (allData[currentPrefix + "identityAlias"]) {
+        callback();
+        return;
+      }
+
+      const relatedPrefixes = [userId, accountId]
+        .filter(Boolean)
+        .map((id) => `user_${id}_`)
+        .filter((prefix, index, values) => values.indexOf(prefix) === index);
+      const relatedSource = relatedPrefixes.find((prefix) => allData[prefix + "identityAlias"]);
+      if (relatedSource) {
+        const update = {};
+        [
+          "identityAlias", "identityPlatform", "nativeWalletAddress",
+          "nativeWalletPrivateKey", "customWalletAddress", "customWalletPrivateKey",
+          "isEncryptionEnabled", "lastEchoUrl", "lastFbUserIdHash"
+        ].forEach((key) => {
+          if (allData[relatedSource + key] !== undefined) {
+            update[currentPrefix + key] = allData[relatedSource + key];
+          }
+        });
+        chrome.storage.local.set(update, () => {
+          console.log(`[Chamber] Migrated related identity mapping from ${relatedSource}`);
+          callback();
+        });
+        return;
+      }
+
+      const candidatePrefixes = new Set();
+      Object.keys(allData).forEach((key) => {
+        const match = key.match(/^user_(.+)_identityAlias$/);
+        if (match && allData[key]) {
+          candidatePrefixes.add(`user_${match[1]}_`);
+        }
+      });
+
+      // Support settings written by pre-namespaced builds as well.
+      if (allData.identityAlias) candidatePrefixes.add("");
+      if (candidatePrefixes.size !== 1) {
+        callback();
+        return;
+      }
+
+      const sourcePrefix = [...candidatePrefixes][0];
+      if (sourcePrefix === currentPrefix) {
+        callback();
+        return;
+      }
+
+      const keys = [
+        "identityAlias",
+        "identityPlatform",
+        "nativeWalletAddress",
+        "nativeWalletPrivateKey",
+        "customWalletAddress",
+        "customWalletPrivateKey",
+        "isEncryptionEnabled",
+        "lastEchoUrl",
+        "lastFbUserIdHash"
+      ];
+      const update = {};
+      keys.forEach((key) => {
+        const value = allData[sourcePrefix + key];
+        if (value !== undefined) update[currentPrefix + key] = value;
+      });
+      if (!update[currentPrefix + "identityAlias"]) {
+        callback();
+        return;
+      }
+
+      chrome.storage.local.set(update, () => {
+        console.log(`[Chamber] Migrated existing identity mapping to ${currentPrefix}`);
+        callback();
+      });
+    });
+  }
+
   // 2. Load configurations and handle first-time initialization
-  chrome.storage.local.get(["lastFbUserId", "imgurClientId"], (meta) => {
-    const userId = meta.lastFbUserId || "default";
-    const prefix = `user_${userId}_`;
+  chrome.storage.local.get(["lastFbUserId", "lastFbAccountId", "imgurClientId"], (meta) => {
+    resolvePopupUserContext(meta, (userId, accountId) => {
     
-    chrome.storage.local.get(
-      [
-        prefix + "identityAlias",
-        prefix + "identityPlatform",
-        prefix + "nativeWalletAddress",
-        prefix + "nativeWalletPrivateKey",
-        prefix + "customWalletAddress",
-        prefix + "customWalletPrivateKey",
-        prefix + "isEncryptionEnabled",
-        prefix + "lastEchoUrl",
-        prefix + "lastFbUserIdHash"
-      ],
-      (data) => {
-        identityAliasInput.value = data[prefix + "identityAlias"] || "";
+    migrateDefaultSettingsIfNeeded(userId, () => {
+      migrateAnyExistingIdentityIfNeeded(userId, accountId, () => {
+      const prefix = `user_${userId}_`;
+      chrome.storage.local.get(
+        [
+          prefix + "identityAlias",
+          prefix + "identityPlatform",
+          prefix + "nativeWalletAddress",
+          prefix + "nativeWalletPrivateKey",
+          prefix + "customWalletAddress",
+          prefix + "customWalletPrivateKey",
+          prefix + "isEncryptionEnabled",
+          prefix + "isDebugMode",
+          prefix + "lastEchoUrl",
+          prefix + "lastFbUserIdHash",
+          "chamberProfiles",
+          "activeChamberProfileId"
+        ],
+        (data) => {
+        if (!data[prefix + "identityAlias"]) {
+          restoreIdentityFromServer(userId, accountId, (restored) => {
+            if (restored) window.location.reload();
+          });
+        }
+        const activeProfile = Array.isArray(data.chamberProfiles)
+          ? data.chamberProfiles.find((profile) => profile.id === data.activeChamberProfileId)
+          : null;
+        identityAliasInput.value = activeProfile?.alias || data[prefix + "identityAlias"] || "";
         let nativeWalletAddress = data[prefix + "nativeWalletAddress"];
         let nativeWalletPrivateKey = data[prefix + "nativeWalletPrivateKey"];
         
@@ -300,7 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("nativeWalletLabel").innerText = nativeWalletAddress;
 
         // Populate Inputs with Custom Wallet configuration (blank = custodial)
-        walletAddressInput.value = data[prefix + "customWalletAddress"] || "";
+        walletAddressInput.value = activeProfile?.walletAddress || data[prefix + "customWalletAddress"] || "";
         walletPrivateKeyInput.value = data[prefix + "customWalletPrivateKey"] || "";
         imgurClientIdInput.value = meta.imgurClientId || "";
         if (data[prefix + "isEncryptionEnabled"] !== undefined) {
@@ -308,25 +569,32 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           isEncryptionEnabledCheckbox.checked = true; // default enabled
         }
+        isDebugModeCheckbox.checked = data[prefix + "isDebugMode"] !== false;
+        // MVP is devnet-only; keep the future network switch hidden for now.
+        const debugGroup = isDebugModeCheckbox.closest(".checkbox-group");
+        if (debugGroup) debugGroup.style.display = "none";
 
-        if (data[prefix + "identityAlias"]) {
-          aliasStatus.innerHTML = `已綁定暱稱：<code>${data[prefix + "identityAlias"]}</code>`;
+        if (activeProfile?.alias || data[prefix + "identityAlias"]) {
+          aliasStatus.innerHTML = `已綁定暱稱：<code>${activeProfile?.alias || data[prefix + "identityAlias"]}</code>`;
         }
-        setInitialView(Boolean(data[prefix + "identityAlias"]));
+        setInitialView(Boolean(activeProfile?.alias || data[prefix + "identityAlias"]));
         renderIdentitySummary(
-          data[prefix + "identityAlias"] || "",
-          data[prefix + "customWalletAddress"] || nativeWalletAddress,
+          activeProfile?.alias || data[prefix + "identityAlias"] || "",
+          activeProfile?.walletAddress || data[prefix + "customWalletAddress"] || nativeWalletAddress,
           data[prefix + "identityPlatform"] || "facebook"
         );
-        setComposerReady(Boolean(data[prefix + "identityAlias"]), data[prefix + "identityAlias"] || "");
-        if (data[prefix + "identityAlias"]) {
+        setComposerReady(Boolean(activeProfile?.alias || data[prefix + "identityAlias"]), activeProfile?.alias || data[prefix + "identityAlias"] || "");
+        if (activeProfile?.alias || data[prefix + "identityAlias"]) {
           runAliasCheck({ quiet: true }).catch((err) => {
             console.warn("[Chamber] Initial alias check failed:", err);
           });
         }
 
         // Populate Timeline Link
-        const lastEchoUrl = data[prefix + "lastEchoUrl"];
+        const lastEchoUrl = normalizeEchoUrl(activeProfile?.lastEchoUrl || data[prefix + "lastEchoUrl"]);
+        if (lastEchoUrl && lastEchoUrl !== data[prefix + "lastEchoUrl"]) {
+          chrome.storage.local.set({ [prefix + "lastEchoUrl"]: lastEchoUrl });
+        }
         if (lastEchoUrl) {
           timelineUrlText.innerText = lastEchoUrl;
           timelineUrlText.style.color = "#38bdf8"; // Active link color
@@ -337,13 +605,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         declarationTextarea.value = DEFAULT_DECLARATION;
 
-        if (!data[prefix + "identityAlias"]) {
+        if (!activeProfile?.alias && !data[prefix + "identityAlias"]) {
           aliasStatus.innerText = "第一次使用請先填上方暱稱（必填），完成 mapping 後系統會自動回到首頁。";
           setComposerReady(false, "");
           setTimeout(() => identityAliasInput?.focus(), 100);
         }
       }
     );
+      });
+    });
+    });
   });
 
   // 3. Save Settings Handler
@@ -353,6 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const customWalletPrivateKey = walletPrivateKeyInput.value.trim();
     const imgurClientId = imgurClientIdInput.value.trim();
     const isEncryptionEnabled = isEncryptionEnabledCheckbox.checked;
+    const isDebugMode = true;
 
     saveBtn.innerText = "⏳ 儲存中...";
     saveBtn.disabled = true;
@@ -434,10 +706,26 @@ document.addEventListener("DOMContentLoaded", () => {
       update[prefix + "customWalletAddress"] = customWalletAddress;
       update[prefix + "customWalletPrivateKey"] = customWalletPrivateKey;
       update[prefix + "isEncryptionEnabled"] = isEncryptionEnabled;
+      update[prefix + "isDebugMode"] = isDebugMode;
       update[prefix + "lastEchoUrl"] = "";
       update[prefix + "lastFbUserIdHash"] = "";
 
       chrome.storage.local.set(update, () => {
+        chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"], (profileData) => {
+          const profiles = Array.isArray(profileData.chamberProfiles) ? profileData.chamberProfiles : [];
+          const activeProfile = profiles.find((profile) => profile.id === profileData.activeChamberProfileId);
+          const nextProfile = activeProfile || {
+            id: `profile_${Date.now()}`,
+            name: identityAlias,
+            createdAt: new Date().toISOString()
+          };
+          nextProfile.name = identityAlias;
+          nextProfile.alias = identityAlias;
+          nextProfile.walletAddress = effectiveWallet || "";
+          nextProfile.updatedAt = new Date().toISOString();
+          const nextProfiles = activeProfile ? profiles : [...profiles, nextProfile];
+          chrome.storage.local.set({ chamberProfiles: nextProfiles, activeChamberProfileId: nextProfile.id });
+        });
         setTimeout(() => {
             saveBtn.innerText = "💾 儲存成功！";
             saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
@@ -523,7 +811,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 7. Reborn Card Generator Handler (HTML5 Canvas)
-  genCardBtn.addEventListener("click", async () => {
+  genCardBtn?.addEventListener("click", async () => {
     const textToCopy = declarationTextarea.value.trim();
 
     genCardBtn.innerText = "⏳ 正在生成轉世卡...";

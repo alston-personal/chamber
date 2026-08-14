@@ -3,7 +3,11 @@ const path = require("path");
 const crypto = require("crypto");
 
 const DATA_DIR = process.env.CHAMBER_DATA_DIR || "/home/ubuntu/agent-data/projects/metashield-protocol";
-const STORE_PATH = path.join(DATA_DIR, "identity-registry.json");
+const IS_PROD = process.env.NODE_ENV === "production";
+const STORE_NAME = IS_PROD ? "identity-registry.json" : "identity-registry.dev.json";
+const STORE_PATH = path.join(DATA_DIR, STORE_NAME);
+
+console.log(`ℹ️ [Identity Registry] Environment: ${IS_PROD ? "production" : "development"}. Database file: ${STORE_NAME}`);
 
 function nowIso() {
   return new Date().toISOString();
@@ -189,6 +193,24 @@ async function getRegistry() {
   return readStore();
 }
 
+function findActorBinding(store, { platform, actorType, actorId }) {
+  const normalizedPlatform = normalizePlatform(platform);
+  const normalizedActorType = normalizeActorType(actorType);
+  const normalizedActorId = String(actorId || "").trim();
+  const slug = platformBindingKey(normalizedPlatform);
+  if (!normalizedActorId) return null;
+  for (const root of Object.values(store.aliases || {})) {
+    const binding = root.platform_bindings?.[slug];
+    if (binding &&
+        String(binding.actor_id || "") === normalizedActorId &&
+        normalizeActorType(binding.actor_type) === normalizedActorType &&
+        binding.binding_status !== "revoked") {
+      return { alias: root.alias, root, binding, platform: normalizedPlatform, actorType: normalizedActorType, actorId: normalizedActorId };
+    }
+  }
+  return null;
+}
+
 async function resolveIdentity({ alias, platform }) {
   const store = await readStore();
   const normalizedAlias = normalizeAlias(alias);
@@ -258,6 +280,13 @@ async function registerIdentity(input) {
   const actorId = String(input.actorId || "").trim();
 
   const store = await readStore();
+  const actorBinding = findActorBinding(store, { platform, actorType, actorId });
+  if (actorBinding && actorBinding.alias !== alias) {
+    const error = new Error(`platform identity already belongs to Chamber account "${actorBinding.alias}"`);
+    error.code = "IDENTITY_ALREADY_BOUND";
+    error.boundAlias = actorBinding.alias;
+    throw error;
+  }
   const wallet = input.walletAddress ? String(input.walletAddress).trim() : null;
   const proof = input.proof ? String(input.proof) : "";
   const slug = platformSlug(platform);
@@ -313,6 +342,12 @@ async function registerIdentity(input) {
     updated_at: now,
   };
 
+  if (existingBinding.wallet_address && wallet && existingBinding.wallet_address.toLowerCase() !== wallet.toLowerCase()) {
+    const error = new Error("wallet ownership changes require the verified ownership-transfer flow");
+    error.code = "OWNERSHIP_TRANSFER_REQUIRED";
+    throw error;
+  }
+
   const sameWallet = existingBinding.wallet_address && wallet && existingBinding.wallet_address.toLowerCase() === wallet.toLowerCase();
   existingBinding.actor_type = actorType || existingBinding.actor_type || "personal";
   existingBinding.actor_id = actorId || existingBinding.actor_id || "";
@@ -352,7 +387,18 @@ async function registerIdentity(input) {
   };
 }
 
-async function transferIdentity({ alias, platform, actorType, actorId, fromWallet, toWallet, proof }) {
+async function transferIdentity() {
+  const error = new Error("ownership transfer is not enabled until article-key and owner-capability handover is verified");
+  error.code = "OWNERSHIP_TRANSFER_NOT_READY";
+  throw error;
+}
+
+// This registry mutation is intentionally private. A future transfer
+// coordinator may call it only after both owners authorize the handover,
+// every post-key-v2 article has a recipient envelope for the new owner, and
+// the owner access capability has been rotated. Exposing it directly would
+// create a timeline that looks transferred while its archives remain locked.
+async function commitVerifiedIdentityTransfer({ alias, platform, actorType, actorId, fromWallet, toWallet, proof }) {
   const normalizedAlias = normalizeAlias(alias);
   if (!normalizedAlias) {
     throw new Error("alias is required");
@@ -486,6 +532,7 @@ function suggestAliasCandidates(alias, store, count = 5) {
 
 module.exports = {
   getRegistry,
+  findActorBinding,
   resolveIdentity,
   registerIdentity,
   transferIdentity,

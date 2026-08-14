@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chamber</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 18px; color: #e5e7eb; background: #0f172a; overflow-x: hidden; }
+    h1 { margin: 0 0 4px; color: #a5b4fc; font-size: 24px; }
+    .sub { margin: 0 0 18px; color: #94a3b8; font-size: 12px; }
+    .card { padding: 14px; margin: 12px 0; border: 1px solid #334155; border-radius: 14px; background: #172554; }
+    .label { color: #94a3b8; font-size: 11px; }
+    #pageUrl { margin-top: 5px; color: #cbd5e1; font-size: 12px; overflow-wrap: anywhere; }
+    #postList { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; width: 100%; }
+    .post { min-width: 0; width: 100%; max-width: 100%; padding: 11px; overflow: hidden; border: 1px solid #334155; border-radius: 10px; background: #111827; }
+    .post-text { margin-bottom: 9px; color: #e2e8f0; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .post-thumb { display: block; width: 100%; max-width: 100%; height: auto; max-height: 130px; object-fit: cover; margin: 0 0 9px; border-radius: 7px; }
+    .post-meta { margin-bottom: 8px; color: #64748b; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .post button { padding: 8px; font-size: 11px; }
+    button { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 9px; color: white; background: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, .28); font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease, opacity .16s ease; }
+    button:not(:disabled):hover { background: #6366f1; box-shadow: 0 6px 16px rgba(79, 70, 229, .38); transform: translateY(-1px); }
+    button:not(:disabled):active { transform: translateY(0); }
+    button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+    button:disabled { cursor: not-allowed; opacity: .38; filter: grayscale(.65); box-shadow: none; }
+    #status { min-height: 20px; margin-top: 12px; color: #cbd5e1; font-size: 12px; line-height: 1.5; }
+    #result a { color: #93c5fd; font-size: 12px; overflow-wrap: anywhere; }
+    .result-links { display: grid; gap: 6px; min-width: 0; }
+    .version { margin-top: 24px; color: #64748b; font-size: 10px; text-align: center; }
+    .secondary-action { margin-top: 8px; border-color: #6366f1; background: rgba(79, 70, 229, .12); color: #e0e7ff; box-shadow: none; }
+    .secondary-action:not(:disabled):hover { border-color: #a5b4fc; background: rgba(79, 70, 229, .3); color: #fff; }
+    .field-action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
+    .compact-action { width: auto; min-width: 88px; margin-top: 0; padding: 9px 12px; }
+    .navigation-action { border-color: #64748b; background: transparent; color: #e2e8f0; box-shadow: none; }
+    .navigation-action:not(:disabled):hover { border-color: #a5b4fc; background: rgba(99, 102, 241, .18); }
+    .danger-note { margin: 12px 0 8px; padding: 10px; border: 1px solid #92400e; border-radius: 9px; background: #451a03; color: #fed7aa; font-size: 11px; line-height: 1.5; }
+    .video-limit-note { margin: 8px 0; padding: 9px 10px; border: 1px solid #92400e; border-radius: 8px; background: #451a03; color: #fde68a; font-size: 11px; line-height: 1.45; }
+    textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid #334155; border-radius: 9px; background: #111827; color: #e2e8f0; font: inherit; font-size: 12px; line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <h1>Chamber</h1>
+  <p class="sub">去中心化社交備份室</p>
+  <div id="backupView">
+  <div class="card">
+    <div class="label">目前 Facebook 分頁（不是備份內容）</div>
+    <div id="pageUrl">讀取中...</div>
+  </div>
+  <div class="card">
+    <div class="label">目前 Chamber 帳號</div>
+    <select id="profileSelect" disabled style="width:100%;margin-top:6px;padding:9px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;"></select>
+    <div class="post-meta" style="margin-top:7px;white-space:normal;">目前版本固定使用一個 Chamber 帳號與一個 Facebook 帳號。</div>
+  </div>
+  <div class="label" style="margin: 16px 0 8px;">先在 Facebook 明確選取一篇文章</div>
+  <div id="postList"><div class="post-meta">尚未選取文章</div></div>
+  <button id="selectButton" type="button">🎯 在 Facebook 選取文章</button>
+  <button id="rebornButton" class="secondary-action" type="button">🪪 建立轉世聲明</button>
+  <button id="declarationButton" class="secondary-action" type="button">⚙️ 開啟 Chamber 帳號設定</button>
+  <button id="switchAccountButton" class="secondary-action" type="button">🔄 重新讀取目前 Facebook 帳號</button>
+  <div id="status"></div>
+  <div id="result"></div>
+  </div>
+  <div id="settingsView" hidden>
+    <div class="card">
+      <div class="label">Chamber 帳號設定</div>
+      <div class="post-meta" style="white-space:normal;">目前版本使用一個 Chamber 帳號綁定一個 Facebook 帳號。</div>
+      <label class="label" for="settingsAlias">身份暱稱 / mapping</label>
+      <div class="field-action-row">
+        <input id="settingsAlias" type="text" placeholder="例如：sunlake" style="min-width:0;width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
+        <button id="settingsCheck" class="secondary-action compact-action" type="button">檢查</button>
+      </div>
+      <div id="settingsAliasStatus" class="post-meta" style="white-space:normal;">用於 Echo 時光軸網址。</div>
+      <label class="label" for="settingsWallet">自訂 Web3 錢包（選填）</label>
+      <input id="settingsWallet" type="text" placeholder="留空使用託管錢包" style="width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
+      <div class="danger-note">復原採 2-of-3：A 留在目前 Chrome 的 Chamber Extension；B 加密保存於 Chamber Recovery Vault 並由 Passkey 保護；C 是您離線保存的緊急復原碼。Echo 只提供操作介面，不保存完整金鑰。</div>
+      <button id="recoveryExport" class="secondary-action" type="button">🛡️ 開啟金鑰復原設定 <span aria-hidden="true">→</span></button>
+      <div id="recoveryStatus" class="post-meta" style="white-space:normal;">尚未確認是否已建立 Recovery Vault 與緊急復原碼 C。</div>
+      <button id="settingsSave" type="button">儲存並套用</button>
+      <button id="settingsBack" class="secondary-action navigation-action" type="button">← 返回文章備份</button>
+    </div>
+  </div>
+  <div id="rebornView" hidden>
+    <div class="card">
+      <div class="label">Web3 轉世聲明</div>
+      <div class="post-meta" style="white-space:normal;line-height:1.5;">編輯聲明後，Chamber 會產生含 Echo QR Code 的身分卡，並開啟 Facebook 發文框。送出前仍由你自行確認。</div>
+      <textarea id="rebornText" rows="15" aria-label="轉世聲明內容"></textarea>
+      <div class="danger-note">轉世卡會公開你的 Chamber 暱稱與 Echo 網址，不會顯示復原碼或私鑰。</div>
+      <button id="rebornGenerate" type="button">⚡ 產生轉世卡並開啟發文框</button>
+      <button id="rebornBack" class="secondary-action navigation-action" type="button">← 返回文章備份</button>
+      <div id="rebornStatus" class="post-meta" style="margin-top:10px;white-space:normal;line-height:1.5;"></div>
+    </div>
+  </div>
+  <div id="versionLabel" class="version"></div>
+  <script src="mvp-validation.js"></script>
+  <script src="declaration-card.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

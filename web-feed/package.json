@@ -6,9 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pack-extension": "python3 ../scripts/pack-extension.py",
+    "release-extension": "python3 ../scripts/pack-extension.py --release"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
     "ethers": "^6.16.0",
     "next": "16.2.9",
     "react": "19.2.4",

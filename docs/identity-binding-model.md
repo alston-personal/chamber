@@ -56,8 +56,9 @@ Ownership changes are appended as immutable transfer events.
 1. The alias is stable.
 2. The wallet can change.
 3. Existing backup records stay immutable.
-4. Changing the wallet updates ownership mapping only.
+4. A wallet change must be atomic: identity mapping, article-key access, and owner-management capability move together.
 5. Public URLs resolve through the backend registry, not through extension storage.
+6. Ordinary registration must never overwrite an existing wallet binding; it must enter the verified transfer flow.
 
 ## Backend API
 
@@ -71,7 +72,8 @@ Checks whether an alias is available for the requesting wallet and returns sugge
 Creates or updates a binding record.
 
 ### `POST /chamber-api/identity/transfer`
-Transfers an alias from one wallet to another and appends a transfer event.
+Reserved for the verified transfer coordinator. The current test release returns
+`OWNERSHIP_TRANSFER_NOT_READY` instead of creating a broken partial transfer.
 
 ### `GET /chamber-api/identity`
 Returns the full registry for debugging and administration.
@@ -86,11 +88,15 @@ Returns the full registry for debugging and administration.
 
 ## Transfer Flow
 
-1. User initiates a transfer in the web UI.
-2. Old wallet signs or approves release.
-3. New wallet signs or accepts ownership.
-4. Backend appends a transfer record.
-5. Historic posts remain visible under the same alias.
+1. User initiates a transfer in Echo.
+2. Old owner authorizes release and new owner accepts with a registered Chamber sharing key.
+3. The old owner's Extension unwraps every `post-key-v2` article key and wraps it for the new owner's sharing key. Legacy owner-key articles must first be republished as a new encrypted revision.
+4. Backend verifies that the handover manifest covers every transferable article.
+5. Backend rotates the owner-management capability used for reading requests.
+6. Only after steps 2–5 succeed does the registry append the transfer event and change `current_wallet`.
+7. The alias, content key, public URL, posts, history, and recipient grants remain unchanged. Echo uses the new owner's transfer envelopes to unlock historic articles.
+
+If any step fails, the registry remains with the old owner; Chamber must never display a partially transferred identity.
 
 ## Implementation Notes
 
