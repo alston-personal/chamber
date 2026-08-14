@@ -18,6 +18,17 @@ const { registerIdentity, resolveIdentity, transferIdentity } = require("../api/
   };
   await registerIdentity(original);
   await registerIdentity(original);
+  const facebookIdentity = await resolveIdentity({ alias: original.alias, platform: "facebook" });
+  await registerIdentity({
+    ...original,
+    platform: "threads",
+    actorId: "threads-actor-1",
+    displayName: "@transfer_test",
+  });
+  const threadsIdentity = await resolveIdentity({ alias: original.alias, platform: "threads" });
+  assert.equal(threadsIdentity.current_wallet, original.walletAddress, "Threads binding must retain the Chamber owner wallet");
+  assert.equal(threadsIdentity.content_key, facebookIdentity.content_key, "Facebook and Threads must share one Echo content identity");
+  assert.equal(threadsIdentity.platform_binding.actor_id, "threads-actor-1", "Threads actor binding must be recorded independently");
 
   await assert.rejects(
     () => registerIdentity({ ...original, walletAddress: "0x2222222222222222222222222222222222222222" }),

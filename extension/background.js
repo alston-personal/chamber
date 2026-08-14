@@ -13,6 +13,10 @@ ChamberI18n.init(null).catch(() => {});
 const t = (key, variables) => ChamberI18n.t(key, variables);
 
 function validationMessage(validation, payload) {
+  if (validation?.code === "SOURCE_URL_REQUIRED") {
+    const platform = String(payload?.platform || "facebook").toLowerCase() === "threads" ? "Threads" : "Facebook";
+    return t("validation.SOURCE_URL_REQUIRED_PLATFORM", { platform });
+  }
   const key = validation?.code === "AUTHOR_NOT_CONFIRMED" && payload?.isOwnAuthor === false
     ? "validation.NOT_OWNER"
     : `validation.${validation?.code || "CONTENT_REQUIRED"}`;
@@ -554,7 +558,9 @@ async function uploadViaChamberAPI(postPayload) {
 
 // Main Controller Flow
 async function processBackupTask(postData, isHistoric) {
-  const fbUserId = postData.fbUserId || postData.fb_user_id || null;
+  // `fbUserId` is retained as a wire/storage compatibility field. For new
+  // platforms it carries the Chamber owner storage ID, not a Facebook ID.
+  const fbUserId = postData.ownerUserId || postData.fbUserId || postData.fb_user_id || null;
   const userId = fbUserId || "default";
   const prefix = `user_${userId}_`;
   if (isHistoric) {
@@ -592,7 +598,7 @@ async function processBackupTask(postData, isHistoric) {
   ].filter(Boolean);
   const isVideoLinkBackup = postData.media?.videoDetected === true;
   const content = postData.textContent || postData.content ||
-    (isVideoLinkBackup ? t("media.facebookVideoPost") : (mediaUrls.length > 0 ? t("media.facebookImagePost") : ""));
+    (isVideoLinkBackup ? t("media.platformVideoPost") : (mediaUrls.length > 0 ? t("media.platformImagePost") : ""));
   for (const [mediaIndex, url] of mediaUrls.entries()) {
     if (url && url.startsWith("http")) {
       let fallback;
@@ -635,7 +641,7 @@ async function processBackupTask(postData, isHistoric) {
     encryptionVersion: "post-key-v2",
     keyEnvelope: ownerKeyEnvelope,
     accessCapabilityHash: config.accessCapabilityHash,
-    platform: mappingData[prefix + "identityPlatform"] || postData.platform || "facebook",
+    platform: postData.platform || mappingData[prefix + "identityPlatform"] || "facebook",
     // Never send an inaccessible Facebook playback/poster URL as though it
     // were a completed immutable media upload.
     mediaUrls: fallbackUrls,
@@ -650,12 +656,12 @@ async function processBackupTask(postData, isHistoric) {
     authorName: postData.authorName || null,
     authorUrl: postData.authorUrl || null,
     // If user has bound a wallet, include it for the binding claim
-    boundWallet: activeProfile ? (activeProfile.walletAddress || null) : (config.boundWalletAddress || null),
+    boundWallet: activeProfile?.walletAddress || config.boundWalletAddress || null,
     sourceUrl: postData.sourceUrl || null,
     identityAlias: activeProfile ? (activeProfile.alias || null) : (mappingData[prefix + "identityAlias"] || null),
     identityDisplayName: activeProfile ? (activeProfile.name || null) : (mappingData[prefix + "identityDisplayName"] || null),
-    identityActorType: mappingData[prefix + "identityActorType"] || "personal",
-    identityActorId: mappingData[prefix + "identityActorId"] || fbUserId || "default",
+    identityActorType: postData.identityActorType || mappingData[prefix + "identityActorType"] || "personal",
+    identityActorId: postData.identityActorId || mappingData[prefix + "identityActorId"] || fbUserId || "default",
     // The current test release uses devnet without exposing an internal
     // DEBUG label to users. Network selection and diagnostics are separate.
     network: "devnet",

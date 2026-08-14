@@ -24,6 +24,18 @@ The MVP remains focused on validating the core path:
 
 The MVP does not implement user-paid storage, platform fees, production-wallet payments, or mainnet billing.
 
+## Candidate: Threads parity on the 0.6.0 contract
+
+Status: `0.7.0` candidate; the stable website download remains `0.6.0` until real Threads acceptance passes.
+
+- Add a replaceable Threads adapter without mixing Threads DOM rules into the Facebook adapter.
+- Reuse one Chamber owner identity, local encryption key hierarchy and 2-of-3 recovery set across Facebook and Threads bindings.
+- Preserve the 0.6.0 integrity gates: explicit selection, own-author verification, canonical source URL, complete expanded text, declared media completeness, publication time and layout.
+- Reuse Echo's platform-neutral transaction history, automatic timeline unlock, single-post links, reading requests/grants and recovery flows.
+- Keep video semantics link/poster-only; do not claim complete Threads video backup.
+- Keep Traditional Chinese and English parity for selection, errors, recovery and Echo status messages.
+- Do not promote until the real-browser matrix in [`docs/threads-0.7-validation.md`](threads-0.7-validation.md) has no pending data-integrity gate.
+
 ## Next: alias-based reading permissions
 
 Echo will present reading permissions in terms of Chamber identities, never raw wallet addresses:

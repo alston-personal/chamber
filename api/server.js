@@ -156,6 +156,17 @@ function isValidFacebookPostUrl(value) {
   }
 }
 
+function isValidThreadsPostUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+    if (!["threads.com", "www.threads.com", "threads.net", "www.threads.net"].includes(host)) return false;
+    return /^\/@[^/]+\/post\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname);
+  } catch (_) {
+    return false;
+  }
+}
+
 function canonicalSourceIdentity(value) {
   try {
     const url = new URL(String(value || ""));
@@ -442,8 +453,12 @@ router.post("/backup", async (req, res) => {
       return res.status(400).json({ error: "content is required" });
     }
 
-    if (normalizePlatform(platform || "facebook") === "facebook" && !isValidFacebookPostUrl(sourceUrl)) {
+    const requestedPlatform = normalizePlatform(platform || "facebook");
+    if (requestedPlatform === "facebook" && !isValidFacebookPostUrl(sourceUrl)) {
       return res.status(400).json({ error: "Facebook sourceUrl must be a valid post permalink", code: "SOURCE_URL_REQUIRED" });
+    }
+    if (requestedPlatform === "threads" && !isValidThreadsPostUrl(sourceUrl)) {
+      return res.status(400).json({ error: "Threads sourceUrl must be a valid post permalink", code: "SOURCE_URL_REQUIRED" });
     }
 
     // Hash FB user ID for on-chain storage (privacy protection)

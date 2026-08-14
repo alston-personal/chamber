@@ -34,6 +34,9 @@ function renderVersion() {
 }
 
 function validationMessage(validation, payload) {
+  if (validation?.code === "SOURCE_URL_REQUIRED") {
+    return t("validation.SOURCE_URL_REQUIRED_PLATFORM", { platform: platformName(payload?.platform || "facebook") });
+  }
   const key = validation?.code === "AUTHOR_NOT_CONFIRMED" && payload?.isOwnAuthor === false
     ? "validation.NOT_OWNER"
     : `validation.${validation?.code || "CONTENT_REQUIRED"}`;
@@ -44,13 +47,43 @@ function bytesToHex(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function activeFacebookIdentity() {
-  const tab = await getActiveTab();
-  const cookie = tab?.url?.includes("facebook.com")
-    ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
-    : null;
-  if (!cookie?.value) throw new Error(t("error.loginFacebook"));
-  return { userId: cookie.value, prefix: `user_${cookie.value}_` };
+function platformForTab(tab) {
+  try {
+    const host = new URL(tab?.url || "").hostname.toLowerCase();
+    if (host === "facebook.com" || host.endsWith(".facebook.com")) return "facebook";
+    if (["threads.com", "www.threads.com", "threads.net", "www.threads.net"].includes(host)) return "threads";
+  } catch (_) {}
+  return null;
+}
+
+const platformName = (platform) => platform === "threads" ? "Threads" : "Facebook";
+
+async function rawPlatformIdentity(tab = null) {
+  tab ||= await getActiveTab();
+  const platform = platformForTab(tab);
+  if (!platform) throw new Error(t("error.openSupportedPlatform"));
+  if (platform === "facebook") {
+    const cookie = await chrome.cookies.get({ url: tab.url, name: "c_user" });
+    if (!cookie?.value) throw new Error(t("error.loginPlatform", { platform: "Facebook" }));
+    return { platform, actorId: cookie.value, actorHandle: "", tab };
+  }
+  const cookie = await chrome.cookies.get({ url: tab.url, name: "ds_user_id" });
+  await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-threads.js"] });
+  const injected = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => globalThis.ChamberThreadsPlatform?.getAccountContext?.() || null
+  });
+  const account = injected?.[0]?.result;
+  if (!cookie?.value || !account?.handle) throw new Error(t("error.loginPlatform", { platform: "Threads" }));
+  return { platform, actorId: cookie.value, actorHandle: account.handle, tab };
+}
+
+async function activePlatformIdentity() {
+  const raw = await rawPlatformIdentity();
+  const state = await getActiveProfile(raw);
+  const profile = state.profiles.find((item) => item.id === state.activeId);
+  const userId = profile?.ownerUserId || (raw.platform === "facebook" ? raw.actorId : `threads:${raw.actorId}`);
+  return { ...raw, userId, prefix: `user_${userId}_`, profile };
 }
 
 async function ensureNativeOwnerKey(userId) {
@@ -74,7 +107,7 @@ async function ensureNativeOwnerKey(userId) {
 
 async function refreshRecoveryStatus() {
   try {
-    const { prefix } = await activeFacebookIdentity();
+    const { prefix } = await activePlatformIdentity();
     const data = await chrome.storage.local.get([prefix + "recoveryExportedAt", prefix + "recoveryLocalShare", prefix + "recoveryExportConfirmedVersion"]);
     recoveryStatus.textContent = data[prefix + "recoveryExportedAt"] && data[prefix + "recoveryLocalShare"] && data[prefix + "recoveryExportConfirmedVersion"] === "2-of-3-vault-v1"
       ? t("recovery.complete", { date: formatDate(data[prefix + "recoveryExportedAt"], { dateStyle: "medium", timeStyle: "short" }) })
@@ -92,13 +125,11 @@ function profileId() {
   return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function getActiveProfile() {
-  const tab = await getActiveTab();
-  const cookie = tab?.url?.includes("facebook.com")
-    ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
-    : null;
-  const userId = cookie?.value || "default";
-  const prefix = `user_${userId}_`;
+async function getActiveProfile(rawIdentity = null) {
+  const raw = rawIdentity || await rawPlatformIdentity();
+  const legacy = await chrome.storage.local.get(["lastFbUserId"]);
+  const initialOwnerId = raw.platform === "facebook" ? raw.actorId : (legacy.lastFbUserId || `threads:${raw.actorId}`);
+  const prefix = `user_${initialOwnerId}_`;
   const data = await chrome.storage.local.get([
     "chamberProfiles", "activeChamberProfileId", prefix + "identityAlias",
     prefix + "customWalletAddress", prefix + "nativeWalletAddress"
@@ -108,7 +139,7 @@ async function getActiveProfile() {
   if (!profiles.length) {
     const alias = data[prefix + "identityAlias"] || "";
     const wallet = data[prefix + "customWalletAddress"] || data[prefix + "nativeWalletAddress"] || "";
-    const first = { id: profileId(), name: alias || t("account.defaultName"), alias, walletAddress: wallet, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const first = { id: profileId(), name: alias || t("account.defaultName"), alias, walletAddress: wallet, ownerUserId: initialOwnerId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     profiles = [first];
     activeId = first.id;
     await chrome.storage.local.set({ chamberProfiles: profiles, activeChamberProfileId: activeId });
@@ -118,9 +149,13 @@ async function getActiveProfile() {
     await chrome.storage.local.set({ activeChamberProfileId: activeId });
   }
   const activeProfile = profiles.find((profile) => profile.id === activeId);
-  if (activeProfile && !activeProfile.alias && cookie?.value) {
+  if (activeProfile && !activeProfile.ownerUserId) {
+    activeProfile.ownerUserId = initialOwnerId;
+    await chrome.storage.local.set({ chamberProfiles: profiles });
+  }
+  if (activeProfile && !activeProfile.alias && raw.actorId) {
     try {
-      const response = await fetch(`https://studio.milkcat.org/chamber-api/identity/by-actor?platform=facebook&actorId=${encodeURIComponent(cookie.value)}`);
+      const response = await fetch(`https://studio.milkcat.org/chamber-api/identity/by-actor?platform=${encodeURIComponent(raw.platform)}&actorId=${encodeURIComponent(raw.actorId)}`);
       const identity = response.ok ? await response.json() : null;
       if (identity?.success && identity.alias) {
         activeProfile.alias = identity.alias;
@@ -149,22 +184,20 @@ async function renderProfiles() {
   profileSelect.value = activeId;
   const active = profiles.find((profile) => profile.id === activeId);
   const mapped = Boolean(active?.alias);
+  const currentPlatform = platformName(platformForTab(await getActiveTab()) || "facebook");
   selectButton.disabled = !mapped;
   rebornButton.disabled = !mapped;
-  selectButton.title = mapped ? t("account.selectTitle") : t("account.mappingRequiredTitle");
+  selectButton.title = mapped ? t("account.selectTitlePlatform", { platform: currentPlatform }) : t("account.mappingRequiredTitle");
   if (!mapped) {
     setStatus(t("account.mappingRequired"), true);
   }
 }
 
 async function loadSettingsForm() {
-  const state = await getActiveProfile();
+  const identity = await activePlatformIdentity();
+  const state = await getActiveProfile(identity);
   const profile = state.profiles.find((item) => item.id === state.activeId);
-  const tab = await getActiveTab();
-  const cookie = tab?.url?.includes("facebook.com")
-    ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
-    : null;
-  const prefix = `user_${cookie?.value || "default"}_`;
+  const prefix = identity.prefix;
   const data = await chrome.storage.local.get([prefix + "identityAlias", prefix + "customWalletAddress"]);
   settingsAlias.value = profile?.alias || data[prefix + "identityAlias"] || "";
   settingsWallet.value = profile?.walletAddress || data[prefix + "customWalletAddress"] || "";
@@ -173,7 +206,7 @@ async function loadSettingsForm() {
 
 recoveryExport?.addEventListener("click", async () => {
   try {
-    const { prefix } = await activeFacebookIdentity();
+    const { prefix } = await activePlatformIdentity();
     const data = await chrome.storage.local.get([prefix + "identityAlias", prefix + "lastEchoUrl"]);
     const alias = data[prefix + "identityAlias"] || "";
     const target = alias
@@ -201,6 +234,7 @@ function showBackup() {
 }
 
 async function showReborn() {
+  const identity = await activePlatformIdentity();
   const state = await getActiveProfile();
   const profile = state.profiles.find((item) => item.id === state.activeId);
   if (!profile?.alias) {
@@ -211,7 +245,10 @@ async function showReborn() {
   backupView.hidden = true;
   settingsView.hidden = true;
   rebornView.hidden = false;
-  if (!rebornText.value.trim()) rebornText.value = ChamberDeclaration.getDefaultText();
+  const name = platformName(identity.platform);
+  const description = document.getElementById("rebornDescription");
+  if (description) description.textContent = t("reborn.descriptionPlatform", { platform: name });
+  if (!rebornText.value.trim()) rebornText.value = identity.platform === "threads" ? t("declaration.defaultTextThreads") : ChamberDeclaration.getDefaultText();
   rebornStatus.textContent = t("reborn.identity", { alias: profile.alias });
 }
 
@@ -230,12 +267,12 @@ rebornGenerate?.addEventListener("click", async () => {
   rebornGenerate.textContent = t("reborn.generating");
   try {
     const tab = await getActiveTab();
-    if (!tab?.id || !tab.url?.includes("facebook.com")) throw new Error(t("reborn.facebookRequired"));
-    await activeFacebookIdentity();
+    const identity = await activePlatformIdentity();
+    if (!tab?.id || !identity.platform) throw new Error(t("reborn.platformRequired"));
     const state = await getActiveProfile();
     const profile = state.profiles.find((item) => item.id === state.activeId);
     if (!profile?.alias) throw new Error(t("reborn.aliasRequired"));
-    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/fb`;
+    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/${identity.platform === "threads" ? "threads" : "fb"}`;
     const card = await ChamberDeclaration.generateCard({ timelineUrl, alias: profile.alias });
 
     try {
@@ -247,11 +284,23 @@ rebornGenerate?.addEventListener("click", async () => {
       await navigator.clipboard.writeText(text);
     }
 
-    await sendTabMessageWithRecovery(tab.id, {
-      action: "OPEN_FB_COMPOSER_AND_FILL",
-      payload: { text, imageUrl: card.dataUrl },
-    });
-    rebornStatus.textContent = t("reborn.success");
+    if (identity.platform === "threads") {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-threads.js"] });
+      const injected = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (body, imageUrl) => globalThis.ChamberThreadsPlatform?.openComposerAndFill?.(body, imageUrl),
+        args: [text, card.dataUrl]
+      });
+      const result = injected?.[0]?.result;
+      if (!result?.success) throw new Error(t("threads.composerMissing"));
+      rebornStatus.textContent = result.imageAttached ? t("reborn.successPlatform", { platform: "Threads" }) : t("reborn.successTextOnly", { platform: "Threads" });
+    } else {
+      await sendTabMessageWithRecovery(tab.id, {
+        action: "OPEN_FB_COMPOSER_AND_FILL",
+        payload: { text, imageUrl: card.dataUrl },
+      });
+      rebornStatus.textContent = t("reborn.successPlatform", { platform: "Facebook" });
+    }
   } catch (error) {
     rebornStatus.textContent = t("reborn.failed", { error: error.message });
   } finally {
@@ -287,25 +336,23 @@ settingsSave?.addEventListener("click", async () => {
   settingsSave.disabled = true;
   settingsSave.textContent = t("alias.saving");
   try {
-    const tab = await getActiveTab();
-    const cookie = tab?.url?.includes("facebook.com")
-      ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
-      : null;
-    if (!cookie?.value) throw new Error(t("alias.facebookRequired"));
+    const identity = await activePlatformIdentity();
     const wallet = settingsWallet.value.trim();
+    const nativeOwner = await ensureNativeOwnerKey(identity.userId);
+    const effectiveWallet = wallet || nativeOwner.address;
     const checkUrl = new URL("https://studio.milkcat.org/chamber-api/identity/check");
     checkUrl.searchParams.set("alias", alias);
-    if (wallet) checkUrl.searchParams.set("walletAddress", wallet);
+    checkUrl.searchParams.set("walletAddress", effectiveWallet);
     const checkResponse = await fetch(checkUrl);
     const check = await checkResponse.json();
     if (!check.success || (!check.available && !check.ownedByRequester)) throw new Error(t("alias.invalid"));
     const registerResponse = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alias, platform: "facebook", actorType: "personal", actorId: cookie.value, displayName: alias, walletAddress: wallet || null, proof: "" })
+      body: JSON.stringify({ alias, platform: identity.platform, actorType: "personal", actorId: identity.actorId, displayName: alias, walletAddress: effectiveWallet, proof: "" })
     });
     const registered = await registerResponse.json();
     if (!registerResponse.ok || !registered.success) throw new Error(registered.error || t("alias.mappingSaveFailed"));
-    const prefix = `user_${cookie.value}_`;
+    const prefix = identity.prefix;
     const state = await getActiveProfile();
     const profile = state.profiles.find((item) => item.id === state.activeId);
     if (profile) {
@@ -313,8 +360,12 @@ settingsSave?.addEventListener("click", async () => {
     }
     await chrome.storage.local.set({
       [prefix + "identityAlias"]: alias,
-      [prefix + "identityPlatform"]: "facebook",
+      [prefix + "identityPlatform"]: identity.platform,
+      [prefix + "identityActorId"]: identity.actorId,
+      [prefix + "identityActorType"]: "personal",
+      [prefix + "identityDisplayName"]: alias,
       [prefix + "customWalletAddress"]: wallet,
+      lastFbUserId: identity.userId,
       chamberProfiles: state.profiles
     });
     settingsAliasStatus.textContent = t("alias.mapped", { alias });
@@ -330,18 +381,15 @@ settingsSave?.addEventListener("click", async () => {
 
 switchAccountButton?.addEventListener("click", async () => {
   await chrome.storage.local.remove(["lastFbUserId", "lastFbAccountId"]);
-  const tab = await getActiveTab();
-  const cookie = tab?.url?.includes("facebook.com")
-    ? await chrome.cookies.get({ url: tab.url, name: "c_user" })
-    : null;
-  if (cookie?.value) {
-    await chrome.storage.local.set({ lastFbUserId: cookie.value });
-  }
+  let identity = null;
+  try { identity = await activePlatformIdentity(); } catch (_) {}
+  if (identity?.userId) await chrome.storage.local.set({ lastFbUserId: identity.userId });
   resultEl.replaceChildren();
   postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("account.refreshed") }));
-  setStatus(cookie?.value
-    ? t("account.refreshHelp")
-    : t("account.contextCleared"));
+  const name = platformName(identity?.platform || platformForTab(await getActiveTab()) || "facebook");
+  setStatus(identity?.actorId
+    ? t("account.refreshHelpPlatform", { platform: name })
+    : t("account.contextClearedPlatform", { platform: name }));
   await loadPageInfo();
 });
 const DEV_ERROR_ENDPOINT = "https://studio.milkcat.org/chamber-api/dev-errors";
@@ -444,6 +492,13 @@ document.addEventListener("keydown", (event) => {
 async function loadPageInfo() {
   const tab = await getActiveTab();
   pageUrlEl.textContent = tab?.url || t("page.unavailable");
+  const platform = platformForTab(tab);
+  const name = platformName(platform || "facebook");
+  const currentLabel = document.getElementById("currentPlatformLabel");
+  const promptLabel = document.getElementById("selectPromptLabel");
+  if (currentLabel) currentLabel.textContent = t("backup.currentPlatformNamed", { platform: name });
+  if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: name });
+  if (platform) selectButton.textContent = t("backup.selectPlatform", { platform: name });
   await renderProfiles();
 }
 
@@ -452,6 +507,7 @@ async function backupPost(payload, button) {
   button.disabled = true;
   setStatus(t("backup.inProgress"));
   reportSidepanelEvent("sidepanel:backup-start", {
+    platform: payload.platform || "facebook",
     sourceUrl: payload.sourceUrl || "",
     contentLength: String(payload.textContent || payload.content || "").length,
     mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0,
@@ -460,7 +516,7 @@ async function backupPost(payload, button) {
   try {
     const validation = ChamberMvpValidation.validateBackupPayload(payload);
     if (!validation.ok) throw new Error(validationMessage(validation, payload));
-    const { userId, prefix } = await activeFacebookIdentity();
+    const { userId, prefix } = await activePlatformIdentity();
     await ensureNativeOwnerKey(userId);
     const profileState = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"]);
     const activeProfile = Array.isArray(profileState.chamberProfiles)
@@ -484,6 +540,7 @@ async function backupPost(payload, button) {
       ? t("backup.successRecoveryPending")
       : t("backup.success"));
     reportSidepanelEvent("sidepanel:backup-success", {
+      platform: payload.platform || "facebook",
       sourceUrl: payload.sourceUrl || "",
       txId: result.txId,
       arweaveUrl: result.arweaveUrl,
@@ -540,6 +597,7 @@ async function backupPost(payload, button) {
     resultEl.replaceChildren(links, tx);
   } catch (error) {
     reportSidepanelEvent("sidepanel:backup-error", {
+      platform: payload.platform || "facebook",
       sourceUrl: payload.sourceUrl || "",
       error: error.message || String(error),
       contentLength: String(payload.textContent || payload.content || "").length,
@@ -552,7 +610,7 @@ async function backupPost(payload, button) {
   }
 }
 
-function watchSelectedPost(payload, button, textEl, tab) {
+function watchSelectedPost(payload, button, textEl, tab, identity) {
   if (selectedRefreshTimer) clearInterval(selectedRefreshTimer);
   let attempts = 0;
   selectedRefreshTimer = setInterval(async () => {
@@ -560,11 +618,25 @@ function watchSelectedPost(payload, button, textEl, tab) {
     try {
       const injected = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (pageUrl, sourceUrl, selectedText) => globalThis.ChamberFacebookPlatform?.refreshSelected?.(pageUrl, sourceUrl, selectedText) || null,
-        args: [tab.url, payload.sourceUrl || "", payload.textContent || ""]
+        func: (platform, pageUrl, sourceUrl, selectedText, expectedHandle) => {
+          const adapter = platform === "threads" ? globalThis.ChamberThreadsPlatform : globalThis.ChamberFacebookPlatform;
+          return adapter?.refreshSelected?.(pageUrl, sourceUrl, selectedText, expectedHandle) || null;
+        },
+        args: [payload.platform || "facebook", tab.url, payload.sourceUrl || "", payload.textContent || "", identity?.actorHandle || ""]
       });
       const refreshed = injected?.[0]?.result;
       if (!refreshed) return;
+      const rememberedMedia = Array.from(new Set([...(payload.mediaUrls || []), ...(refreshed.mediaUrls || [])]));
+      if (rememberedMedia.length > (refreshed.mediaUrls || []).length) {
+        refreshed.mediaUrls = rememberedMedia;
+        refreshed.media = {
+          ...(refreshed.media || {}),
+          primary_fb_cdn: rememberedMedia[0] || refreshed.media?.primary_fb_cdn || "",
+          album: rememberedMedia.length > 1 || refreshed.media?.album === true,
+          albumLoadedCount: rememberedMedia.length,
+          albumComplete: payload.media?.albumComplete === true || refreshed.media?.albumComplete === true
+        };
+      }
       const changed = refreshed.contentExpanded !== payload.contentExpanded ||
         refreshed.textContent !== payload.textContent ||
         refreshed.media?.primary_fb_cdn !== payload.media?.primary_fb_cdn ||
@@ -599,7 +671,7 @@ function watchSelectedPost(payload, button, textEl, tab) {
 
 async function loadPosts() {
   const tab = await getActiveTab();
-  if (!tab?.id || !tab.url?.includes("facebook.com")) {
+  if (!tab?.id || platformForTab(tab) !== "facebook") {
     postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("post.facebookOnly") }));
     return;
   }
@@ -700,7 +772,14 @@ async function loadPosts() {
 
 async function selectPost() {
   if (selectedRefreshTimer) { clearInterval(selectedRefreshTimer); selectedRefreshTimer = null; }
-  const profileState = await getActiveProfile();
+  const tab = await getActiveTab();
+  const platform = platformForTab(tab);
+  if (!tab?.id || !platform) {
+    setStatus(t("post.supportedOnly"), true);
+    return;
+  }
+  const identity = await activePlatformIdentity();
+  const profileState = await getActiveProfile(identity);
   const activeProfile = profileState.profiles.find((profile) => profile.id === profileState.activeId);
   if (!activeProfile?.alias) {
     setStatus(t("picker.unmapped"), true);
@@ -708,34 +787,36 @@ async function selectPost() {
     await renderProfiles();
     return;
   }
-  const tab = await getActiveTab();
-  if (!tab?.id || !tab.url?.includes("facebook.com")) {
-    setStatus(t("post.facebookOnly"), true);
-    return;
-  }
   pickerTabId = tab.id;
   selectButton.disabled = false;
   selectButton.textContent = t("backup.cancelSelect");
   resultEl.replaceChildren();
-  postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.clickPost") }));
-  setStatus(t("picker.instructions"));
+  postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.clickPostPlatform", { platform: platformName(platform) }) }));
+  setStatus(t("picker.instructionsPlatform", { platform: platformName(platform) }));
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-facebook.js"] });
+    const adapterFile = platform === "threads" ? "platform-threads.js" : "platform-facebook.js";
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [adapterFile] });
     const injected = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (pageUrl) => globalThis.ChamberFacebookPlatform?.startPicker?.(pageUrl) || null,
-      args: [tab.url]
+      func: (platformName, pageUrl, expectedHandle) => {
+        const adapter = platformName === "threads" ? globalThis.ChamberThreadsPlatform : globalThis.ChamberFacebookPlatform;
+        return adapter?.startPicker?.(pageUrl, expectedHandle) || null;
+      },
+      args: [platform, tab.url, identity.actorHandle || ""]
     });
     const payload = injected?.[0]?.result;
     if (!payload) {
-      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.canceledList") }));
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.canceledListPlatform", { platform: platformName(platform) }) }));
       setStatus(t("picker.canceled"));
       return;
     }
-    const cookie = await chrome.cookies.get({ url: tab.url, name: "c_user" });
-    payload.fbUserId = cookie?.value || null;
+    payload.platform = platform;
+    payload.fbUserId = identity.userId;
+    payload.identityActorId = identity.actorId;
+    payload.identityActorType = "personal";
+    payload.identityDisplayName = identity.actorHandle ? `@${identity.actorHandle}` : (payload.authorName || "");
     if (payload.isOwnAuthor !== true) {
-      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.authorUnknown") }));
+      postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.authorUnknownPlatform", { platform: platformName(platform) }) }));
       setStatus(payload.isOwnAuthor === false ? t("picker.notOwner") : t("picker.authorStopped"), true);
       reportSidepanelEvent("sidepanel:author-check-blocked", {
         sourceUrl: payload.sourceUrl || "",
@@ -750,7 +831,7 @@ async function selectPost() {
     card.className = "post";
     const text = document.createElement("div");
     text.className = "post-text";
-    text.textContent = payload.textContent || t("post.selectedNoText");
+    text.textContent = payload.textContent || t("post.selectedNoTextPlatform", { platform: platformName(platform) });
     if (payload.media.primary_fb_cdn) {
       const thumb = document.createElement("img");
       thumb.className = "post-thumb";
@@ -762,7 +843,7 @@ async function selectPost() {
     button.textContent = t("post.backupButton");
     let canBackup = false;
     const validation = ChamberMvpValidation.validateBackupPayload(payload);
-    if (!ChamberMvpValidation.isValidFacebookPostUrl(payload.sourceUrl)) {
+    if (!ChamberMvpValidation.isValidPostUrl(payload.sourceUrl, platform)) {
       button.disabled = true;
       button.textContent = t("post.missingPermalinkButton");
       setStatus(validationMessage(validation, payload), true);
@@ -782,11 +863,11 @@ async function selectPost() {
     } else if (payload.contentExpanded === false) {
       button.disabled = true;
       button.textContent = t("picker.textCollapsedButton");
-      setStatus(t("picker.textCollapsed"), true);
+      setStatus(t("picker.textCollapsedPlatform", { platform: platformName(platform) }), true);
     } else if (!payload.textContent && !payload.mediaUrls?.length && !payload.media?.videoDetected) {
       button.disabled = true;
       button.textContent = t("picker.emptyButton");
-      setStatus(t("picker.empty"), true);
+      setStatus(t("picker.emptyPlatform", { platform: platformName(platform) }), true);
     } else {
       // Text is optional. Photo albums, reels and image-only posts may have
       // an empty caption; a valid media URL is sufficient content.
@@ -815,7 +896,7 @@ async function selectPost() {
     if (payload.media?.videoDetected) {
       const videoLimit = document.createElement("div");
       videoLimit.className = "video-limit-note";
-      videoLimit.textContent = t("picker.videoLimit");
+      videoLimit.textContent = t("picker.videoLimitPlatform", { platform: platformName(platform) });
       card.appendChild(videoLimit);
     }
     if (payload.sourceUrl) {
@@ -829,7 +910,7 @@ async function selectPost() {
     } else {
       const missing = document.createElement("div");
       missing.className = "post-meta";
-      missing.textContent = t("picker.noPermalink");
+      missing.textContent = t("picker.noPermalinkPlatform", { platform: platformName(platform) });
       card.appendChild(missing);
     }
     card.appendChild(button);
@@ -841,13 +922,13 @@ async function selectPost() {
           ? t("picker.albumReady", { count: payload.media.albumLoadedCount || payload.mediaUrls.length })
           : t("picker.ready")
     );
-    else if (payload.contentExpanded === false) watchSelectedPost(payload, button, text, tab);
+    else if (payload.contentExpanded === false) watchSelectedPost(payload, button, text, tab, identity);
   } catch (error) {
     setStatus(error.message || t("picker.failed"), true);
     postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.failedList") }));
   } finally {
     pickerTabId = null;
-    selectButton.textContent = t("backup.select");
+    selectButton.textContent = t("backup.selectPlatform", { platform: platformName(platform || "facebook") });
     await renderProfiles();
   }
 }

@@ -57,27 +57,27 @@
   </div>
   <div id="backupView">
   <div class="card">
-    <div class="label" data-i18n="backup.currentFacebookTab">目前 Facebook 分頁（不是備份內容）</div>
+    <div id="currentPlatformLabel" class="label" data-i18n="backup.currentPlatformTab">目前社群平台分頁（不是備份內容）</div>
     <div id="pageUrl" data-i18n="backup.loading">讀取中...</div>
   </div>
   <div class="card">
     <div class="label" data-i18n="backup.currentAccount">目前 Chamber 帳號</div>
     <select id="profileSelect" disabled style="width:100%;margin-top:6px;padding:9px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;"></select>
-    <div class="post-meta" style="margin-top:7px;white-space:normal;" data-i18n="backup.accountLimit">目前版本固定使用一個 Chamber 帳號與一個 Facebook 帳號。</div>
+    <div class="post-meta" style="margin-top:7px;white-space:normal;" data-i18n="backup.accountLimitMulti">目前版本固定使用一個 Chamber 帳號，可綁定 Facebook 或 Threads 帳號。</div>
   </div>
-  <div class="label" style="margin: 16px 0 8px;" data-i18n="backup.selectPrompt">先在 Facebook 明確選取一篇文章</div>
+  <div id="selectPromptLabel" class="label" style="margin: 16px 0 8px;" data-i18n="backup.selectPromptPlatform">先在目前平台明確選取一篇文章</div>
   <div id="postList"><div class="post-meta" data-i18n="backup.notSelected">尚未選取文章</div></div>
-  <button id="selectButton" type="button" data-i18n="backup.select">🎯 在 Facebook 選取文章</button>
+  <button id="selectButton" type="button" data-i18n="backup.selectCurrent">🎯 在目前平台選取文章</button>
   <button id="rebornButton" class="secondary-action" type="button" data-i18n="backup.reborn">🪪 建立轉世聲明</button>
   <button id="declarationButton" class="secondary-action" type="button" data-i18n="backup.settings">⚙️ 開啟 Chamber 帳號設定</button>
-  <button id="switchAccountButton" class="secondary-action" type="button" data-i18n="backup.refreshAccount">🔄 重新讀取目前 Facebook 帳號</button>
+  <button id="switchAccountButton" class="secondary-action" type="button" data-i18n="backup.refreshPlatformAccount">🔄 重新讀取目前平台帳號</button>
   <div id="status"></div>
   <div id="result"></div>
   </div>
   <div id="settingsView" hidden>
     <div class="card">
       <div class="label" data-i18n="settings.title">Chamber 帳號設定</div>
-      <div class="post-meta" style="white-space:normal;" data-i18n="settings.accountLimit">目前版本使用一個 Chamber 帳號綁定一個 Facebook 帳號。</div>
+      <div class="post-meta" style="white-space:normal;" data-i18n="settings.accountLimitMulti">同一個 Chamber 帳號可綁定 Facebook 與 Threads；加密與復原身分保持一致。</div>
       <label class="label" for="settingsAlias" data-i18n="settings.alias">身份暱稱 / mapping</label>
       <div class="field-action-row">
         <input id="settingsAlias" type="text" placeholder="例如：sunlake" data-i18n-placeholder="settings.aliasPlaceholder" style="min-width:0;width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
@@ -96,7 +96,7 @@
   <div id="rebornView" hidden>
     <div class="card">
       <div class="label" data-i18n="reborn.title">Web3 轉世聲明</div>
-      <div class="post-meta" style="white-space:normal;line-height:1.5;" data-i18n="reborn.description">編輯聲明後，Chamber 會產生含 Echo QR Code 的身分卡，並開啟 Facebook 發文框。送出前仍由你自行確認。</div>
+      <div id="rebornDescription" class="post-meta" style="white-space:normal;line-height:1.5;" data-i18n="reborn.description">編輯聲明後，Chamber 會產生含 Echo QR Code 的身分卡，並開啟目前平台的發文框。送出前仍由你自行確認。</div>
       <textarea id="rebornText" rows="15" aria-label="轉世聲明內容" data-i18n-aria-label="reborn.aria"></textarea>
       <div class="danger-note" data-i18n="reborn.privacy">轉世卡會公開你的 Chamber 暱稱與 Echo 網址，不會顯示復原碼或私鑰。</div>
       <button id="rebornGenerate" type="button" data-i18n="reborn.generate">⚡ 產生轉世卡並開啟發文框</button>

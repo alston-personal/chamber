@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { isValidFacebookPostUrl, validateBackupPayload } = require("../extension/mvp-validation.js");
+const { isValidFacebookPostUrl, isValidThreadsPostUrl, validateBackupPayload } = require("../extension/mvp-validation.js");
 require("../extension/platform-facebook.js");
 
 const base = {
@@ -41,6 +41,21 @@ assert.equal(isValidFacebookPostUrl("https://www.facebook.com/reel/1983138152569
 assert.equal(isValidFacebookPostUrl("https://www.facebook.com/idiotforg/?comment_id=2161286308056736"), false, "一般個人頁留言連結不得冒充文章");
 assert.equal(isValidFacebookPostUrl("https://www.facebook.com/reel/?s=tab"), false);
 assert.equal(isValidFacebookPostUrl("https://www.facebook.com/sunlake"), false);
+assert.equal(isValidThreadsPostUrl("https://www.threads.com/@sunlake/post/DMabc_123"), true);
+assert.equal(isValidThreadsPostUrl("https://threads.net/@sunlake/post/DMabc-123/"), true, "legacy threads.net permalink remains supported");
+assert.equal(isValidThreadsPostUrl("https://www.threads.com/@sunlake"), false);
+assert.equal(validateBackupPayload({
+  ...base,
+  platform: "threads",
+  sourceUrl: "https://www.threads.com/@sunlake/post/DMabc_123",
+  textContent: "A complete Threads post"
+}).ok, true, "Threads text post should pass the shared MVP contract");
+assert.equal(validateBackupPayload({
+  ...base,
+  platform: "threads",
+  sourceUrl: "https://www.threads.com/@sunlake",
+  textContent: "Not a post"
+}).code, "SOURCE_URL_REQUIRED");
 
 const textNode = (value) => ({ nodeType: 3, nodeValue: value });
 const element = (tagName, children = [], attributes = {}) => ({

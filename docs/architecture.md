@@ -76,6 +76,7 @@ flowchart TB
 - `extension`
   - `sidepanel.js`: 選文、預覽、帳號設定、備份結果入口
   - `platform-facebook.js`: Facebook 文章定位、作者／永久連結／文字／相簿擷取
+  - `platform-threads.js`: Threads 文章定位、handle 作者驗證、永久連結、文字／多圖／影片封面擷取；與 Facebook adapter 共用相同輸出契約
   - `background.js`: 每篇 AES-GCM 金鑰、owner/recipient envelope、本機加解密、媒體上傳、備份 API 呼叫
   - `secret-sharing.js`: 2-of-3 Shamir 復原份額拆分與組合
   - `content.js`: Facebook 與 Echo 頁面的擴充功能訊息橋接
@@ -98,7 +99,7 @@ flowchart TB
 
 1. 使用者從 Echo 建立 2-of-3 復原組；Extension 保存 A，Recovery Vault 加密保存 B 並由 Passkey 保護，使用者離線保存 C。同裝置可用 A+C；Extension 遺失後通過 Passkey 取得 B，再用 B+C。
 2. `backend` 檢查 alias 是否可用，並建立 `alias -> platform -> wallet` mapping。
-3. 使用者在 Facebook 明確選取自己的文章，平台擷取器取得文字、永久連結、時間與支援媒體。
+3. 使用者在 Facebook 或 Threads 明確選取自己的文章；Side Panel 依目前網域載入可替換的平台 adapter，取得文字、永久連結、時間與支援媒體。
 4. `background.js` 為新文章產生獨立內容金鑰，加密文字與媒體，再以 owner envelope 包住文章金鑰後送到 backend。
 5. backend 將媒體交易與文章交易寫入 Irys Devnet，並回傳 TxID 與 Echo 連結。
 6. Echo 讀取加密交易；Extension 身分與作者相符時自動解鎖目前時光牆，相簿採分批平行解密。
@@ -108,6 +109,7 @@ flowchart TB
 ## Notes
 
 - 這份圖描述目前測試版；主網、完整影片備份、使用者付費與跨平台發佈仍屬未來版本。
+- `0.6.0` 是 Facebook 穩定封測基線；Threads 在 `0.7.0` 候選線驗證，真實頁面驗收矩陣見 [`docs/threads-0.7-validation.md`](threads-0.7-validation.md)。
 - 資料可攜性、直接交易存取方式與第三方閱讀器最小實作見 [`docs/data-portability.md`](data-portability.md)。
 - Echo mainnet 的官方網站與客戶端不以 DNS 作為最終信任來源。規劃中的 Genesis Anchor 會固定協定身分、治理規則與簽署式 Root Manifest；完整規格與實作里程碑見 [`docs/echo-genesis-root.md`](echo-genesis-root.md)。
 - 如果之後要更細，可以再拆成：
