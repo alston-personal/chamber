@@ -1103,14 +1103,44 @@ export default function PlatformFeed({
     };
   }, [walletAddress, resolvedIdentityKey, currentPlatform, activeTag, searchParams]);
 
+  const activeAuthor = searchParams.get("author") || "";
+
+  const getPostAuthorName = (post: PostItem): string => {
+    const p = post.payload as any;
+    return String(
+      p.author_name ||
+      p.authorName ||
+      p.source_author?.name ||
+      p.author ||
+      ""
+    ).trim();
+  };
+
+  const authorStats = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const post of posts) {
+      const author = getPostAuthorName(post);
+      if (author) {
+        counts.set(author, (counts.get(author) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [posts]);
+
   const sortedAndFilteredPosts = useMemo(() => {
     let result = [...posts];
+
+    if (activeAuthor) {
+      result = result.filter((p) => getPostAuthorName(p).toLowerCase() === activeAuthor.toLowerCase());
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((p) => {
         const text = (p.decryptedContent || p.payload.content || "").toLowerCase();
-        const author = (p.payload.source_author?.name || p.payload.authorName || "").toLowerCase();
+        const author = getPostAuthorName(p).toLowerCase();
         const platform = (p.payload.platform || "").toLowerCase();
         const tags = (p.payload.tags || []).join(" ").toLowerCase();
         return text.includes(q) || author.includes(q) || platform.includes(q) || tags.includes(q);
@@ -1130,7 +1160,7 @@ export default function PlatformFeed({
     });
 
     return result;
-  }, [posts, searchQuery, sortMode]);
+  }, [posts, activeAuthor, searchQuery, sortMode]);
 
 
 
@@ -1987,6 +2017,87 @@ export default function PlatformFeed({
             );
           })}
         </nav>
+
+        {/* Author / Page Smart Filter Bar */}
+        {authorStats.length > 1 && (
+          <div
+            className="mb-6 -mt-2 p-2.5 rounded-2xl border transition-all"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+          >
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+                <span>🏢</span>
+                <span>{locale === "zh-TW" ? "作者 / 粉絲專頁分流" : "Author / Page Filter"}</span>
+              </div>
+              {activeAuthor && (
+                <Link
+                  href={`${localizedTimelinePath()}?${(() => {
+                    const q = new URLSearchParams(searchParams.toString());
+                    q.delete("author");
+                    return q.toString();
+                  })()}`}
+                  className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                >
+                  {ft("clearFilter")}
+                </Link>
+              )}
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+              <Link
+                href={`${localizedTimelinePath()}?${(() => {
+                  const q = new URLSearchParams(searchParams.toString());
+                  q.delete("author");
+                  return q.toString();
+                })()}`}
+                className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+                  !activeAuthor
+                    ? "font-bold shadow-sm"
+                    : "text-slate-400 border-transparent hover:bg-white/5"
+                }`}
+                style={!activeAuthor ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+              >
+                <span>✨</span>
+                <span>{locale === "zh-TW" ? "全部作者" : "All Authors"}</span>
+                <span
+                  className="text-[10px] px-1.5 py-0.2 rounded-full opacity-80"
+                  style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+                >
+                  {posts.length}
+                </span>
+              </Link>
+
+              {authorStats.map((item) => {
+                const isSelected = activeAuthor.toLowerCase() === item.name.toLowerCase();
+                const isPage = item.name.includes("粉專") || item.name.includes("科技") || item.name.includes("社") || item.name.includes("官方") || item.name.length > 5;
+                return (
+                  <Link
+                    key={item.name}
+                    href={`${localizedTimelinePath()}?${(() => {
+                      const q = new URLSearchParams(searchParams.toString());
+                      q.set("author", item.name);
+                      return q.toString();
+                    })()}`}
+                    className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+                      isSelected
+                        ? "font-bold shadow-md"
+                        : "hover:bg-white/5"
+                    }`}
+                    style={isSelected ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+                  >
+                    <span>{isPage ? "🏢" : "👤"}</span>
+                    <span>{item.name}</span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.2 rounded-full opacity-80"
+                      style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+                    >
+                      {item.count}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {focusTxId && (
           <div className="mb-5 rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-3 flex items-center justify-between gap-3">

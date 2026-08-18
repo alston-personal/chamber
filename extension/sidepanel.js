@@ -205,13 +205,49 @@ async function refreshRecoveryStatus() {
   }
 }
 
-// MVP deliberately exposes one identity only. Profile storage remains for
-// forward compatibility, but switching/creating accounts is deferred.
-if (newProfileButton) newProfileButton.style.display = "none";
-
 function profileId() {
   return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
+
+newProfileButton?.addEventListener("click", async () => {
+  const name = prompt(t("profile.promptName"), "");
+  if (name === null) return;
+  const trimmedName = name.trim() || t("account.defaultName");
+
+  const alias = prompt(t("profile.promptAlias"), "");
+  if (alias === null) return;
+  const trimmedAlias = alias.trim().toLowerCase().replace(/^@/, "");
+
+  const { profiles } = await getActiveProfile();
+  let ownerUserId = "default";
+  try {
+    const raw = await rawPlatformIdentity();
+    if (raw?.actorId) ownerUserId = raw.actorId;
+  } catch (_) {}
+
+  const newId = profileId();
+  const newProf = {
+    id: newId,
+    name: trimmedName,
+    alias: trimmedAlias,
+    walletAddress: "",
+    ownerUserId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  profiles.push(newProf);
+  await chrome.storage.local.set({ chamberProfiles: profiles, activeChamberProfileId: newId });
+  await renderProfiles();
+  await loadPageInfo();
+  setStatus(t("profile.created", { name: trimmedName }));
+});
+
+profileSelect?.addEventListener("change", async () => {
+  const nextId = profileSelect.value;
+  await chrome.storage.local.set({ activeChamberProfileId: nextId });
+  await renderProfiles();
+  await loadPageInfo();
+});
 
 async function getActiveProfile(rawIdentity = null) {
   let raw = rawIdentity;

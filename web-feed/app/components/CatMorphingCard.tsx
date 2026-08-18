@@ -340,8 +340,8 @@ export default function CatMorphingCard({
           <g
             className="cursor-pointer hover:scale-125 transition-transform origin-[250px_72px]"
             onClick={() => window.open(`${irysHost}/${post.txId}`, "_blank")}
-            title="點擊查看 Arweave 鏈上存證"
           >
+            <title>點擊查看 Arweave 鏈上存證</title>
             <circle cx="250" cy="72" r="14" fill="#fbbf24" stroke="#d97706" strokeWidth="2" />
             <circle cx="250" cy="74" r="3" fill="#78350f" />
             <line x1="250" y1="77" x2="250" y2="84" stroke="#78350f" strokeWidth="1.5" />

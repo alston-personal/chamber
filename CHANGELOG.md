@@ -4,6 +4,19 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.9.6] - 2026-08-18
+### 🚀 Added & Enhanced (Echo 作者/粉專智慧過濾、Chamber 多身分切換與建立、全站 6 大語言同步)
+- 🏢 **Echo 時光牆「作者 / 粉絲專頁智慧過濾列」**：
+  - 在時光牆平台標籤下方自動解析該時光牆內所有貼文的作者與粉專清單，動態生成過濾按鈕（`[ 全部 (25) ]` · `[ 👤 個人 (10) ]` · `[ 🏢 牛奶貓科技 (15) ]`）。
+  - 支援 URL 參數 `?author=...`，點擊即時過濾該特定粉專或作者的所有歷史備份。
+- 👥 **Extension 側邊欄開放「Chamber 多身分切換與新增 (Multi-Profile)」**：
+  - 正式開放 `➕ 新增身分` 按鈕，允許使用者自由建立多個獨立 Chamber 身分（如 `@sunlake` 個人帳號 vs `@milkcat_biz` 企業粉專隔離身分）。
+  - 身分切換下拉選單即時連動，備份時歸屬選取的特定 Profile，達成完全的身分隱私與品牌隔離。
+- 🌐 **Echo Web 時光牆多語系同步升級**：
+  - Echo Web 完整同步支援 6 大世界主流語言：**繁體中文 (`zh-TW`)**、**English (`en`)**、**Español (`es`)**、**日本語 (`ja`)**、**Français (`fr`)**、**Português (`pt`)**（排除簡體中文）。
+
+---
+
 ## 🎯 [0.9.5] - 2026-08-18
 ### 🚀 Added & Fixed (全球五大語言支援、IG/X 貼文選取範圍精準鎖定與側邊欄全語系翻譯)
 - 🌐 **全球 5 大語系完整支援 (排除簡體中文)**：

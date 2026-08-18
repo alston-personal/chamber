@@ -107,4 +107,4 @@ const en: GuideCopy = {
   limitsTitle: "Current test-build limitations", limits: ["Only your own Facebook posts are supported; other platforms are planned.", "Data is written to Irys Devnet, not mainnet. Test data and service availability are not guaranteed permanently.", "Video files are not backed up; only available text, source URL, and poster are stored.", "Facebook layout changes can affect detection. Keep screenshots and post-type details when reporting errors."], footerBack: "Back to Echo",
 };
 
-export const guideCopy: Record<Locale, GuideCopy> = { "zh-TW": zhTW, en };
+export const guideCopy: Record<Locale, GuideCopy> = { "zh-TW": zhTW, en, es: en, ja: en, fr: en, pt: en };
