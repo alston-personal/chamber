@@ -280,16 +280,24 @@ async function registerIdentity(input) {
   const actorId = String(input.actorId || "").trim();
 
   const store = await readStore();
+  const slug = platformSlug(platform);
   const actorBinding = findActorBinding(store, { platform, actorType, actorId });
   if (actorBinding && actorBinding.alias !== alias) {
-    const error = new Error(`platform identity already belongs to Chamber account "${actorBinding.alias}"`);
-    error.code = "IDENTITY_ALREADY_BOUND";
-    error.boundAlias = actorBinding.alias;
-    throw error;
+    if (input.rebind || input.force) {
+      // User requested rebind/transfer: unbind from previous alias
+      if (actorBinding.root && actorBinding.root.platform_bindings) {
+        delete actorBinding.root.platform_bindings[slug];
+        actorBinding.root.updated_at = nowIso();
+      }
+    } else {
+      const error = new Error(`platform identity already belongs to Chamber account "${actorBinding.alias}"`);
+      error.code = "IDENTITY_ALREADY_BOUND";
+      error.boundAlias = actorBinding.alias;
+      throw error;
+    }
   }
   const wallet = input.walletAddress ? String(input.walletAddress).trim() : null;
   const proof = input.proof ? String(input.proof) : "";
-  const slug = platformSlug(platform);
   const existingRoot = store.aliases[alias];
   const contentKey = existingRoot?.content_key || stableContentKey({
     identityAlias: alias,

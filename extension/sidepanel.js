@@ -829,11 +829,22 @@ settingsSave?.addEventListener("click", async () => {
     const checkResponse = await fetch(checkUrl);
     const check = await checkResponse.json();
     if (!check.success || (!check.available && !check.ownedByRequester)) throw new Error(t("alias.invalid"));
-    const registerResponse = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
+    let registerResponse = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ alias, platform: identity.platform, actorType: "personal", actorId: identity.actorId, displayName: alias, walletAddress: effectiveWallet, proof: "" })
     });
-    const registered = await registerResponse.json();
+    let registered = await registerResponse.json();
+    if (!registerResponse.ok && (registered.code === "IDENTITY_ALREADY_BOUND" || String(registered.error).includes("already belongs"))) {
+      const boundAlias = registered.boundAlias || "另一個 Chamber 帳號";
+      const confirmRebind = confirm(`此 ${platformName(identity.platform)} 社群帳號目前已綁定於「${boundAlias}」，是否確認將綁定轉移給目前的 Chamber 身分「${alias}」？`);
+      if (confirmRebind) {
+        registerResponse = await fetch("https://studio.milkcat.org/chamber-api/identity/register", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ alias, platform: identity.platform, actorType: "personal", actorId: identity.actorId, displayName: alias, walletAddress: effectiveWallet, proof: "", rebind: true })
+        });
+        registered = await registerResponse.json();
+      }
+    }
     if (!registerResponse.ok || !registered.success) throw new Error(registered.error || t("alias.mappingSaveFailed"));
     const prefix = identity.prefix;
     const state = await getActiveProfile();

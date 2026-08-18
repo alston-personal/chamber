@@ -4,6 +4,14 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.9.7] - 2026-08-18
+### 🚀 Added & Enhanced (身分重綁定/轉移確認機制、多 Profile 衝突防護)
+- 🔄 **Chamber 身分轉移與重新綁定 (Rebind / Transfer)**：
+  - 解決當社群帳號已被前一個 Chamber 身分綁定時，API 拋出 `IDENTITY_ALREADY_BOUND` 500/409 錯誤的問題。
+  - 後端 `registerIdentity` 新增 `rebind: true` 支援，前端自動彈出轉移確認視窗（`「此 Facebook 社群帳號目前已綁定於『sunlake』，是否確認將綁定轉移給目前的 Chamber 身分『...』？」`），一鍵確認即可無痛轉移綁定。
+
+---
+
 ## 🎯 [0.9.6] - 2026-08-18
 ### 🚀 Added & Enhanced (Echo 作者/粉專智慧過濾、Chamber 多身分切換與建立、全站 6 大語言同步)
 - 🏢 **Echo 時光牆「作者 / 粉絲專頁智慧過濾列」**：
