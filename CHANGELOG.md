@@ -4,13 +4,13 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
-## 🐦 [1.0.0] - 2026-08-18
-### 🚀 Added & Enhanced (四大主流社群齊備：X/Twitter 支援 & 智慧跳轉與全域 Mapping 快取)
+## 🐦 [0.9.2] - 2026-08-18
+### 🚀 Added & Enhanced (四大主流社群齊備：X/Twitter 支援、智慧跳轉與彈窗轉世聲明自動化修復)
 - 🐦 **X (Twitter) 全功能備份引擎 (`platform-x.js`)**：
   - 擴充功能全面支援 **X (`x.com`)** 與 **Twitter (`twitter.com`)** 之推文、多圖相簿、影片與連續推文串 (Thread) 永久上鏈備份。
   - **智慧 DOM 擷取**：精準擷取推文內文、作者 `@handle`、發布時間 (`time[datetime]`)、高解析度相簿 (`pbs.twimg.com/media/`) 與影片縮圖。
   - **互動式推文選取器 (Interactive Tweet Picker)**：支援在 X 動態牆或個人主頁點選任意推文進行一鍵備份。
-  - **轉世聲明整合**：支援自動開啟 X 發文框 (`[data-testid="SideNav_NewTweet_Button"]`) 並自動填入轉世身分卡。
+  - **轉世聲明對話框自動化修復**：修正側邊欄點擊發布轉世卡時，點開 X 浮動發文對話框 (`[role="dialog"]`) 卻填入背景動態牆輸入框的時序問題，確保精準聚焦並填入彈窗發文框。
 - 🚀 **社群平台智慧跳轉導引 (Smart Platform Auto-Navigation)**：
   - 當使用者在非社群分頁（例如空白頁或時光牆）點擊選取或發布轉世卡時，按鈕動態轉為 **`🚀 前往 {Platform} 並選取文章`**，點擊自動為使用者開啟或切換至該社群分頁，徹底消除按鈕 disabled 的困惑！
 - 🔒 **Chamber 帳號全域持久快取 (Global Mapping Memory)**：

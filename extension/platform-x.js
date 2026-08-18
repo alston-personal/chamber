@@ -349,16 +349,31 @@
 
   async function openComposerAndFill(text, imageUrl) {
     const newTweetBtn = document.querySelector('[data-testid="SideNav_NewTweet_Button"], a[href="/compose/post"], [aria-label*="Post" i], [aria-label*="發文" i]');
-    newTweetBtn?.click();
+    
+    // Check if modal dialog is already open
+    let modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
+    if (!modal && newTweetBtn) {
+      newTweetBtn.click();
+      // Wait for modal dialog to appear
+      for (let attempt = 0; attempt < 25 && !modal; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
+      }
+    }
 
+    // Prioritize textbox inside modal dialog if present, otherwise fallback to any visible composer
     let textbox = null;
+    let targetScope = modal || document;
     for (let attempt = 0; attempt < 30 && !textbox; attempt += 1) {
-      textbox = Array.from(document.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible) || null;
+      modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
+      targetScope = modal || document;
+      textbox = Array.from(targetScope.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible) || null;
       if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!textbox) throw new Error("Could not locate X tweet composer");
 
     textbox.focus();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     document.execCommand("insertText", false, text);
     textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
 
@@ -367,7 +382,8 @@
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        const fileInput = Array.from(document.querySelectorAll('input[type="file"][accept*="image"]')).find((node) => !node.disabled);
+        const fileInput = (modal ? modal.querySelector('input[type="file"][accept*="image"]') : null)
+          || Array.from(document.querySelectorAll('input[type="file"][accept*="image"]')).find((node) => !node.disabled);
         if (fileInput) {
           const transfer = new DataTransfer();
           transfer.items.add(file);
