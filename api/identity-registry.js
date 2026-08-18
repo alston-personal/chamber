@@ -583,10 +583,18 @@ async function reassignAuthorPosts({ fromAlias, toAlias, authorName, proof, auto
   if (!normAuthor) throw new Error("authorName is required");
 
   const store = await readStore();
-  const fromRoot = store.aliases[normFrom];
-  const toRoot = store.aliases[normTo];
-  if (!fromRoot) throw new Error(`Source Chamber identity "${normFrom}" not found`);
-  if (!toRoot) throw new Error(`Target Chamber identity "${normTo}" not found`);
+  const fromRoot = store.aliases[normFrom] || {
+    alias: normFrom,
+    content_key: stableContentKey({ identityAlias: normFrom }),
+    display_name: normFrom,
+  };
+  const toRoot = store.aliases[normTo] || {
+    alias: normTo,
+    content_key: stableContentKey({ identityAlias: normTo }),
+    display_name: normTo,
+  };
+  if (!store.aliases[normFrom]) store.aliases[normFrom] = fromRoot;
+  if (!store.aliases[normTo]) store.aliases[normTo] = toRoot;
 
   store.post_transfers = Array.isArray(store.post_transfers) ? store.post_transfers : [];
   
@@ -621,10 +629,18 @@ async function reassignPostTx({ fromAlias, toAlias, postTxId, proof, autoAccept 
   if (!txId) throw new Error("postTxId is required");
 
   const store = await readStore();
-  const fromRoot = store.aliases[normFrom];
-  const toRoot = store.aliases[normTo];
-  if (!fromRoot) throw new Error(`Source Chamber identity "${normFrom}" not found`);
-  if (!toRoot) throw new Error(`Target Chamber identity "${normTo}" not found`);
+  const fromRoot = store.aliases[normFrom] || {
+    alias: normFrom,
+    content_key: stableContentKey({ identityAlias: normFrom }),
+    display_name: normFrom,
+  };
+  const toRoot = store.aliases[normTo] || {
+    alias: normTo,
+    content_key: stableContentKey({ identityAlias: normTo }),
+    display_name: normTo,
+  };
+  if (!store.aliases[normFrom]) store.aliases[normFrom] = fromRoot;
+  if (!store.aliases[normTo]) store.aliases[normTo] = toRoot;
 
   store.post_transfers = Array.isArray(store.post_transfers) ? store.post_transfers : [];
   
