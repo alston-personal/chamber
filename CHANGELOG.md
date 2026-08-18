@@ -4,6 +4,15 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🔗 [0.9.4] - 2026-08-18
+### 🚀 Added & Enhanced (X / Twitter 連結預覽卡片、外顯網址與卡片圖片深度備份)
+- 🔗 **X (Twitter) Link Card 與預覽卡片深度擷取**：
+  - 支援 Twitter Cards (`[data-testid="card.wrapper"]` / `card.layoutLarge.detail`) 之外部連結標題、描述與超連結目標 URL 完整備份。
+  - 自動擷取推文內 `t.co` 縮網址與超連結，若推文內未包含目標 URL 則自動附加 `🔗 [標題] [網址]`，徹底解決帶連結推文備份只剩純文字的問題。
+  - **卡片縮圖上鏈**：擴充 `mediaForPost` 擷取範圍至 `pbs.twimg.com/card_img/` 與卡片預覽圖，卡片封面圖亦自動升級為高清圖並備份上鏈。
+
+---
+
 ## 🎨 [0.9.3] - 2026-08-18
 ### 🔧 Fixed & Enhanced (全平台動態標籤抽換、非社群頁智慧引導與全域主題美學整合)
 - 🌐 **全平台動態標籤與非社群頁平滑引導**：

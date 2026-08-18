@@ -116,15 +116,27 @@
     const urls = [];
     let videoDetected = Array.from(container.querySelectorAll('[data-testid="videoPlayer"], [data-testid="videoComponent"], video')).some(visible);
     
-    // Images in tweet
-    for (const img of Array.from(container.querySelectorAll('img[src*="pbs.twimg.com/media/"]'))) {
+    // Images in tweet (photos, albums, and link preview cards)
+    const imgSelectors = [
+      'img[src*="pbs.twimg.com/media/"]',
+      'img[src*="pbs.twimg.com/card_img/"]',
+      'img[src*="pbs.twimg.com/semantic_core_img/"]',
+      '[data-testid="card.wrapper"] img',
+      '[data-testid="card.layoutLarge.detail"] img',
+      '[data-testid="card.layoutSmall.detail"] img',
+      '[data-testid="tweetPhoto"] img'
+    ];
+    for (const img of Array.from(container.querySelectorAll(imgSelectors.join(", ")))) {
       if (!visible(img)) continue;
       const src = img.currentSrc || img.src;
+      if (!src) continue;
       // Convert to high res
       let highRes = src;
       try {
         const url = new URL(src);
-        if (url.searchParams.has("name")) url.searchParams.set("name", "large");
+        if (url.hostname.includes("twimg.com")) {
+          if (url.searchParams.has("name")) url.searchParams.set("name", "large");
+        }
         highRes = url.toString();
       } catch (_) {}
       if (highRes && /^https?:\/\//i.test(highRes) && !urls.includes(highRes)) {
@@ -156,6 +168,59 @@
     };
   }
 
+  function extractCardAndLinks(container, baseText) {
+    let text = baseText;
+    const cards = [];
+
+    // 1. Twitter Cards / Link preview wrappers
+    const cardWrappers = Array.from(container.querySelectorAll('[data-testid="card.wrapper"], [data-testid="card.layoutLarge.detail"], [data-testid="card.layoutSmall.detail"], div[data-testid="preview"]'));
+    for (const card of cardWrappers) {
+      const linkNode = card.querySelector('a[href]') || card.closest('a[href]') || (card.tagName === 'A' ? card : null);
+      let href = linkNode?.href || linkNode?.getAttribute('href') || "";
+      if (!href || href.startsWith("/") || href.startsWith("#")) continue;
+
+      const cardTexts = Array.from(card.querySelectorAll('span, div'))
+        .map((s) => s.textContent.trim())
+        .filter((s) => s && s.length > 1 && !/^(promoted|sponsored|廣告)$/i.test(s));
+      const cardTitle = cardTexts[0] || "";
+      if (!cards.some((c) => c.href === href)) {
+        cards.push({ href, title: cardTitle });
+      }
+    }
+
+    // 2. Inline links in tweetText (e.g. t.co links or external URLs)
+    const tweetTextNode = container.querySelector('[data-testid="tweetText"]');
+    const linksInText = Array.from((tweetTextNode || container).querySelectorAll('a[href*="t.co"], a[target="_blank"][href^="http"]'));
+    for (const a of linksInText) {
+      const href = a.href || a.getAttribute("href") || "";
+      if (!href || href.startsWith("/") || href.startsWith("#")) continue;
+      const display = a.textContent.trim();
+      if (!cards.some((c) => c.href === href)) {
+        cards.push({ href, title: display });
+      }
+    }
+
+    // Append rich link / card snippets if not already contained in text
+    const linkSnippets = [];
+    for (const card of cards) {
+      const urlToAppend = card.href;
+      // Check if text already has this URL
+      if (!text.includes(urlToAppend)) {
+        if (card.title && card.title !== card.href && !text.includes(card.title)) {
+          linkSnippets.push(`🔗 ${card.title}\n${urlToAppend}`);
+        } else {
+          linkSnippets.push(`🔗 ${urlToAppend}`);
+        }
+      }
+    }
+
+    if (linkSnippets.length > 0) {
+      text = text ? `${text}\n\n${linkSnippets.join("\n\n")}` : linkSnippets.join("\n\n");
+    }
+
+    return text.trim();
+  }
+
   function textForPost(container) {
     const moreBtn = Array.from(container.querySelectorAll('[role="button"], button, span')).find(isMoreControl);
     if (moreBtn && typeof moreBtn.click === "function") {
@@ -163,10 +228,8 @@
     }
 
     const tweetTextNode = container.querySelector('[data-testid="tweetText"]');
-    if (tweetTextNode) {
-      return structuredText(tweetTextNode);
-    }
-    return structuredText(container);
+    const baseText = tweetTextNode ? structuredText(tweetTextNode) : structuredText(container);
+    return extractCardAndLinks(container, baseText);
   }
 
   function extract(container, expectedHandle, preferredSourceUrl = "") {
