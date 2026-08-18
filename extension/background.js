@@ -796,6 +796,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === "GET_AVAILABLE_PROFILES") {
+    chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"], (meta) => {
+      sendResponse({
+        success: true,
+        profiles: Array.isArray(meta.chamberProfiles) ? meta.chamberProfiles : [],
+        activeProfileId: meta.activeChamberProfileId || ""
+      });
+    });
+    return true;
+  }
+
   if (request.action === "DECRYPT_OWNER_DATA") {
     chrome.storage.local.get(["lastFbUserId"], (meta) => {
       const userId = meta.lastFbUserId || "default";

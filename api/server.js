@@ -19,6 +19,9 @@ const {
   findActorBinding,
   transferIdentity,
   checkAliasAvailability,
+  reassignAuthorPosts,
+  reassignPostTx,
+  getPostTransfers,
   normalizeAlias,
   normalizePlatform,
   normalizeActorType,
@@ -349,6 +352,44 @@ router.post("/identity/transfer", async (req, res) => {
     return res.status(err.code === "OWNERSHIP_TRANSFER_NOT_READY" ? 501 : 400).json({
       error: err.message || "Failed to transfer identity",
       code: err.code || "IDENTITY_TRANSFER_FAILED",
+    });
+  }
+});
+
+router.post("/identity/transfer-author", async (req, res) => {
+  try {
+    const transfer = await reassignAuthorPosts(req.body || {});
+    return res.json({ success: true, transfer });
+  } catch (err) {
+    return res.status(400).json({
+      error: err.message || "Failed to transfer author posts",
+      code: "TRANSFER_AUTHOR_FAILED",
+    });
+  }
+});
+
+router.post("/identity/transfer-post", async (req, res) => {
+  try {
+    const transfer = await reassignPostTx(req.body || {});
+    return res.json({ success: true, transfer });
+  } catch (err) {
+    return res.status(400).json({
+      error: err.message || "Failed to transfer post",
+      code: "TRANSFER_POST_FAILED",
+    });
+  }
+});
+
+router.get("/identity/transfers", async (req, res) => {
+  try {
+    const alias = req.query.alias || req.query.id;
+    if (!alias) return res.status(400).json({ error: "alias is required" });
+    const data = await getPostTransfers(alias);
+    return res.json({ success: true, ...data });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message || "Failed to get transfers",
+      code: "GET_TRANSFERS_FAILED",
     });
   }
 });

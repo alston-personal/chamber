@@ -4,6 +4,16 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.10.0] - 2026-08-18
+### 🚀 Major Milestone (文章 / 粉專歸屬一鍵轉掛與雙向簽章系統)
+- 🔄 **文章與粉專歸屬一鍵轉移協議 (Post Ownership Handover Protocol)**：
+  - 支援在 Echo 時光牆作者過濾列上一鍵點擊「🔄 轉移」，將特定粉專/作者的所有歷史貼文劃撥至分身（如 `test · milkcat`）或外部 Chamber 身分。
+  - **本機分身極速秒轉**：偵測為本機 Profile 時由 Extension 背景自動完成「轉出簽章」+「接收簽章」，使用者免二次確認、一鍵即刻生效。
+  - **自動時光牆排除與同步**：轉移後原時光牆（`echo/sunlake`）立即排除該粉專所有文章，目標時光牆（`echo/milkcat`）立即接管並展示。
+  - **外部帳號防惡意投毒**：跨人轉移支援 `pending` 認領防護。
+
+---
+
 ## 🎯 [0.9.9] - 2026-08-18
 ### 🚀 Fixed & Enhanced (分身備份上鏈身分衝突徹底修復)
 - 🔒 **修復分身備份拋出「已綁定」錯誤**：

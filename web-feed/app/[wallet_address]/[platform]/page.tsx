@@ -217,6 +217,29 @@ export default function PlatformFeed({
       ? "instagram"
       : currentPlatform;
 
+  const [availableProfiles, setAvailableProfiles] = useState<{ id: string; name: string; alias: string; walletAddress: string }[]>([]);
+  const [transferModal, setTransferModal] = useState<{ isOpen: boolean; authorName: string; count: number } | null>(null);
+  const [transferTargetAlias, setTransferTargetAlias] = useState<string>("");
+  const [transferBusy, setTransferBusy] = useState<boolean>(false);
+  const [transferStatus, setTransferStatus] = useState<string>("");
+
+  const requestExtensionProfiles = () => new Promise<{ id: string; name: string; alias: string; walletAddress: string }[]>((resolve) => {
+    const requestId = `profiles_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      resolve([]);
+    }, 2000);
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin || event.data?.type !== "EXTENSION_PROFILES_RESPONSE") return;
+      if (event.data.requestId && event.data.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      resolve(event.data.profiles || []);
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "echo-portal", type: "GET_EXTENSION_PROFILES", requestId }, window.location.origin);
+  });
+
   const requestExtensionIdentity = () => new Promise<ExtensionIdentity>((resolve, reject) => {
     const requestId = `identity_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const timeout = window.setTimeout(() => {
@@ -635,12 +658,17 @@ export default function PlatformFeed({
       setExtensionIdentity(initialLocal);
     }
 
-    const syncExtensionIdentity = () => requestExtensionIdentity().then((identity) => {
-      if (!cancelled) setExtensionIdentity(identity);
-    }).catch(() => {
-      const localMobile = checkLocalMobileIdentity();
-      if (!cancelled && localMobile) setExtensionIdentity(localMobile);
-    });
+    const syncExtensionIdentity = () => {
+      requestExtensionIdentity().then((identity) => {
+        if (!cancelled) setExtensionIdentity(identity);
+      }).catch(() => {
+        const localMobile = checkLocalMobileIdentity();
+        if (!cancelled && localMobile) setExtensionIdentity(localMobile);
+      });
+      requestExtensionProfiles().then((profs) => {
+        if (!cancelled && profs.length) setAvailableProfiles(profs);
+      }).catch(() => {});
+    };
     syncExtensionIdentity();
     window.addEventListener("focus", syncExtensionIdentity);
     const timer = window.setInterval(syncExtensionIdentity, 15000);
@@ -1008,12 +1036,33 @@ export default function PlatformFeed({
             b.payload.timestamp - a.payload.timestamp
           );
 
-          // Filter out legacy encrypted posts without key_envelope (which cannot support recipient access grants)
-          // unless explicitly requested via ?legacy=true
+          // Fetch handover / transfer delegations
+          let outgoingAuthors = new Set<string>();
+          let outgoingPosts = new Set<string>();
+          try {
+            const transRes = await fetch(`https://studio.milkcat.org/chamber-api/identity/transfers?alias=${encodeURIComponent(walletAddress)}`);
+            if (transRes.ok) {
+              const transData = await transRes.json();
+              if (transData.success) {
+                (transData.outgoing || []).forEach((t: any) => {
+                  if (t.type === "author" && t.authorName) outgoingAuthors.add(t.authorName.toLowerCase());
+                  if (t.type === "post" && t.postTxId) outgoingPosts.add(t.postTxId);
+                });
+              }
+            }
+          } catch (_) {}
+
+          // Filter out legacy encrypted posts without key_envelope
           const showLegacy = searchParams.get("legacy") === "true";
-          const compatiblePosts = showLegacy
+          const compatiblePosts = (showLegacy
             ? fetchedPosts
-            : fetchedPosts.filter((post) => !post.payload.is_encrypted || Boolean(post.payload.key_envelope));
+            : fetchedPosts.filter((post) => !post.payload.is_encrypted || Boolean(post.payload.key_envelope))
+          ).filter((post) => {
+            const author = String((post.payload as any).author_name || post.payload.authorName || post.payload.source_author?.name || (post.payload as any).author || "").toLowerCase();
+            if (author && outgoingAuthors.has(author)) return false;
+            if (outgoingPosts.has(post.txId)) return false;
+            return true;
+          });
 
           // Same source URL means the same logical post. Keep only the latest
           // revision by default; `history=true` is the explicit audit view.
@@ -1750,6 +1799,129 @@ export default function PlatformFeed({
         </div>
       )}
 
+      {transferModal && transferModal.isOpen && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
+          <div
+            className="w-full max-w-md rounded-2xl border p-5 shadow-2xl transition-all animate-fade-in"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+          >
+            <div className="flex items-center justify-between mb-3 border-b pb-2.5" style={{ borderColor: "var(--border-card)" }}>
+              <div className="text-sm font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <span>🔄</span>
+                <span>{locale === "zh-TW" ? "轉移文章 / 粉專歸屬權" : "Transfer Post Ownership"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTransferModal(null)}
+                className="text-slate-400 hover:text-white text-xs px-2 py-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mb-4 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              {locale === "zh-TW" ? (
+                <>
+                  您正準備將作者「<strong className="text-indigo-300">{transferModal.authorName}</strong>」（共 <strong>{transferModal.count}</strong> 篇文章）從目前的時光牆轉移至另一個 Chamber 身分。
+                </>
+              ) : (
+                <>
+                  You are about to transfer all posts by <strong className="text-indigo-300">{transferModal.authorName}</strong> ({transferModal.count} posts) to another Chamber identity.
+                </>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[11px] font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
+                {locale === "zh-TW" ? "選擇接收分身 (Target Profile)" : "Select Target Profile"}
+              </label>
+              {availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress)).length > 0 ? (
+                <select
+                  value={transferTargetAlias}
+                  onChange={(e) => setTransferTargetAlias(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
+                  style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+                >
+                  {availableProfiles
+                    .filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress))
+                    .map(p => (
+                      <option key={p.id} value={p.alias}>
+                        🏢 {p.name} · @{p.alias}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={transferTargetAlias}
+                  onChange={(e) => setTransferTargetAlias(e.target.value)}
+                  placeholder="例如: milkcat"
+                  className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
+                  style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+                />
+              )}
+              <div className="text-[10px] text-slate-500 leading-normal">
+                💡 {locale === "zh-TW" ? "轉移至本機分身將自動完成雙向簽章，此作者的所有文章將立即從當前時光牆移出，並掛載至目標分身的時光牆。" : "Transferring to a local profile will auto-sign both sides. Posts will be immediately moved."}
+              </div>
+            </div>
+
+            {transferStatus && (
+              <div className="mb-4 p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-900/60 text-xs text-indigo-200">
+                {transferStatus}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2 border-t" style={{ borderColor: "var(--border-card)" }}>
+              <button
+                type="button"
+                onClick={() => setTransferModal(null)}
+                disabled={transferBusy}
+                className="px-4 py-2 rounded-xl text-xs font-semibold hover:bg-white/5 transition-colors"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {locale === "zh-TW" ? "取消" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!transferTargetAlias.trim()) return;
+                  setTransferBusy(true);
+                  setTransferStatus(locale === "zh-TW" ? "正在處理雙向簽章與轉移..." : "Processing transfer...");
+                  try {
+                    const res = await fetch("https://studio.milkcat.org/chamber-api/identity/transfer-author", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        fromAlias: walletAddress,
+                        toAlias: transferTargetAlias.trim(),
+                        authorName: transferModal.authorName,
+                        autoAccept: true,
+                      })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) throw new Error(data.error || "Transfer failed");
+                    setTransferStatus(locale === "zh-TW" ? `🎉 轉移成功！「${transferModal.authorName}」已轉掛至 @${transferTargetAlias}` : `Transfer successful to @${transferTargetAlias}!`);
+                    setTimeout(() => {
+                      setTransferModal(null);
+                      window.location.reload();
+                    }, 1200);
+                  } catch (err: any) {
+                    setTransferStatus(`⚠️ ${err.message || "Transfer error"}`);
+                  } finally {
+                    setTransferBusy(false);
+                  }
+                }}
+                disabled={transferBusy || !transferTargetAlias.trim()}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent-primary)" }}
+              >
+                {transferBusy ? "⏳..." : (locale === "zh-TW" ? "🚀 確認轉移" : "Confirm Transfer")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showRecovery && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
           <section className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-indigo-800/60 bg-slate-900 p-5 shadow-2xl shadow-indigo-950/50">
@@ -2070,29 +2242,48 @@ export default function PlatformFeed({
                 const isSelected = activeAuthor.toLowerCase() === item.name.toLowerCase();
                 const isPage = item.name.includes("粉專") || item.name.includes("科技") || item.name.includes("社") || item.name.includes("官方") || item.name.length > 5;
                 return (
-                  <Link
-                    key={item.name}
-                    href={`${localizedTimelinePath()}?${(() => {
-                      const q = new URLSearchParams(searchParams.toString());
-                      q.set("author", item.name);
-                      return q.toString();
-                    })()}`}
-                    className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
-                      isSelected
-                        ? "font-bold shadow-md"
-                        : "hover:bg-white/5"
-                    }`}
-                    style={isSelected ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
-                  >
-                    <span>{isPage ? "🏢" : "👤"}</span>
-                    <span>{item.name}</span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.2 rounded-full opacity-80"
-                      style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+                  <div key={item.name} className="flex items-center gap-1 shrink-0">
+                    <Link
+                      href={`${localizedTimelinePath()}?${(() => {
+                        const q = new URLSearchParams(searchParams.toString());
+                        q.set("author", item.name);
+                        return q.toString();
+                      })()}`}
+                      className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+                        isSelected
+                          ? "font-bold shadow-md"
+                          : "hover:bg-white/5"
+                      }`}
+                      style={isSelected ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
                     >
-                      {item.count}
-                    </span>
-                  </Link>
+                      <span>{isPage ? "🏢" : "👤"}</span>
+                      <span>{item.name}</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.2 rounded-full opacity-80"
+                        style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+                      >
+                        {item.count}
+                      </span>
+                    </Link>
+
+                    {isTimelineOwner && (
+                      <button
+                        type="button"
+                        title={locale === "zh-TW" ? `轉移「${item.name}」所有文章至其他分身` : `Transfer all posts by "${item.name}" to another profile`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTransferModal({ isOpen: true, authorName: item.name, count: item.count });
+                          const otherProfiles = availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress));
+                          setTransferTargetAlias(otherProfiles[0]?.alias || "");
+                          setTransferStatus("");
+                        }}
+                        className="text-[11px] px-2 py-1.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-indigo-950/80 hover:border-indigo-500 text-slate-400 hover:text-indigo-200 transition-all shrink-0 shadow-sm cursor-pointer"
+                      >
+                        🔄
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

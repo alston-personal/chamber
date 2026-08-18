@@ -264,6 +264,24 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Handle Echo Portal requests for available profiles
+  if (event.data && event.data.source === "echo-portal" && event.data.type === "GET_EXTENSION_PROFILES") {
+    if (location.origin !== "https://studio.milkcat.org") return;
+    chrome.runtime.sendMessage({
+      action: "GET_AVAILABLE_PROFILES"
+    }, (response) => {
+      if (chrome.runtime.lastError) return;
+      window.postMessage({
+        source: "chamber-extension",
+        type: "EXTENSION_PROFILES_RESPONSE",
+        requestId: event.data.requestId || "",
+        profiles: response?.profiles || [],
+        activeProfileId: response?.activeProfileId || ""
+      }, "https://studio.milkcat.org");
+    });
+    return;
+  }
+
   if (event.data && event.data.source === "echo-portal" && event.data.type === "DECRYPT_ECHO_CONTENT") {
     if (location.origin !== "https://studio.milkcat.org") return;
     chrome.runtime.sendMessage({

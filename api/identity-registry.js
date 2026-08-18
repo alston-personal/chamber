@@ -175,6 +175,7 @@ async function readStore() {
     identities: parsed.identities || {},
     aliases: parsed.aliases || {},
     transfers: parsed.transfers || [],
+    post_transfers: parsed.post_transfers || [],
   };
 }
 
@@ -185,6 +186,7 @@ async function writeStore(store) {
     identities: store.identities || {},
     aliases: store.aliases || {},
     transfers: store.transfers || [],
+    post_transfers: store.post_transfers || [],
   };
   await fs.mkdir(path.dirname(STORE_PATH), { recursive: true });
   await fs.writeFile(STORE_PATH, JSON.stringify(next, null, 2), "utf8");
@@ -573,6 +575,97 @@ function suggestAliasCandidates(alias, store, count = 5) {
   return out.slice(0, count);
 }
 
+async function reassignAuthorPosts({ fromAlias, toAlias, authorName, proof, autoAccept = true }) {
+  const normFrom = normalizeAlias(fromAlias);
+  const normTo = normalizeAlias(toAlias);
+  const normAuthor = String(authorName || "").trim();
+  if (!normFrom || !normTo) throw new Error("fromAlias and toAlias are required");
+  if (!normAuthor) throw new Error("authorName is required");
+
+  const store = await readStore();
+  const fromRoot = store.aliases[normFrom];
+  const toRoot = store.aliases[normTo];
+  if (!fromRoot) throw new Error(`Source Chamber identity "${normFrom}" not found`);
+  if (!toRoot) throw new Error(`Target Chamber identity "${normTo}" not found`);
+
+  store.post_transfers = Array.isArray(store.post_transfers) ? store.post_transfers : [];
+  
+  store.post_transfers = store.post_transfers.filter(
+    (t) => !(t.fromAlias === normFrom && t.authorName?.toLowerCase() === normAuthor.toLowerCase())
+  );
+
+  const transfer = {
+    id: `transfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    type: "author",
+    fromAlias: normFrom,
+    fromContentKey: fromRoot.content_key,
+    toAlias: normTo,
+    toContentKey: toRoot.content_key,
+    authorName: normAuthor,
+    status: autoAccept ? "accepted" : "pending",
+    proof: proof || "",
+    transferredAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+
+  store.post_transfers.push(transfer);
+  await writeStore(store);
+  return transfer;
+}
+
+async function reassignPostTx({ fromAlias, toAlias, postTxId, proof, autoAccept = true }) {
+  const normFrom = normalizeAlias(fromAlias);
+  const normTo = normalizeAlias(toAlias);
+  const txId = String(postTxId || "").trim();
+  if (!normFrom || !normTo) throw new Error("fromAlias and toAlias are required");
+  if (!txId) throw new Error("postTxId is required");
+
+  const store = await readStore();
+  const fromRoot = store.aliases[normFrom];
+  const toRoot = store.aliases[normTo];
+  if (!fromRoot) throw new Error(`Source Chamber identity "${normFrom}" not found`);
+  if (!toRoot) throw new Error(`Target Chamber identity "${normTo}" not found`);
+
+  store.post_transfers = Array.isArray(store.post_transfers) ? store.post_transfers : [];
+  
+  store.post_transfers = store.post_transfers.filter(
+    (t) => !(t.fromAlias === normFrom && t.postTxId === txId)
+  );
+
+  const transfer = {
+    id: `transfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    type: "post",
+    fromAlias: normFrom,
+    fromContentKey: fromRoot.content_key,
+    toAlias: normTo,
+    toContentKey: toRoot.content_key,
+    postTxId: txId,
+    status: autoAccept ? "accepted" : "pending",
+    proof: proof || "",
+    transferredAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+
+  store.post_transfers.push(transfer);
+  await writeStore(store);
+  return transfer;
+}
+
+async function getPostTransfers(alias) {
+  const norm = normalizeAlias(alias);
+  const store = await readStore();
+  const transfers = Array.isArray(store.post_transfers) ? store.post_transfers : [];
+  
+  const outgoing = transfers.filter((t) => t.fromAlias === norm && t.status === "accepted");
+  const incoming = transfers.filter((t) => t.toAlias === norm && t.status === "accepted");
+
+  return {
+    alias: norm,
+    outgoing,
+    incoming,
+  };
+}
+
 module.exports = {
   getRegistry,
   findActorBinding,
@@ -581,6 +674,9 @@ module.exports = {
   transferIdentity,
   checkAliasAvailability,
   suggestAliasCandidates,
+  reassignAuthorPosts,
+  reassignPostTx,
+  getPostTransfers,
   normalizeAlias,
   normalizePlatform,
   normalizeActorType,
