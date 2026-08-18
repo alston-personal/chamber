@@ -1823,11 +1823,11 @@ export default function PlatformFeed({
             <div className="mb-4 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               {locale === "zh-TW" ? (
                 <>
-                  您正準備將作者「<strong className="text-indigo-300">{transferModal.authorName}</strong>」（共 <strong>{transferModal.count}</strong> 篇文章）從目前的時光牆轉移至另一個 Chamber 身分。
+                  您正準備將作者「<strong style={{ color: "var(--accent-primary)" }}>{transferModal.authorName}</strong>」（共 <strong>{transferModal.count}</strong> 篇文章）從目前的時光牆轉移至另一個 Chamber 身分。
                 </>
               ) : (
                 <>
-                  You are about to transfer all posts by <strong className="text-indigo-300">{transferModal.authorName}</strong> ({transferModal.count} posts) to another Chamber identity.
+                  You are about to transfer all posts by <strong style={{ color: "var(--accent-primary)" }}>{transferModal.authorName}</strong> ({transferModal.count} posts) to another Chamber identity.
                 </>
               )}
             </div>
@@ -1838,7 +1838,7 @@ export default function PlatformFeed({
               </label>
 
               {/* Mode Switcher */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950/60 border mb-3" style={{ borderColor: "var(--border-card)" }}>
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl border mb-3" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -1846,11 +1846,15 @@ export default function PlatformFeed({
                     const otherProfiles = availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress));
                     setTransferTargetAlias(otherProfiles[0]?.alias || "");
                   }}
-                  className={`text-xs py-1.5 rounded-lg font-medium transition-all ${
-                    transferMode === "local"
-                      ? "bg-indigo-600 text-white font-bold shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
+                  className="text-xs py-1.5 rounded-lg font-semibold transition-all"
+                  style={transferMode === "local" ? {
+                    backgroundColor: "var(--accent-primary)",
+                    color: "#ffffff",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+                  } : {
+                    backgroundColor: "transparent",
+                    color: "var(--text-secondary)"
+                  }}
                 >
                   👥 {locale === "zh-TW" ? "我的本機分身" : "My Sub-Profile"}
                 </button>
@@ -1860,11 +1864,15 @@ export default function PlatformFeed({
                     setTransferMode("custom");
                     setTransferTargetAlias("");
                   }}
-                  className={`text-xs py-1.5 rounded-lg font-medium transition-all ${
-                    transferMode === "custom"
-                      ? "bg-indigo-600 text-white font-bold shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
+                  className="text-xs py-1.5 rounded-lg font-semibold transition-all"
+                  style={transferMode === "custom" ? {
+                    backgroundColor: "var(--accent-primary)",
+                    color: "#ffffff",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+                  } : {
+                    backgroundColor: "transparent",
+                    color: "var(--text-secondary)"
+                  }}
                 >
                   🌐 {locale === "zh-TW" ? "外部其他帳號" : "External Account"}
                 </button>
@@ -1887,7 +1895,7 @@ export default function PlatformFeed({
                       ))}
                   </select>
                 ) : (
-                  <div className="p-3 rounded-xl bg-slate-900 border text-xs text-slate-400 mb-2" style={{ borderColor: "var(--border-card)" }}>
+                  <div className="p-3 rounded-xl border text-xs mb-2" style={{ backgroundColor: "var(--bg-page)", color: "var(--text-secondary)", borderColor: "var(--border-card)" }}>
                     {locale === "zh-TW" ? "尚無其他本機分身，請使用「外部其他帳號」或於 Extension 新增身分。" : "No other local profile found. Please use External Account mode."}
                   </div>
                 )
@@ -1901,7 +1909,7 @@ export default function PlatformFeed({
                     className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
                     style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
                   />
-                  <div className="text-[10px] text-indigo-400 mb-2">
+                  <div className="text-[10px] mb-2 font-medium" style={{ color: "var(--accent-primary)" }}>
                     {transferTargetAlias ? `接收時光牆: https://studio.milkcat.org/echo/${transferTargetAlias}` : ""}
                   </div>
                 </div>
@@ -1917,7 +1925,7 @@ export default function PlatformFeed({
             </div>
 
             {transferStatus && (
-              <div className="mb-4 p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-900/60 text-xs text-indigo-200">
+              <div className="mb-4 p-2.5 rounded-xl border text-xs" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--text-primary)" }}>
                 {transferStatus}
               </div>
             )}
