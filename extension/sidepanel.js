@@ -40,23 +40,10 @@ function renderVersion() {
 const myEchoTimelineBtn = document.getElementById("myEchoTimelineBtn");
 myEchoTimelineBtn?.addEventListener("click", async () => {
   try {
-    const allData = await chrome.storage.local.get(null);
-    let target = "";
-    for (const [k, v] of Object.entries(allData)) {
-      if (k.endsWith("identityAlias") && typeof v === "string" && v.trim()) {
-        target = v.trim();
-        break;
-      }
-      if (!target && k.endsWith("nativeWalletAddress") && typeof v === "string" && v.trim()) {
-        target = v.trim();
-      }
-    }
-    const profiles = allData.chamberProfiles || [];
-    for (const p of profiles) {
-      if (p.alias) { target = p.alias.trim(); break; }
-      if (!target && p.walletAddress) target = p.walletAddress.trim();
-    }
-    const url = target ? `https://studio.milkcat.org/echo/${encodeURIComponent(target)}/all` : "https://studio.milkcat.org/echo/all";
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || profile?.walletAddress || "";
+    const url = alias ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all` : "https://studio.milkcat.org/echo/all";
     chrome.tabs.create({ url });
   } catch (_) {
     chrome.tabs.create({ url: "https://studio.milkcat.org/echo/all" });
@@ -567,17 +554,6 @@ requestsBannerBtn?.addEventListener("click", async () => {
   }
 });
 
-const myEchoTimelineBtnEl = document.getElementById("myEchoTimelineBtn");
-myEchoTimelineBtnEl?.addEventListener("click", async () => {
-  try {
-    const state = await getActiveProfile();
-    const profile = state.profiles.find((item) => item.id === state.activeId);
-    const alias = profile?.alias || "sunlake";
-    chrome.tabs.create({ url: `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all` });
-  } catch (_) {
-    chrome.tabs.create({ url: "https://studio.milkcat.org/echo" });
-  }
-});
 
 pairingCloseBtn?.addEventListener("click", () => {
   if (pairingInterval) clearInterval(pairingInterval);
