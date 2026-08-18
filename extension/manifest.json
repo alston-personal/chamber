@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_TW",
   "minimum_chrome_version": "116",
@@ -19,6 +19,9 @@
     "*://*.threads.com/*",
     "*://*.threads.net/*",
     "*://*.instagram.com/*",
+    "*://*.x.com/*",
+    "*://*.twitter.com/*",
+    "*://*.twimg.com/*",
     "*://*.fbcdn.net/*",
     "*://*.fbsbx.com/*",
     "*://*.cdninstagram.com/*",
@@ -34,7 +37,13 @@
       "run_at": "document_end"
     },
     {
-      "matches": ["*://*.threads.com/*", "*://*.threads.net/*", "*://*.instagram.com/*"],
+      "matches": [
+        "*://*.threads.com/*",
+        "*://*.threads.net/*",
+        "*://*.instagram.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*"
+      ],
       "js": ["i18n.js"],
       "run_at": "document_start"
     }

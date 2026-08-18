@@ -49,10 +49,22 @@
     }
   }
 
+  function isValidXPostUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      const host = url.hostname.toLowerCase();
+      if (!["x.com", "www.x.com", "twitter.com", "www.twitter.com"].includes(host)) return false;
+      return /^\/[^/]+\/status\/[0-9]+\/?$/i.test(url.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function isValidPostUrl(value, platform = "facebook") {
     const p = String(platform || "facebook").toLowerCase();
     if (p === "threads") return isValidThreadsPostUrl(value);
     if (p === "instagram") return isValidInstagramPostUrl(value);
+    if (p === "x" || p === "twitter") return isValidXPostUrl(value);
     return isValidFacebookPostUrl(value);
   }
 
