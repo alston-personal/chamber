@@ -13,6 +13,26 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+const RESERVED_ALIASES = new Set([
+  // System & Administrative
+  "admin", "administrator", "root", "system", "sys", "superuser", "moderator", "mod",
+  "staff", "operator", "bot", "official", "support", "help", "security", "contact",
+  // Protocol & App Routing Namespaces
+  "all", "api", "echo", "chamber", "feed", "reborn", "portal", "guide", "docs",
+  "about", "terms", "privacy", "login", "logout", "auth", "signin", "signup",
+  "register", "settings", "profile", "explore", "search", "home", "index",
+  "status", "health", "metrics", "dashboard", "app", "static", "public", "assets",
+  "null", "undefined", "void",
+  // Major Platforms & Ecosystem
+  "facebook", "fb", "threads", "instagram", "ig", "twitter", "x", "youtube", "tiktok",
+  "arweave", "ethereum", "solana"
+]);
+
+function isReservedAlias(alias) {
+  const norm = normalizeAlias(alias);
+  return RESERVED_ALIASES.has(norm);
+}
+
 function normalizeAlias(alias) {
   return String(alias || "")
     .trim()
@@ -274,6 +294,11 @@ async function registerIdentity(input) {
   if (!alias) {
     throw new Error("alias is required");
   }
+  if (isReservedAlias(alias)) {
+    const error = new Error(`The alias "${alias}" is reserved by Chamber Protocol`);
+    error.code = "RESERVED_ALIAS";
+    throw error;
+  }
 
   const platform = normalizePlatform(input.platform);
   const actorType = normalizeActorType(input.actorType);
@@ -484,6 +509,16 @@ async function checkAliasAvailability({ alias, walletAddress }) {
   const normalizedAlias = normalizeAlias(alias);
   if (!normalizedAlias) {
     throw new Error("alias is required");
+  }
+  if (isReservedAlias(normalizedAlias)) {
+    return {
+      alias: normalizedAlias,
+      available: false,
+      ownedByRequester: false,
+      reason: "RESERVED_ALIAS",
+      error: `The alias "${normalizedAlias}" is a reserved system keyword.`,
+      suggestions: suggestAliasCandidates(normalizedAlias, await readStore()),
+    };
   }
   const store = await readStore();
   const root = store.aliases[normalizedAlias];
