@@ -222,6 +222,7 @@ export default function PlatformFeed({
   const [transferTargetAlias, setTransferTargetAlias] = useState<string>("");
   const [transferBusy, setTransferBusy] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>("");
+  const [transferMode, setTransferMode] = useState<"local" | "custom">("local");
 
   const requestExtensionProfiles = () => new Promise<{ id: string; name: string; alias: string; walletAddress: string }[]>((resolve) => {
     const requestId = `profiles_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -1832,36 +1833,86 @@ export default function PlatformFeed({
             </div>
 
             <div className="mb-4">
-              <label className="block text-[11px] font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                {locale === "zh-TW" ? "選擇接收分身 (Target Profile)" : "Select Target Profile"}
+              <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+                {locale === "zh-TW" ? "接收對象身分 (Target Identity)" : "Target Identity"}
               </label>
-              {availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress)).length > 0 ? (
-                <select
-                  value={transferTargetAlias}
-                  onChange={(e) => setTransferTargetAlias(e.target.value)}
-                  className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
-                  style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+
+              {/* Mode Switcher */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950/60 border mb-3" style={{ borderColor: "var(--border-card)" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransferMode("local");
+                    const otherProfiles = availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress));
+                    setTransferTargetAlias(otherProfiles[0]?.alias || "");
+                  }}
+                  className={`text-xs py-1.5 rounded-lg font-medium transition-all ${
+                    transferMode === "local"
+                      ? "bg-indigo-600 text-white font-bold shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
                 >
-                  {availableProfiles
-                    .filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress))
-                    .map(p => (
-                      <option key={p.id} value={p.alias}>
-                        🏢 {p.name} · @{p.alias}
-                      </option>
-                    ))}
-                </select>
+                  👥 {locale === "zh-TW" ? "我的本機分身" : "My Sub-Profile"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransferMode("custom");
+                    setTransferTargetAlias("");
+                  }}
+                  className={`text-xs py-1.5 rounded-lg font-medium transition-all ${
+                    transferMode === "custom"
+                      ? "bg-indigo-600 text-white font-bold shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  🌐 {locale === "zh-TW" ? "外部其他帳號" : "External Account"}
+                </button>
+              </div>
+
+              {transferMode === "local" ? (
+                availableProfiles.filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress)).length > 0 ? (
+                  <select
+                    value={transferTargetAlias}
+                    onChange={(e) => setTransferTargetAlias(e.target.value)}
+                    className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
+                    style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+                  >
+                    {availableProfiles
+                      .filter(p => p.alias && normalizeIdentityAlias(p.alias) !== normalizeIdentityAlias(walletAddress))
+                      .map(p => (
+                        <option key={p.id} value={p.alias}>
+                          🏢 {p.name} · @{p.alias}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-900 border text-xs text-slate-400 mb-2" style={{ borderColor: "var(--border-card)" }}>
+                    {locale === "zh-TW" ? "尚無其他本機分身，請使用「外部其他帳號」或於 Extension 新增身分。" : "No other local profile found. Please use External Account mode."}
+                  </div>
+                )
               ) : (
-                <input
-                  type="text"
-                  value={transferTargetAlias}
-                  onChange={(e) => setTransferTargetAlias(e.target.value)}
-                  placeholder="例如: milkcat"
-                  className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
-                  style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
-                />
+                <div>
+                  <input
+                    type="text"
+                    value={transferTargetAlias}
+                    onChange={(e) => setTransferTargetAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+                    placeholder="例如: peter, alice 或 自訂 Chamber Alias"
+                    className="w-full p-2.5 text-xs rounded-xl border outline-none font-medium mb-2"
+                    style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
+                  />
+                  <div className="text-[10px] text-indigo-400 mb-2">
+                    {transferTargetAlias ? `接收時光牆: https://studio.milkcat.org/echo/${transferTargetAlias}` : ""}
+                  </div>
+                </div>
               )}
+
               <div className="text-[10px] text-slate-500 leading-normal">
-                💡 {locale === "zh-TW" ? "轉移至本機分身將自動完成雙向簽章，此作者的所有文章將立即從當前時光牆移出，並掛載至目標分身的時光牆。" : "Transferring to a local profile will auto-sign both sides. Posts will be immediately moved."}
+                {transferMode === "local" ? (
+                  <>💡 {locale === "zh-TW" ? "轉移至本機分身將自動完成雙向簽章，此作者的所有文章將立即從當前時光牆移出，並掛載至目標分身的時光牆。" : "Transferring to a local profile will auto-sign both sides. Posts will be immediately moved."}</>
+                ) : (
+                  <>🛡️ {locale === "zh-TW" ? "轉移給外部帳號將發起歸屬轉移，文章將從您的時光牆移出，並直接劃撥交由對方的 Chamber 時光牆接管展示。" : "Transferring to an external account will assign the post ownership directly to their Chamber timeline."}</>
+                )}
               </div>
             </div>
 
