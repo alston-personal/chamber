@@ -769,19 +769,24 @@ async function processBackupTask(postData, isHistoric) {
 // Listen to requests from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "GET_ACTIVE_WALLET_INFO") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      const userId = meta.lastFbUserId || "default";
+    chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId", "lastFbUserId"], (meta) => {
+      const activeId = meta.activeChamberProfileId;
+      const profiles = Array.isArray(meta.chamberProfiles) ? meta.chamberProfiles : [];
+      const activeProfile = profiles.find((p) => p.id === activeId) || profiles[0];
+      const userId = activeProfile?.ownerUserId || meta.lastFbUserId || "default";
       const prefix = `user_${userId}_`;
       Promise.all([
         getExtensionConfig(userId),
         getOrCreateSharingIdentity(userId),
         chrome.storage.local.get([prefix + "identityAlias", prefix + "identityDisplayName"]),
       ]).then(([config, sharing, identity]) => {
+        const alias = activeProfile?.alias || identity[prefix + "identityAlias"] || "";
+        const displayName = activeProfile?.name || identity[prefix + "identityDisplayName"] || alias;
         sendResponse({
           success: true,
-          walletAddress: config.boundWalletAddress,
-          identityAlias: identity[prefix + "identityAlias"] || "",
-          identityDisplayName: identity[prefix + "identityDisplayName"] || identity[prefix + "identityAlias"] || "",
+          walletAddress: activeProfile?.walletAddress || config.boundWalletAddress,
+          identityAlias: alias,
+          identityDisplayName: displayName,
           sharingPublicKey: sharing.publicKey,
           sharingKeyId: sharing.keyId,
           accessCapability: config.accessCapability

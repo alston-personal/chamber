@@ -4,6 +4,14 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.9.8] - 2026-08-18
+### 🚀 Fixed & Enhanced (Echo 跨分身身分感知與右上角當前 Profile 連動)
+- 🌐 **Echo Portal 身分感知精準連動**：
+  - 修復 Echo 網頁透過 `GET_ACTIVE_WALLET_INFO` 請求擴充功能當前身分時，Background 讀取舊全域 `sunlake` 的問題。
+  - 全面連動 `activeChamberProfileId`，當在 Extension 切換至新分身（如 `test · milkcat`）時，Echo 頂部右上角標籤與身分標章即時同步顯示為 `@milkcat`。
+
+---
+
 ## 🎯 [0.9.7] - 2026-08-18
 ### 🚀 Added & Enhanced (身分重綁定/轉移確認機制、多 Profile 衝突防護)
 - 🔄 **Chamber 身分轉移與重新綁定 (Rebind / Transfer)**：
