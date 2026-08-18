@@ -4,6 +4,18 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎨 [0.9.3] - 2026-08-18
+### 🔧 Fixed & Enhanced (全平台動態標籤抽換、非社群頁智慧引導與全域主題美學整合)
+- 🌐 **全平台動態標籤與非社群頁平滑引導**：
+  - 徹底消除非社群頁面（如時光牆、空白頁）預設誤判為 Facebook 的問題，改以動態 `backup.currentNonSocialTab`（目前分頁（非社群平台））友善呈現。
+  - 下拉選單與提示字串全面抽換為 `{platform}` 變數，消除「請先開啟 Facebook 或 Threads 分頁」的紅字報錯。
+  - 按鈕自動切換為 **`🚀 前往 {Platform} 並選取文章`**，達成零阻礙智慧跳轉。
+- 🎨 **全元件 Theme 變數化與「已備份」樣式調和**：
+  - 「已備份」狀態按鈕與「文章已成功備份上鏈」卡片全面改採動態 CSS 主題變數，徹底告別寫死綠色/深藍色。
+  - 側邊欄全域輸入框、下拉選單、行動裝置配對視窗全面支援 5 大主題切換（琥珀、賽博、櫻花、黑曜、翡翠）。
+
+---
+
 ## 🐦 [0.9.2] - 2026-08-18
 ### 🚀 Added & Enhanced (四大主流社群齊備：X/Twitter 支援、智慧跳轉與彈窗轉世聲明自動化修復)
 - 🐦 **X (Twitter) 全功能備份引擎 (`platform-x.js`)**：
