@@ -2143,7 +2143,8 @@ export default function PlatformFeed({
               </div>
               <button
                 onClick={() => setShowRecovery(true)}
-                className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center gap-1.5"
+                className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center gap-1.5 hover:opacity-90"
+                style={{ backgroundColor: "var(--accent-primary)" }}
               >
                 🔐 密碼/復原碼解鎖
               </button>
@@ -2354,10 +2355,13 @@ export default function PlatformFeed({
         )}
 
         {focusTxId && (
-          <div className="mb-5 rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-3 flex items-center justify-between gap-3">
+          <div
+            className="mb-5 rounded-xl border p-3 flex items-center justify-between gap-3 shadow-sm"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+          >
             <div>
-              <div className="text-xs font-semibold text-indigo-200">{ft("singleBackupTitle")}</div>
-              <div className="text-[9px] text-slate-500 mt-0.5">{ft("singleBackupBody")}</div>
+              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{ft("singleBackupTitle")}</div>
+              <div className="text-[9px] mt-0.5" style={{ color: "var(--text-secondary)" }}>{ft("singleBackupBody")}</div>
             </div>
             <Link
               href={`${localizedTimelinePath()}?${(() => {
@@ -2365,7 +2369,8 @@ export default function PlatformFeed({
                 query.delete("post");
                 return query.toString();
               })()}`}
-              className="shrink-0 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-lg transition-colors"
+              className="shrink-0 text-xs text-white font-semibold px-3.5 py-2 rounded-xl transition-all shadow-sm"
+              style={{ backgroundColor: "var(--accent-primary)" }}
             >
               {ft("backTimeline")}
             </Link>
@@ -2373,15 +2378,19 @@ export default function PlatformFeed({
         )}
 
         {encryptedRemainingCount > 0 && isTimelineOwner && (
-          <div className="mb-5 rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-3 flex items-center justify-between gap-3">
+          <div
+            className="mb-5 rounded-xl border p-3 flex items-center justify-between gap-3 shadow-sm"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+          >
             <div>
-              <div className="text-xs font-semibold text-indigo-200">{ft("privateTimeline")}</div>
-              <div className="text-[9px] text-slate-500 mt-0.5">{ft("privateTimelineBody", { count: encryptedRemainingCount })}</div>
+              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{ft("privateTimeline")}</div>
+              <div className="text-[9px] mt-0.5" style={{ color: "var(--text-secondary)" }}>{ft("privateTimelineBody", { count: encryptedRemainingCount })}</div>
             </div>
             <button
               onClick={handleDecryptAll}
               disabled={isDecryptingAll}
-              className="shrink-0 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white px-3.5 py-2 rounded-lg transition-colors"
+              className="shrink-0 text-xs font-semibold disabled:opacity-60 text-white px-3.5 py-2 rounded-xl transition-all shadow-sm"
+              style={{ backgroundColor: "var(--accent-primary)" }}
             >
               {isDecryptingAll ? ft("unlockingProgress", { progress: decryptProgress }) : ft("unlockAgain")}
             </button>
@@ -2392,12 +2401,24 @@ export default function PlatformFeed({
 
         {/* Dynamic Tag filtering display block */}
         {activeTag && (
-          <div className="mb-6 flex items-center justify-between bg-indigo-950/20 border border-indigo-900/40 px-3 py-2 rounded-xl text-xs text-indigo-300">
-            <div className="flex items-center gap-1">
-              <span>{ft("filteringTag")}</span>
-              <span className="font-bold bg-indigo-900/60 px-2 py-0.5 rounded font-mono">#{activeTag}</span>
+          <div
+            className="mb-6 flex items-center justify-between border px-3.5 py-2 rounded-xl text-xs shadow-sm"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)", color: "var(--text-primary)" }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span style={{ color: "var(--text-secondary)" }}>{ft("filteringTag")}</span>
+              <span
+                className="font-bold px-2 py-0.5 rounded-lg font-mono text-white text-[11px]"
+                style={{ backgroundColor: "var(--accent-primary)" }}
+              >
+                #{activeTag}
+              </span>
             </div>
-            <Link href={localizedTimelinePath()} className="text-indigo-400 hover:underline hover:text-indigo-300">
+            <Link
+              href={localizedTimelinePath()}
+              className="hover:underline font-medium"
+              style={{ color: "var(--accent-primary)" }}
+            >
               {ft("clearFilter")}
             </Link>
           </div>
