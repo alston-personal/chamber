@@ -4,6 +4,22 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 📷 [0.9.0] - 2026-08-18
+### 🚀 Added (全生態 Instagram 支援 & 貓頭張嘴動態形態引擎)
+- 📸 **全功能 Instagram (IG) 備份引擎 (`platform-instagram.js`)**：
+  - 擴充功能全面支援 **Instagram 貼文 (`/p/POST_ID/`)** 與 **連續短片 (`/reel/REEL_ID/`)** 之鏈上永久備份。
+  - **智慧 DOM 擷取**：精準擷取 IG 貼文內文 (Caption)、作者帳號 (`@handle`)、發布時間、多圖輪播相簿 (Carousel) 與 Reels 影片縮圖。
+  - **互動選取器 (Interactive Post Picker)**：支援在 Instagram 動態牆與個人主頁直接點選目標貼文進行即時備份。
+  - **轉世聲明整合**：支援自動辨識並開啟 Instagram「新增貼文」發文視窗。
+- 🐱 **真・貓頭張嘴吞吐動態形態原型 (`CatMorphingCard.tsx`)**：
+  - 支援以貓頭解剖學結構呈現的互動式時光牆卡片，具備立體動態雙貓耳、發光貓眼、貓咪小虎牙與項圈金色鈴鐺存證門戶。
+  - 具備真實平滑的「大口張開 / 咬合吞吐」物理動畫，展開時由粉嫩貓舌托出長篇羊皮紙文章卷軸！
+- 🛡️ **後端與時光牆全平台統一支援**：
+  - 後端 API 支援 `platform: "instagram"` 格式驗證與 Arweave / Irys 存證。
+  - 時光牆支援 `/echo/[wallet]/instagram` 專屬平台分頁。
+
+---
+
 ## 🎨 [0.8.13] - 2026-08-18
 ### 🌟 Added (Chamber Extension 全面支援 5 大主題風格引擎)
 - 🎨 **擴充功能主題即時切換 (Sidepanel & Popup Full Theme Engine)**：

@@ -168,6 +168,17 @@ function isValidThreadsPostUrl(value) {
   }
 }
 
+function isValidInstagramPostUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+    if (!["instagram.com", "www.instagram.com"].includes(host)) return false;
+    return /^\/(?:p|reel)\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname);
+  } catch (_) {
+    return false;
+  }
+}
+
 function canonicalSourceIdentity(value) {
   try {
     const url = new URL(String(value || ""));
@@ -488,6 +499,9 @@ router.post("/backup", async (req, res) => {
     }
     if (requestedPlatform === "threads" && !isValidThreadsPostUrl(sourceUrl)) {
       return res.status(400).json({ error: "Threads sourceUrl must be a valid post permalink", code: "SOURCE_URL_REQUIRED" });
+    }
+    if (requestedPlatform === "instagram" && !isValidInstagramPostUrl(sourceUrl)) {
+      return res.status(400).json({ error: "Instagram sourceUrl must be a valid post permalink", code: "SOURCE_URL_REQUIRED" });
     }
 
     // Hash FB user ID for on-chain storage (privacy protection)

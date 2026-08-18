@@ -107,11 +107,16 @@ function platformForTab(tab) {
     const host = new URL(tab?.url || "").hostname.toLowerCase();
     if (host === "facebook.com" || host.endsWith(".facebook.com")) return "facebook";
     if (["threads.com", "www.threads.com", "threads.net", "www.threads.net"].includes(host)) return "threads";
+    if (host === "instagram.com" || host.endsWith(".instagram.com")) return "instagram";
   } catch (_) {}
   return null;
 }
 
-const platformName = (platform) => platform === "threads" ? "Threads" : "Facebook";
+const platformName = (platform) => {
+  if (platform === "threads") return "Threads";
+  if (platform === "instagram") return "Instagram";
+  return "Facebook";
+};
 
 async function rawPlatformIdentity(tab = null) {
   tab ||= await getActiveTab();
@@ -121,6 +126,21 @@ async function rawPlatformIdentity(tab = null) {
     const cookie = await chrome.cookies.get({ url: tab.url, name: "c_user" });
     if (!cookie?.value) throw new Error(t("error.loginPlatform", { platform: "Facebook" }));
     return { platform, actorId: cookie.value, actorHandle: "", tab };
+  }
+  if (platform === "instagram") {
+    const cookie = await chrome.cookies.get({ url: tab.url, name: "ds_user_id" });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-instagram.js"] });
+    const injected = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const p = globalThis.ChamberInstagramPlatform;
+        const author = p?.extractAuthorFrom?.(document.body) || "";
+        return { handle: author };
+      }
+    });
+    const account = injected?.[0]?.result;
+    const actorId = cookie?.value || account?.handle || "ig_user";
+    return { platform, actorId, actorHandle: account?.handle || "", tab };
   }
   const cookie = await chrome.cookies.get({ url: tab.url, name: "ds_user_id" });
   await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-threads.js"] });
@@ -137,7 +157,7 @@ async function activePlatformIdentity() {
   const raw = await rawPlatformIdentity();
   const state = await getActiveProfile(raw);
   const profile = state.profiles.find((item) => item.id === state.activeId);
-  const userId = profile?.ownerUserId || (raw.platform === "facebook" ? raw.actorId : `threads:${raw.actorId}`);
+  const userId = profile?.ownerUserId || (raw.platform === "facebook" ? raw.actorId : `${raw.platform}:${raw.actorId}`);
   return { ...raw, userId, prefix: `user_${userId}_`, profile };
 }
 
@@ -628,7 +648,8 @@ rebornGenerate?.addEventListener("click", async () => {
     const state = await getActiveProfile();
     const profile = state.profiles.find((item) => item.id === state.activeId);
     if (!profile?.alias) throw new Error(t("reborn.aliasRequired"));
-    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/${identity.platform === "threads" ? "threads" : "fb"}`;
+    const timelinePlatform = identity.platform === "threads" ? "threads" : identity.platform === "instagram" ? "instagram" : "fb";
+    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/${timelinePlatform}`;
     const card = await ChamberDeclaration.generateCard({ timelineUrl, alias: profile.alias });
 
     try {
@@ -650,6 +671,15 @@ rebornGenerate?.addEventListener("click", async () => {
       const result = injected?.[0]?.result;
       if (!result?.success) throw new Error(t("threads.composerMissing"));
       rebornStatus.textContent = result.imageAttached ? t("reborn.successPlatform", { platform: "Threads" }) : t("reborn.successTextOnly", { platform: "Threads" });
+    } else if (identity.platform === "instagram") {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "platform-instagram.js"] });
+      const injected = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (body, imageUrl) => globalThis.ChamberInstagramPlatform?.openComposerAndFill?.(body, imageUrl),
+        args: [text, card.dataUrl]
+      });
+      const result = injected?.[0]?.result;
+      rebornStatus.textContent = result?.imageAttached ? t("reborn.successPlatform", { platform: "Instagram" }) : t("reborn.successTextOnly", { platform: "Instagram" });
     } else {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "content.js"] }).catch(() => {});
       try {
@@ -844,12 +874,19 @@ async function getActiveTab() {
 async function activatePlatformTab(platform) {
   const patterns = platform === "threads"
     ? ["*://*.threads.com/*", "*://*.threads.net/*"]
+    : platform === "instagram"
+    ? ["*://*.instagram.com/*"]
     : ["*://*.facebook.com/*"];
   let tabs = await chrome.tabs.query({ currentWindow: true, url: patterns });
   if (!tabs.length) tabs = await chrome.tabs.query({ url: patterns });
   const tab = tabs.sort((a, b) => Number(b.active) - Number(a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
   if (!tab?.id) {
-    const created = await chrome.tabs.create({ url: platform === "threads" ? "https://www.threads.com/" : "https://www.facebook.com/", active: true });
+    const targetUrl = platform === "threads"
+      ? "https://www.threads.com/"
+      : platform === "instagram"
+      ? "https://www.instagram.com/"
+      : "https://www.facebook.com/";
+    const created = await chrome.tabs.create({ url: targetUrl, active: true });
     preferredActiveTabId = created?.id ?? null;
   } else {
     preferredActiveTabId = tab.id;
@@ -1107,7 +1144,11 @@ function watchSelectedPost(payload, button, textEl, tab, identity) {
       const injected = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (platform, pageUrl, sourceUrl, selectedText, expectedHandle) => {
-          const adapter = platform === "threads" ? globalThis.ChamberThreadsPlatform : globalThis.ChamberFacebookPlatform;
+          const adapter = platform === "threads"
+            ? globalThis.ChamberThreadsPlatform
+            : platform === "instagram"
+            ? globalThis.ChamberInstagramPlatform
+            : globalThis.ChamberFacebookPlatform;
           return adapter?.refreshSelected?.(pageUrl, sourceUrl, selectedText, expectedHandle) || null;
         },
         args: [payload.platform || "facebook", tab.url, payload.sourceUrl || "", payload.textContent || "", identity?.actorHandle || ""]
@@ -1282,12 +1323,20 @@ async function selectPost() {
   postListEl.replaceChildren(Object.assign(document.createElement("div"), { className: "post-meta", textContent: t("picker.clickPostPlatform", { platform: platformName(platform) }) }));
   setStatus(t("picker.instructionsPlatform", { platform: platformName(platform) }));
   try {
-    const adapterFile = platform === "threads" ? "platform-threads.js" : "platform-facebook.js";
+    const adapterFile = platform === "threads"
+      ? "platform-threads.js"
+      : platform === "instagram"
+      ? "platform-instagram.js"
+      : "platform-facebook.js";
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [adapterFile] });
     const injected = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: (platformName, pageUrl, expectedHandle) => {
-        const adapter = platformName === "threads" ? globalThis.ChamberThreadsPlatform : globalThis.ChamberFacebookPlatform;
+        const adapter = platformName === "threads"
+          ? globalThis.ChamberThreadsPlatform
+          : platformName === "instagram"
+          ? globalThis.ChamberInstagramPlatform
+          : globalThis.ChamberFacebookPlatform;
         return adapter?.startPicker?.(pageUrl, expectedHandle) || null;
       },
       args: [platform, tab.url, identity.actorHandle || ""]

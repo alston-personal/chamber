@@ -38,10 +38,22 @@
     }
   }
 
+  function isValidInstagramPostUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      const host = url.hostname.toLowerCase();
+      if (!["instagram.com", "www.instagram.com"].includes(host)) return false;
+      return /^\/(?:p|reel)\/[A-Za-z0-9_-]+\/?$/i.test(url.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function isValidPostUrl(value, platform = "facebook") {
-    return String(platform || "facebook").toLowerCase() === "threads"
-      ? isValidThreadsPostUrl(value)
-      : isValidFacebookPostUrl(value);
+    const p = String(platform || "facebook").toLowerCase();
+    if (p === "threads") return isValidThreadsPostUrl(value);
+    if (p === "instagram") return isValidInstagramPostUrl(value);
+    return isValidFacebookPostUrl(value);
   }
 
   function validateBackupPayload(payload) {
@@ -50,7 +62,8 @@
     }
     const platform = String(payload.platform || "facebook").toLowerCase();
     if (!isValidPostUrl(payload.sourceUrl, platform)) {
-      return { ok: false, code: "SOURCE_URL_REQUIRED", message: `${platform === "threads" ? "Threads" : "Facebook"} 尚未提供這篇文章的永久連結，已停止備份，避免文章張冠李戴。` };
+      const pName = platform === "threads" ? "Threads" : platform === "instagram" ? "Instagram" : "Facebook";
+      return { ok: false, code: "SOURCE_URL_REQUIRED", message: `${pName} 尚未提供這篇文章的永久連結，已停止備份，避免文章張冠李戴。` };
     }
     if (payload.contentExpanded === false) {
       return { ok: false, code: "CONTENT_NOT_EXPANDED", message: "文章文字尚未完整展開，請展開後再備份。" };
@@ -67,5 +80,5 @@
     return { ok: true, code: "READY", message: "可以備份" };
   }
 
-  return { isValidFacebookPostUrl, isValidThreadsPostUrl, isValidPostUrl, validateBackupPayload };
+  return { isValidFacebookPostUrl, isValidThreadsPostUrl, isValidInstagramPostUrl, isValidPostUrl, validateBackupPayload };
 });
