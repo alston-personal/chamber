@@ -808,36 +808,79 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "DECRYPT_OWNER_DATA") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      const userId = meta.lastFbUserId || "default";
-      Promise.all([getExtensionConfig(userId), getOrCreateSharingIdentity(userId)]).then(async ([config, sharing]) => {
-        let bytes;
-        if (request.ownerKeyEnvelope || request.recipientKeyEnvelope) {
-          const postKeyBytes = request.recipientKeyEnvelope
-            ? await unwrapRecipientEnvelope(request.recipientKeyEnvelope, sharing)
-            : await unwrapOwnerEnvelope(request.ownerKeyEnvelope, config.walletPrivateKey);
-          const postKey = await importPostKey(postKeyBytes);
-          bytes = new Uint8Array(await crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: base64ToBytes(request.iv) },
-            postKey,
-            base64ToBytes(request.ciphertext)
-          ));
-        } else {
-          bytes = await decryptBytes(request.ciphertext, request.iv, config.walletPrivateKey);
+    chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId", "lastFbUserId"], async (meta) => {
+      const candidateUserIds = new Set();
+      const profiles = Array.isArray(meta.chamberProfiles) ? meta.chamberProfiles : [];
+      const activeProf = profiles.find((p) => p.id === meta.activeChamberProfileId) || profiles[0];
+      if (activeProf?.ownerUserId) candidateUserIds.add(activeProf.ownerUserId);
+      if (activeProf?.id) candidateUserIds.add(activeProf.id);
+      profiles.forEach((p) => {
+        if (p.ownerUserId) candidateUserIds.add(p.ownerUserId);
+        if (p.id) candidateUserIds.add(p.id);
+      });
+      if (meta.lastFbUserId) candidateUserIds.add(meta.lastFbUserId);
+      candidateUserIds.add("default");
+
+      let lastError = null;
+      for (const userId of candidateUserIds) {
+        try {
+          const [config, sharing] = await Promise.all([getExtensionConfig(userId), getOrCreateSharingIdentity(userId)]);
+          let bytes;
+          if (request.ownerKeyEnvelope || request.recipientKeyEnvelope) {
+            const postKeyBytes = request.recipientKeyEnvelope
+              ? await unwrapRecipientEnvelope(request.recipientKeyEnvelope, sharing)
+              : await unwrapOwnerEnvelope(request.ownerKeyEnvelope, config.walletPrivateKey);
+            const postKey = await importPostKey(postKeyBytes);
+            bytes = new Uint8Array(await crypto.subtle.decrypt(
+              { name: "AES-GCM", iv: base64ToBytes(request.iv) },
+              postKey,
+              base64ToBytes(request.ciphertext)
+            ));
+          } else {
+            bytes = await decryptBytes(request.ciphertext, request.iv, config.walletPrivateKey);
+          }
+          sendResponse({
+            success: true,
+            plaintext: request.mode === "bytes" ? "" : new TextDecoder().decode(bytes),
+            data: request.mode === "bytes" ? bytesToBase64(bytes) : ""
+          });
+          return;
+        } catch (err) {
+          lastError = err;
         }
-        sendResponse({ success: true, plaintext: request.mode === "bytes" ? "" : new TextDecoder().decode(bytes), data: request.mode === "bytes" ? bytesToBase64(bytes) : "" });
-      }).catch((error) => sendResponse({ success: false, error: error.message || "Owner decryption failed" }));
+      }
+      sendResponse({ success: false, error: lastError?.message || "Owner decryption failed" });
     });
     return true;
   }
 
   if (request.action === "CREATE_RECIPIENT_GRANT") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      getExtensionConfig(meta.lastFbUserId || "default").then(async (config) => {
-        const postKeyBytes = await unwrapOwnerEnvelope(request.ownerKeyEnvelope, config.walletPrivateKey);
-        const envelope = await createRecipientEnvelope(postKeyBytes, request.recipientPublicKey, request.recipientKeyId);
-        sendResponse({ success: true, recipientKeyEnvelope: envelope });
-      }).catch((error) => sendResponse({ success: false, error: error.message || "Grant creation failed" }));
+    chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId", "lastFbUserId"], async (meta) => {
+      const candidateUserIds = new Set();
+      const profiles = Array.isArray(meta.chamberProfiles) ? meta.chamberProfiles : [];
+      const activeProf = profiles.find((p) => p.id === meta.activeChamberProfileId) || profiles[0];
+      if (activeProf?.ownerUserId) candidateUserIds.add(activeProf.ownerUserId);
+      if (activeProf?.id) candidateUserIds.add(activeProf.id);
+      profiles.forEach((p) => {
+        if (p.ownerUserId) candidateUserIds.add(p.ownerUserId);
+        if (p.id) candidateUserIds.add(p.id);
+      });
+      if (meta.lastFbUserId) candidateUserIds.add(meta.lastFbUserId);
+      candidateUserIds.add("default");
+
+      let lastError = null;
+      for (const userId of candidateUserIds) {
+        try {
+          const config = await getExtensionConfig(userId);
+          const postKeyBytes = await unwrapOwnerEnvelope(request.ownerKeyEnvelope, config.walletPrivateKey);
+          const envelope = await createRecipientEnvelope(postKeyBytes, request.recipientPublicKey, request.recipientKeyId);
+          sendResponse({ success: true, recipientKeyEnvelope: envelope });
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      sendResponse({ success: false, error: lastError?.message || "Grant creation failed" });
     });
     return true;
   }

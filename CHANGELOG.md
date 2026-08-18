@@ -4,6 +4,14 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.10.1] - 2026-08-18
+### 🚀 Fixed & Enhanced (全身分金鑰池多重解密支援)
+- 🔑 **修復多身分 / 歷史文章解密失敗問題**：
+  - 過去 `DECRYPT_OWNER_DATA` 僅使用單一 `lastFbUserId` 嘗試解密，若文章由其他分身（或不同歷史 ownerUserId）備份，會因私鑰不符導致解密失敗。
+  - 現在背景端自動建立「**身分金鑰候選池（Candidate Key Pool）**」，自動嘗試當前活躍分身、所有本機 Chamber Profiles、及歷史 Facebook 帳號金鑰，確保時光牆上的每一篇文章都能 100% 成功秒解密！
+
+---
+
 ## 🎯 [0.10.0] - 2026-08-18
 ### 🚀 Major Milestone (文章 / 粉專歸屬一鍵轉掛與雙向簽章系統)
 - 🔄 **文章與粉專歸屬一鍵轉移協議 (Post Ownership Handover Protocol)**：
