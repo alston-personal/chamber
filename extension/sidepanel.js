@@ -214,9 +214,12 @@ function profileId() {
 }
 
 async function getActiveProfile(rawIdentity = null) {
-  const raw = rawIdentity || await rawPlatformIdentity();
+  let raw = rawIdentity;
+  if (!raw) {
+    try { raw = await rawPlatformIdentity(); } catch (_) { raw = null; }
+  }
   const legacy = await chrome.storage.local.get(["lastFbUserId"]);
-  const initialOwnerId = raw.platform === "facebook" ? raw.actorId : (legacy.lastFbUserId || `threads:${raw.actorId}`);
+  const initialOwnerId = raw?.platform === "facebook" ? raw.actorId : (legacy.lastFbUserId || (raw ? `${raw.platform}:${raw.actorId}` : "default"));
   const prefix = `user_${initialOwnerId}_`;
   const data = await chrome.storage.local.get([
     "chamberProfiles", "activeChamberProfileId", prefix + "identityAlias",
@@ -241,7 +244,7 @@ async function getActiveProfile(rawIdentity = null) {
     activeProfile.ownerUserId = initialOwnerId;
     await chrome.storage.local.set({ chamberProfiles: profiles });
   }
-  if (activeProfile && !activeProfile.alias && raw.actorId) {
+  if (activeProfile && !activeProfile.alias && raw?.actorId) {
     try {
       const response = await fetch(`https://studio.milkcat.org/chamber-api/identity/by-actor?platform=${encodeURIComponent(raw.platform)}&actorId=${encodeURIComponent(raw.actorId)}`);
       const identity = response.ok ? await response.json() : null;
@@ -272,12 +275,25 @@ async function renderProfiles() {
   profileSelect.value = activeId;
   const active = profiles.find((profile) => profile.id === activeId);
   const mapped = Boolean(active?.alias);
-  const currentPlatform = platformName(platformForTab(await getActiveTab()) || "facebook");
+  const tab = await getActiveTab();
+  const platform = platformForTab(tab);
+  const selectedPlatform = platformSelect?.value || platform || "facebook";
+  const selectedName = platformName(selectedPlatform);
+
   selectButton.disabled = !mapped;
   rebornButton.disabled = !mapped;
-  selectButton.title = mapped ? t("account.selectTitlePlatform", { platform: currentPlatform }) : t("account.mappingRequiredTitle");
+
+  if (platform) {
+    selectButton.textContent = t("backup.selectPlatform", { platform: selectedName });
+  } else {
+    selectButton.textContent = `🚀 前往 ${selectedName} 並選取文章`;
+  }
+
+  selectButton.title = mapped ? (platform ? t("account.selectTitlePlatform", { platform: selectedName }) : `前往 ${selectedName} 並選取文章`) : t("account.mappingRequiredTitle");
   if (!mapped) {
     setStatus(t("account.mappingRequired"), true);
+  } else {
+    setStatus("");
   }
 }
 
@@ -954,19 +970,26 @@ async function loadPageInfo() {
   const tab = await getActiveTab();
   pageUrlEl.textContent = tab?.url || t("page.unavailable");
   const platform = platformForTab(tab);
-  const name = platformName(platform || "facebook");
   if (platform && platformSelect) platformSelect.value = platform;
+  const selectedPlatform = platform || platformSelect?.value || "facebook";
+  const selectedName = platformName(selectedPlatform);
   const currentLabel = document.getElementById("currentPlatformLabel");
   const promptLabel = document.getElementById("selectPromptLabel");
-  if (currentLabel) currentLabel.textContent = t("backup.currentPlatformNamed", { platform: name });
-  if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: name });
-  if (platform) selectButton.textContent = t("backup.selectPlatform", { platform: name });
-  selectButton.disabled = true;
-  rebornButton.disabled = true;
+
+  if (platform) {
+    if (currentLabel) currentLabel.textContent = t("backup.currentPlatformNamed", { platform: selectedName });
+    if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: selectedName });
+    selectButton.textContent = t("backup.selectPlatform", { platform: selectedName });
+  } else {
+    if (currentLabel) currentLabel.textContent = t("backup.currentNonSocialTab");
+    if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: selectedName });
+    selectButton.textContent = `🚀 前往 ${selectedName} 並選取文章`;
+  }
+
   try {
     await renderProfiles();
   } catch (error) {
-    setStatus(error.message || t("error.loginPlatform", { platform: name }), true);
+    // Keep UI clean on non-social tabs
   }
 }
 
@@ -1591,8 +1614,20 @@ async function initializePanel() {
     }
   });
   chrome.windows?.onFocusChanged?.addListener(schedulePanelContextRefresh);
-  platformSelect?.addEventListener("change", () => {
-    activatePlatformTab(platformSelect.value).catch((error) => setStatus(error.message, true));
+  platformSelect?.addEventListener("change", async () => {
+    const selectedPlatform = platformSelect.value;
+    const selectedName = platformName(selectedPlatform);
+    const promptLabel = document.getElementById("selectPromptLabel");
+    if (promptLabel) promptLabel.textContent = t("backup.selectPromptNamed", { platform: selectedName });
+    const tab = await getActiveTab();
+    const currentPlatform = platformForTab(tab);
+    if (currentPlatform === selectedPlatform) {
+      selectButton.textContent = t("backup.selectPlatform", { platform: selectedName });
+    } else {
+      selectButton.textContent = `🚀 前往 ${selectedName} 並選取文章`;
+    }
+    setStatus("");
+    activatePlatformTab(selectedPlatform).catch((error) => setStatus(error.message, true));
   });
   await loadPageInfo();
   const tab = await getActiveTab();

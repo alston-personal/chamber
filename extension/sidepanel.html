@@ -203,8 +203,8 @@
   </div>
   <div class="card">
     <div class="label" data-i18n="backup.currentAccount">目前 Chamber 帳號</div>
-    <select id="profileSelect" disabled style="width:100%;margin-top:6px;padding:9px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;"></select>
-    <div class="post-meta" style="margin-top:7px;white-space:normal;" data-i18n="backup.accountLimitMulti">目前版本固定使用一個 Chamber 帳號，可綁定 Facebook 或 Threads 帳號。</div>
+    <select id="profileSelect" disabled style="width:100%;margin-top:6px;padding:9px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-page);color:var(--text-primary);"></select>
+    <div class="post-meta" style="margin-top:7px;white-space:normal;" data-i18n="backup.accountLimitMulti">目前版本固定使用一個 Chamber 帳號，可綁定 Facebook、Threads、Instagram 或 X 帳號。</div>
   </div>
   <div id="selectPromptLabel" class="label" style="margin: 16px 0 8px;" data-i18n="backup.selectPromptPlatform">先在目前平台明確選取一篇文章</div>
   <div id="postList"><div class="post-meta" data-i18n="backup.notSelected">尚未選取文章</div></div>
@@ -218,29 +218,29 @@
   <div id="settingsView" hidden>
     <div class="card">
       <div class="label" data-i18n="settings.title">Chamber 帳號設定</div>
-      <div class="post-meta" style="white-space:normal;" data-i18n="settings.accountLimitMulti">同一個 Chamber 帳號可綁定 Facebook 與 Threads；加密與復原身分保持一致。</div>
+      <div class="post-meta" style="white-space:normal;" data-i18n="settings.accountLimitMulti">同一個 Chamber 帳號可綁定 Facebook、Threads、Instagram 與 X (Twitter)；加密與復原身分保持一致。</div>
       <label class="label" for="settingsAlias" data-i18n="settings.alias">身份暱稱 / mapping</label>
       <div class="field-action-row">
-        <input id="settingsAlias" type="text" placeholder="例如：sunlake" data-i18n-placeholder="settings.aliasPlaceholder" style="min-width:0;width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
+        <input id="settingsAlias" type="text" placeholder="例如：sunlake" data-i18n-placeholder="settings.aliasPlaceholder" style="min-width:0;width:100%;padding:10px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-page);color:var(--text-primary);">
         <button id="settingsCheck" class="secondary-action compact-action" type="button" data-i18n="settings.check">檢查</button>
       </div>
       <div id="settingsAliasStatus" class="post-meta" style="white-space:normal;" data-i18n="settings.aliasPurpose">用於 Echo 時光軸網址。</div>
       <label class="label" for="settingsWallet" data-i18n="settings.wallet">自訂 Web3 錢包（選填）</label>
-      <input id="settingsWallet" type="text" placeholder="留空使用託管錢包" data-i18n-placeholder="settings.walletPlaceholder" style="width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
+      <input id="settingsWallet" type="text" placeholder="留空使用託管錢包" data-i18n-placeholder="settings.walletPlaceholder" style="width:100%;padding:10px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-page);color:var(--text-primary);">
       <div class="danger-note" data-i18n="settings.recoveryExplanation">復原採 2-of-3：A 留在目前 Chrome 的 Chamber Extension；B 加密保存於 Chamber Recovery Vault 並由 Passkey 保護；C 是您離線保存的緊急復原碼。Echo 只提供操作介面，不保存完整金鑰。</div>
       <button id="recoveryExport" class="secondary-action" type="button" data-i18n="settings.openRecovery">🛡️ 開啟金鑰復原設定 →</button>
-      <button id="pairMobile" type="button" style="margin-top:10px;width:100%;padding:10px 14px;border-radius:8px;background:linear-gradient(135deg, #4f46e5, #6366f1);color:#ffffff;font-weight:600;font-size:13px;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.4);">📱 綁定新手機 (產生配對 QR Code)</button>
-      <div id="pairingContainer" style="display:none;margin-top:12px;padding:12px;border:1px solid #6366f1;border-radius:12px;background:#0f172a;text-align:center;">
-        <div style="font-size:12px;font-weight:bold;color:#a5b4fc;">📱 請用手機相機照此 QR Code</div>
+      <button id="pairMobile" class="secondary-action" type="button" style="margin-top:10px;width:100%;font-weight:600;">📱 綁定新手機 (產生配對 QR Code)</button>
+      <div id="pairingContainer" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--accent-primary);border-radius:12px;background:var(--bg-card-secondary);text-align:center;">
+        <div style="font-size:12px;font-weight:bold;color:var(--accent-text);">📱 請用手機相機照此 QR Code</div>
         <div id="pairingQrTarget" style="margin:10px auto;display:flex;justify-content:center;"></div>
-        <div id="pairingTimer" style="font-size:11px;color:#f59e0b;margin-top:4px;">⏱️ 配對連結時效剩餘 05:00</div>
+        <div id="pairingTimer" style="font-size:11px;color:var(--accent-text);margin-top:4px;">⏱️ 配對連結時效剩餘 05:00</div>
         <button id="pairingClose" class="secondary-action compact-action" type="button" style="margin-top:8px;">關閉配對視窗</button>
       </div>
       <div id="recoveryStatus" class="post-meta" style="white-space:normal;" data-i18n="settings.recoveryUnknown">尚未確認是否已建立 Recovery Vault 與緊急復原碼 C。</div>
-      <div style="margin-top:14px;border-top:1px solid #334155;padding-top:12px;">
-        <div class="label" style="font-size:12px;color:#a5b4fc;">📱 已綁定行動裝置</div>
+      <div style="margin-top:14px;border-top:1px solid var(--border-card);padding-top:12px;">
+        <div class="label" style="font-size:12px;color:var(--accent-text);">📱 已綁定行動裝置</div>
         <div id="pairedDevicesList" style="margin-top:6px;">
-          <div class="post-meta" style="font-size:11px;color:#64748b;">尚未綁定任何行動裝置。</div>
+          <div class="post-meta" style="font-size:11px;color:var(--text-secondary);">尚未綁定任何行動裝置。</div>
         </div>
       </div>
       <button id="settingsSave" type="button" data-i18n="settings.save">儲存並套用</button>
