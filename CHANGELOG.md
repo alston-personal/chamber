@@ -4,6 +4,15 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🐛 [0.9.1] - 2026-08-18
+### 🔧 Fixed (Instagram 互動選取器與轉世聲明發文框自動化修復)
+- 🎯 **Instagram 互動選取器完整實作 (`platform-instagram.js`)**：
+  - 補齊 `startPicker`、`highlight` 高亮外框與 `expandAndExtract` 多圖遍歷，解決在 Instagram 點擊「選取文章」無法框選與擷取貼文的問題。
+- 🪪 **Instagram 轉世聲明發文框自動化**：
+  - 修正側邊欄 `rebornGenerate` 漏判 Instagram 平台分支的問題，整合 `ChamberInstagramPlatform.openComposerAndFill`，自動開啟 IG「新增貼文」並載入身分卡圖片。
+
+---
+
 ## 📷 [0.9.0] - 2026-08-18
 ### 🚀 Added (全生態 Instagram 支援 & 貓頭張嘴動態形態引擎)
 - 📸 **全功能 Instagram (IG) 備份引擎 (`platform-instagram.js`)**：
