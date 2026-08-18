@@ -100,6 +100,53 @@
     .compact-action { width: auto; min-width: 88px; margin-top: 0; padding: 9px 12px; }
     .navigation-action { border-color: var(--border-card); background: transparent; color: var(--text-primary); box-shadow: none; }
     .navigation-action:not(:disabled):hover { border-color: var(--accent-text); background: var(--accent-glow); }
+    .backup-done-btn {
+      background: var(--accent-glow) !important;
+      border: 1px solid var(--accent-primary) !important;
+      color: var(--accent-text) !important;
+      box-shadow: none !important;
+    }
+    .chamber-backup-success-box {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 10px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-primary);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chamber-backup-success-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--accent-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chamber-backup-echo-btn {
+      flex: 1;
+      background: var(--accent-primary) !important;
+      color: #ffffff !important;
+      font-size: 11px !important;
+      padding: 8px !important;
+      font-weight: bold !important;
+      border: none !important;
+      border-radius: 6px !important;
+      cursor: pointer;
+      box-shadow: 0 2px 8px var(--accent-glow) !important;
+    }
+    .chamber-backup-arweave-btn {
+      background: var(--bg-card-secondary) !important;
+      border: 1px solid var(--border-card-hover) !important;
+      color: var(--accent-text) !important;
+      font-size: 10px !important;
+      padding: 6px 10px !important;
+      border-radius: 6px !important;
+      cursor: pointer;
+      width: auto !important;
+      box-shadow: none !important;
+    }
     .danger-note { margin: 12px 0 8px; padding: 10px; border: 1px solid #92400e; border-radius: 9px; background: #451a03; color: #fed7aa; font-size: 11px; line-height: 1.5; }
     .video-limit-note { margin: 8px 0; padding: 9px 10px; border: 1px solid #92400e; border-radius: 8px; background: #451a03; color: #fde68a; font-size: 11px; line-height: 1.45; }
     textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid var(--border-card); border-radius: 9px; background: var(--bg-page); color: var(--text-primary); font: inherit; font-size: 12px; line-height: 1.55; }

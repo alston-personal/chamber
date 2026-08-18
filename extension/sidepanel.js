@@ -1048,8 +1048,8 @@ async function backupPost(payload, button) {
       mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0
     });
     button.textContent = "✅ " + t("backup.done");
-    button.style.background = "#059669";
-    button.style.borderColor = "#10b981";
+    button.className = "backup-done-btn";
+    button.removeAttribute("style");
 
     // Update local backed posts index with new fingerprint
     try {
@@ -1083,10 +1083,9 @@ async function backupPost(payload, button) {
       card.querySelector(".chamber-backup-success-box")?.remove();
       const successBox = document.createElement("div");
       successBox.className = "chamber-backup-success-box";
-      successBox.style.cssText = "margin-top:10px;padding:12px;border-radius:10px;background:rgba(16,185,129,0.18);border:1px solid #10b981;display:flex;flex-direction:column;gap:8px;";
 
       const titleRow = document.createElement("div");
-      titleRow.style.cssText = "font-size:12px;font-weight:bold;color:#6ee7b7;display:flex;align-items:center;gap:6px;";
+      titleRow.className = "chamber-backup-success-title";
       titleRow.innerHTML = "<span>🎉</span><span>文章已成功備份上鏈！</span>";
 
       const btnRow = document.createElement("div");
@@ -1094,13 +1093,13 @@ async function backupPost(payload, button) {
 
       const echoBtn = document.createElement("button");
       echoBtn.type = "button";
-      echoBtn.style.cssText = "flex:1;background:#059669;color:white;font-size:11px;padding:8px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;";
+      echoBtn.className = "chamber-backup-echo-btn";
       echoBtn.textContent = "🌐 前往我的 Echo 時光牆查看";
       echoBtn.onclick = () => chrome.tabs.create({ url: timelineEchoUrl });
 
       const txBtn = document.createElement("button");
       txBtn.type = "button";
-      txBtn.style.cssText = "background:#1e293b;border:1px solid #475569;color:#93c5fd;font-size:10px;padding:6px 10px;border-radius:6px;cursor:pointer;";
+      txBtn.className = "chamber-backup-arweave-btn";
       txBtn.textContent = "🔗 Arweave 存證";
       txBtn.onclick = () => chrome.tabs.create({ url: result.arweaveUrl });
 
@@ -1476,9 +1475,8 @@ async function selectPost() {
               card.appendChild(editNotice);
             } else {
               button.textContent = "✅ " + t("backup.done") + " (最新版)";
-              button.style.background = "rgba(16, 185, 129, 0.2)";
-              button.style.borderColor = "#10b981";
-              button.style.color = "#10b981";
+              button.className = "backup-done-btn";
+              button.removeAttribute("style");
             }
           }
         });
