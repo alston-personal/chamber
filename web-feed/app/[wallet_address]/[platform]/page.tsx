@@ -2218,7 +2218,7 @@ export default function PlatformFeed({
         </div>
 
         {/* Dynamic Platform Filters sub-navigation bar */}
-        <nav className="mb-6 flex gap-1.5 overflow-x-auto pb-2 border-b border-slate-900 scrollbar-none">
+        <nav className="mb-6 flex gap-1.5 overflow-x-auto pb-2 border-b scrollbar-none" style={{ borderColor: "var(--border-card)" }}>
           {platforms.map((p) => {
             const isActive = currentPlatform === p.id;
             return (
@@ -2229,11 +2229,16 @@ export default function PlatformFeed({
                   ...(showHistory ? { history: "true" } : {}),
                   ...(network === "mainnet" ? { network: "mainnet" } : {})
                 }).toString()}`}
-                className={`text-xs px-3.5 py-1.5 rounded-full font-semibold whitespace-nowrap transition-all ${
-                  isActive
-                    ? "bg-indigo-600 text-indigo-50 border border-indigo-500 shadow-md shadow-indigo-600/25"
-                    : "bg-slate-900 hover:bg-slate-800 text-slate-400 border border-transparent"
-                }`}
+                className="text-xs px-3.5 py-1.5 rounded-full font-semibold whitespace-nowrap transition-all border shadow-sm"
+                style={isActive ? {
+                  backgroundColor: "var(--accent-primary)",
+                  borderColor: "var(--accent-primary)",
+                  color: "#ffffff"
+                } : {
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-card)",
+                  color: "var(--text-secondary)"
+                }}
               >
                 {p.name}
               </Link>
@@ -2244,13 +2249,14 @@ export default function PlatformFeed({
         {/* Author / Page Smart Filter Bar */}
         {authorStats.length > 1 && (
           <div
-            className="mb-6 -mt-2 p-2.5 rounded-2xl border transition-all"
+            className="mb-6 -mt-2 p-3 rounded-2xl border transition-all shadow-sm"
             style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
           >
-            <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center justify-between mb-2.5 px-1">
               <div className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
                 <span>🏢</span>
                 <span>{locale === "zh-TW" ? "作者 / 粉絲專頁分流" : "Author / Page Filter"}</span>
+                <span className="text-[10px] opacity-70">({authorStats.length})</span>
               </div>
               {activeAuthor && (
                 <Link
@@ -2259,25 +2265,22 @@ export default function PlatformFeed({
                     q.delete("author");
                     return q.toString();
                   })()}`}
-                  className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                  className="text-[10px] font-medium hover:underline transition-colors"
+                  style={{ color: "var(--accent-primary)" }}
                 >
                   {ft("clearFilter")}
                 </Link>
               )}
             </div>
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
               <Link
                 href={`${localizedTimelinePath()}?${(() => {
                   const q = new URLSearchParams(searchParams.toString());
                   q.delete("author");
                   return q.toString();
                 })()}`}
-                className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
-                  !activeAuthor
-                    ? "font-bold shadow-sm"
-                    : "text-slate-400 border-transparent hover:bg-white/5"
-                }`}
-                style={!activeAuthor ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                className="text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border"
+                style={!activeAuthor ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-secondary)", borderColor: "var(--border-card)" }}
               >
                 <span>✨</span>
                 <span>{locale === "zh-TW" ? "全部作者" : "All Authors"}</span>
@@ -2293,18 +2296,14 @@ export default function PlatformFeed({
                 const isSelected = activeAuthor.toLowerCase() === item.name.toLowerCase();
                 const isPage = item.name.includes("粉專") || item.name.includes("科技") || item.name.includes("社") || item.name.includes("官方") || item.name.length > 5;
                 return (
-                  <div key={item.name} className="flex items-center gap-1 shrink-0">
+                  <div key={item.name} className="flex items-center gap-1">
                     <Link
                       href={`${localizedTimelinePath()}?${(() => {
                         const q = new URLSearchParams(searchParams.toString());
                         q.set("author", item.name);
                         return q.toString();
                       })()}`}
-                      className={`text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border ${
-                        isSelected
-                          ? "font-bold shadow-md"
-                          : "hover:bg-white/5"
-                      }`}
+                      className="text-xs px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all flex items-center gap-1.5 border"
                       style={isSelected ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
                     >
                       <span>{isPage ? "🏢" : "👤"}</span>
@@ -2329,7 +2328,12 @@ export default function PlatformFeed({
                           setTransferTargetAlias(otherProfiles[0]?.alias || "");
                           setTransferStatus("");
                         }}
-                        className="text-[11px] px-2 py-1.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-indigo-950/80 hover:border-indigo-500 text-slate-400 hover:text-indigo-200 transition-all shrink-0 shadow-sm cursor-pointer"
+                        className="text-[11px] px-2 py-1.5 rounded-xl border transition-all shrink-0 shadow-sm cursor-pointer hover:opacity-80"
+                        style={{
+                          backgroundColor: "var(--bg-page)",
+                          borderColor: "var(--border-card)",
+                          color: "var(--text-secondary)"
+                        }}
                       >
                         🔄
                       </button>
