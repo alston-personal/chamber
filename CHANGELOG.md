@@ -4,6 +4,15 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.9.9] - 2026-08-18
+### 🚀 Fixed & Enhanced (分身備份上鏈身分衝突徹底修復)
+- 🔒 **修復分身備份拋出「已綁定」錯誤**：
+  - 修復 `POST /backup` 端點在執行上鏈註冊時未帶入 `rebind: true` 導致被 `IDENTITY_ALREADY_BOUND` 阻擋的問題。
+  - 修復 Extension 初始化時 `by-actor` 自動查詢誤將主帳號 `sunlake` 別名覆蓋至空白新分身的問題。
+  - 現在分身（如 `milkcat`）選取並備份粉專貼文時，可 100% 順暢直接上鏈，完全隔離於主帳號。
+
+---
+
 ## 🎯 [0.9.8] - 2026-08-18
 ### 🚀 Fixed & Enhanced (Echo 跨分身身分感知與右上角當前 Profile 連動)
 - 🌐 **Echo Portal 身分感知精準連動**：

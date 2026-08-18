@@ -267,7 +267,7 @@ async function getActiveProfile(rawIdentity = null) {
     activeProfile.ownerUserId = initialOwnerId;
     await chrome.storage.local.set({ chamberProfiles: profiles });
   }
-  if (activeProfile && !activeProfile.alias && raw?.actorId) {
+  if (activeProfile && !activeProfile.alias && raw?.actorId && profiles.indexOf(activeProfile) === 0) {
     try {
       const response = await fetch(`https://studio.milkcat.org/chamber-api/identity/by-actor?platform=${encodeURIComponent(raw.platform)}&actorId=${encodeURIComponent(raw.actorId)}`);
       const identity = response.ok ? await response.json() : null;

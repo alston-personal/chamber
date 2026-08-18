@@ -1,10 +1,10 @@
 {
   "channel": "closed-alpha",
-  "version": "0.9.8",
-  "filename": "chamber-extension-v0.9.8.zip",
-  "downloadPath": "/echo/releases/chamber-extension-v0.9.8.zip",
-  "sha256": "6cc3cd8d6bdf26f87526a9297e127420953a5b0165a414c56ecd7c4f0bf6b1c9",
+  "version": "0.9.9",
+  "filename": "chamber-extension-v0.9.9.zip",
+  "downloadPath": "/echo/releases/chamber-extension-v0.9.9.zip",
+  "sha256": "eced5004c52e8ff01124ab706c87a1419e81d592640681259827753cb06e1dd1",
   "fileCount": 22,
-  "publishedAt": "2026-08-18T08:37:42.038042+00:00",
+  "publishedAt": "2026-08-18T08:46:27.001361+00:00",
   "network": "Irys Devnet"
 }

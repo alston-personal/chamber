@@ -550,19 +550,24 @@ router.post("/backup", async (req, res) => {
     }
 
     if (normalizedAlias && boundWallet) {
-      const registeredIdentity = await registerIdentity({
-        alias: normalizedAlias,
-        platform: normalizedPlatform,
-        actorType: normalizedActorType,
-        actorId: identityActorId || fbUserId || "default",
-        displayName: identityDisplayName || normalizedAlias,
-        walletAddress: boundWallet,
-        fbUserIdHash,
-        proof: req.body.identityProof || "",
-      });
-      // Keep backup tags aligned with the key returned by identity resolve.
-      // Otherwise the upload succeeds but Echo queries a different key.
-      identityContentKey = registeredIdentity.content_key || identityContentKey;
+      try {
+        const registeredIdentity = await registerIdentity({
+          alias: normalizedAlias,
+          platform: normalizedPlatform,
+          actorType: normalizedActorType,
+          actorId: identityActorId || fbUserId || "default",
+          displayName: identityDisplayName || normalizedAlias,
+          walletAddress: boundWallet,
+          fbUserIdHash,
+          proof: req.body.identityProof || "",
+          rebind: true,
+        });
+        // Keep backup tags aligned with the key returned by identity resolve.
+        // Otherwise the upload succeeds but Echo queries a different key.
+        identityContentKey = registeredIdentity.content_key || identityContentKey;
+      } catch (err) {
+        console.warn(`[Chamber] Identity registration warning during backup: ${err.message}`);
+      }
     }
 
     // Build Arweave payload
