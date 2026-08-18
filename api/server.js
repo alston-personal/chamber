@@ -37,6 +37,11 @@ const {
   verifyOwnerCapability,
 } = require("./access-store");
 const {
+  getQuota,
+  checkAndConsumeQuota,
+  DEFAULT_FREE_QUOTA,
+} = require("./quota");
+const {
   beginRegistration,
   finishRegistration,
   cancelRegistration,
@@ -527,6 +532,18 @@ router.get("/recovery/pair/status", (req, res) => {
   return res.json({ success: true, status });
 });
 
+// ── GET /quota — Query remaining monthly quota ──
+router.get("/quota", async (req, res) => {
+  try {
+    const rawKey = req.query.actorId || req.query.fbUserIdHash || req.query.clientId || req.query.alias || "default";
+    const entityKey = req.query.fbUserId ? hashFbUserId(req.query.fbUserId) : rawKey;
+    const quota = await getQuota(entityKey);
+    return res.json({ success: true, ...quota });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to fetch quota" });
+  }
+});
+
 // ── POST /backup — main upload endpoint ──
 router.post("/backup", async (req, res) => {
   const requestId = crypto.randomUUID();
@@ -561,6 +578,23 @@ router.post("/backup", async (req, res) => {
 
     // Hash FB user ID for on-chain storage (privacy protection)
     const fbUserIdHash = fbUserId ? hashFbUserId(fbUserId) : "anonymous";
+
+    // ── Enforce Shared Monthly Free Quota ──
+    const quotaEntityKey = fbUserIdHash !== "anonymous"
+      ? fbUserIdHash
+      : (identityActorId || fbUserId || req.body.clientId || identityAlias || "anonymous");
+
+    let quotaResult;
+    try {
+      quotaResult = await checkAndConsumeQuota(quotaEntityKey);
+    } catch (quotaErr) {
+      return res.status(403).json({
+        error: quotaErr.message || "Monthly quota exceeded",
+        code: "QUOTA_EXCEEDED",
+        details: quotaErr.details || {},
+      });
+    }
+
     const normalizedAlias = identityAlias ? normalizeAlias(identityAlias) : "";
     const normalizedPlatform = normalizePlatform(platform || "facebook");
     const normalizedActorType = normalizeActorType(identityActorType || "personal");
@@ -706,6 +740,7 @@ router.post("/backup", async (req, res) => {
       identityKey: identityContentKey,
       canonicalUrl,
       sizeBytes,
+      quota: quotaResult || null,
     };
     await fs.mkdir(path.dirname(BACKUP_RECEIPT_LOG_PATH), { recursive: true });
     await fs.appendFile(BACKUP_RECEIPT_LOG_PATH, JSON.stringify({

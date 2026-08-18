@@ -472,6 +472,41 @@ pairMobileBtn?.addEventListener("click", async () => {
   }
 });
 
+async function updateQuotaDisplay() {
+  const quotaCard = document.getElementById("quotaCard");
+  const quotaCountEl = document.getElementById("quotaCount");
+  const quotaProgressEl = document.getElementById("quotaProgressFill");
+  const quotaTierLabel = document.getElementById("quotaTierLabel");
+  if (!quotaCard) return;
+
+  try {
+    const raw = await getEffectiveSocialAccount(currentPlatform);
+    const userId = raw?.actorId || "default";
+    const res = await fetch(`https://studio.milkcat.org/chamber-api/quota?actorId=${encodeURIComponent(userId)}&fbUserId=${encodeURIComponent(raw?.actorId || "")}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        if (quotaCountEl) quotaCountEl.textContent = `${data.remaining} / ${data.limit} 篇`;
+        if (quotaTierLabel) quotaTierLabel.textContent = data.tier === "pro" ? "尊榮專業版 (Chamber Pro)" : "創世體驗版 (Free Genesis)";
+        if (quotaProgressEl) {
+          const pct = Math.max(0, Math.min(100, Math.round((data.remaining / data.limit) * 100)));
+          quotaProgressEl.style.width = `${pct}%`;
+          if (data.remaining <= 3) {
+            quotaProgressEl.style.background = "#f43f5e";
+          } else {
+            quotaProgressEl.style.background = "var(--accent-primary)";
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+
+const quotaProHint = document.getElementById("quotaProHint");
+quotaProHint?.addEventListener("click", () => {
+  alert("🚀 Chamber Pro (進階創作者版) 即將推出！\n\n將享有：\n• 無限量 Arweave 永久上鏈存證\n• 4K 原畫質無損相簿與高畫質影片備份\n• 解鎖全部 VIP 專屬時光牆 Skin 主題\n• 專屬自訂時光牆網址 (Custom Domain)");
+});
+
 const requestsBanner = document.getElementById("requestsBanner");
 const requestsBannerCount = document.getElementById("requestsBannerCount");
 const requestsBannerBtn = document.getElementById("requestsBannerBtn");
@@ -1122,6 +1157,9 @@ async function backupPost(payload, button) {
       }
     } catch (_) {}
 
+    // Refresh shared quota indicator in real-time
+    updateQuotaDisplay().catch(() => {});
+
     const focusedEchoUrl = (result.echoUrl || "").startsWith("http") ? result.echoUrl : `https://studio.milkcat.org${result.echoUrl || ""}`;
     const timelineEchoUrl = (() => {
       try {
@@ -1663,6 +1701,7 @@ async function initializePanel() {
     activatePlatformTab(selectedPlatform).catch((error) => setStatus(error.message, true));
   });
   await loadPageInfo();
+  updateQuotaDisplay().catch(() => {});
   const tab = await getActiveTab();
   panelContextKey = `${tab?.id || ""}:${tab?.url || ""}`;
 }
