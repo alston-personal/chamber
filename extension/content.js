@@ -6,8 +6,10 @@
  */
 
 const CHAMBER_DEV_ERROR_ENDPOINT = "https://studio.milkcat.org/chamber-api/dev-errors";
-ChamberI18n.init().catch(() => {});
-const t = (key, variables) => ChamberI18n.t(key, variables);
+if (globalThis.ChamberI18n?.init) {
+  globalThis.ChamberI18n.init().catch(() => {});
+}
+const t = (key, variables) => globalThis.ChamberI18n?.t?.(key, variables) || key;
 
 function reportChamberError(error, context = "content") {
   fetch(CHAMBER_DEV_ERROR_ENDPOINT, {
@@ -737,54 +739,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 function findComposerButton() {
-  const main = document.querySelector('div[role="main"]') || document;
-  const composerLabels = [
-    "在想些什麼",
-    "你在想些什麼",
-    "What are you thinking",
-    "What's on your mind",
-    "What’s on your mind",
-    "Share what's on your mind",
-    "分享你的想法",
-    "分享近況",
-    "Create a post",
-    "想分享什麼",
-    "建立貼文",
-    "寫些什麼",
-    "發佈貼文",
-    "開始發文",
-    "Write something"
-  ];
+  const composerRegex = /在想些什麼|你在想些什麼|What.*on your mind|Create a post|建立貼文|建立公開貼文|想分享什麼|寫些什麼|發佈貼文|開始發文|Share what's on your mind|分享你的想法|分享近況|Write something/i;
 
+  // 1. Check elements with aria-label or placeholder
+  const elementsWithLabel = document.querySelectorAll('[aria-label], [placeholder]');
+  for (const el of elementsWithLabel) {
+    const label = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').trim();
+    if (label && composerRegex.test(label)) {
+      const btn = el.closest('div[role="button"]') || el.closest('a') || el.closest('button') || el;
+      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+        btn.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        return btn;
+      }
+    }
+  }
+
+  // 2. Query main area text
+  const main = document.querySelector('div[role="main"]') || document;
   const mainElements = main.querySelectorAll('span, p, button, a, div[role="button"]');
   for (const el of mainElements) {
-    const text = el.innerText || el.textContent || "";
-    if (text.length < 80 && composerLabels.some(label => text.includes(label))) {
-      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
+    const text = (el.innerText || el.textContent || "").trim();
+    if (text.length > 0 && text.length < 80 && composerRegex.test(text)) {
+      const btn = el.closest('div[role="button"]') || el.closest('a') || el.closest('button') || el;
       if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
+        btn.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
         return btn;
       }
     }
   }
 
-  const globalElements = document.querySelectorAll('span, p, button, a, div[role="button"]');
-  for (const el of globalElements) {
-    const text = el.innerText || el.textContent || "";
-    if (text.length < 80 && composerLabels.some(label => text.includes(label))) {
-      const btn = el.closest('div[role="button"]') || el.closest('a') || el;
-      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-        return btn;
-      }
-    }
-  }
-
+  // 3. Query textboxes / contenteditable placeholders
   const textboxes = document.querySelectorAll('div[role="textbox"], div[contenteditable="true"]');
   for (const box of textboxes) {
     const label = (box.getAttribute('aria-label') || box.getAttribute('placeholder') || box.innerText || "").trim();
-    if (label && composerLabels.some(keyword =>
-      label.includes(keyword) || keyword.includes(label)
-    )) {
+    if (label && composerRegex.test(label)) {
       if (box.offsetWidth > 0 || box.offsetHeight > 0) {
+        box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
         return box.closest('div[role="button"]') || box.closest('form') || box;
       }
     }
@@ -1056,3 +1046,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
     alert(t("facebook.openComposer"));
   }
 }
+
+globalThis.ChamberFacebookPlatform = {
+  openComposerAndFill: handleOpenComposerAndFill
+};

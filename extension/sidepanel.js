@@ -37,6 +37,32 @@ function renderVersion() {
   versionLabel.textContent = t("version.label", { version: chrome.runtime.getManifest().version });
 }
 
+const myEchoTimelineBtn = document.getElementById("myEchoTimelineBtn");
+myEchoTimelineBtn?.addEventListener("click", async () => {
+  try {
+    const allData = await chrome.storage.local.get(null);
+    let target = "";
+    for (const [k, v] of Object.entries(allData)) {
+      if (k.endsWith("identityAlias") && typeof v === "string" && v.trim()) {
+        target = v.trim();
+        break;
+      }
+      if (!target && k.endsWith("nativeWalletAddress") && typeof v === "string" && v.trim()) {
+        target = v.trim();
+      }
+    }
+    const profiles = allData.chamberProfiles || [];
+    for (const p of profiles) {
+      if (p.alias) { target = p.alias.trim(); break; }
+      if (!target && p.walletAddress) target = p.walletAddress.trim();
+    }
+    const url = target ? `https://studio.milkcat.org/echo/${encodeURIComponent(target)}/all` : "https://studio.milkcat.org/echo/all";
+    chrome.tabs.create({ url });
+  } catch (_) {
+    chrome.tabs.create({ url: "https://studio.milkcat.org/echo/all" });
+  }
+});
+
 function validationMessage(validation, payload) {
   if (validation?.code === "SOURCE_URL_REQUIRED") {
     return t("validation.SOURCE_URL_REQUIRED_PLATFORM", { platform: platformName(payload?.platform || "facebook") });
@@ -49,6 +75,31 @@ function validationMessage(validation, payload) {
 
 function bytesToHex(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function canonicalSourceKey(value) {
+  try {
+    const url = new URL(value || "");
+    const params = ["story_fbid", "fbid", "set", "v"]
+      .filter((key) => url.searchParams.has(key))
+      .map((key) => `${key}=${url.searchParams.get(key)}`)
+      .join("&");
+    return `${url.hostname.toLowerCase()}${url.pathname.replace(/\/+$/, "").toLowerCase()}${params ? `?${params}` : ""}`;
+  } catch (_) {
+    return String(value || "").trim().toLowerCase();
+  }
+}
+
+function computePostFingerprint(textContent, mediaUrls) {
+  const text = (textContent || "").trim();
+  const media = Array.isArray(mediaUrls) ? mediaUrls.filter(Boolean).join(",") : "";
+  let hash = 0;
+  const str = `${text}::${media}`;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString(16);
 }
 
 function platformForTab(tab) {
@@ -208,19 +259,319 @@ async function loadSettingsForm() {
   await refreshRecoveryStatus();
 }
 
-recoveryExport?.addEventListener("click", async () => {
+async function openRecoveryTab() {
+  let alias = "";
+  let lastEchoUrl = "";
   try {
     const { prefix } = await activePlatformIdentity();
     const data = await chrome.storage.local.get([prefix + "identityAlias", prefix + "lastEchoUrl"]);
-    const alias = data[prefix + "identityAlias"] || "";
-    const target = alias
-      ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?recovery=true`
-      : (data[prefix + "lastEchoUrl"] || "https://studio.milkcat.org/echo");
-    await chrome.tabs.create({ url: target });
+    alias = data[prefix + "identityAlias"] || "";
+    lastEchoUrl = data[prefix + "lastEchoUrl"] || "";
+  } catch (_) {
+    try {
+      const profilesData = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"]);
+      const activeId = profilesData.activeChamberProfileId;
+      const profiles = profilesData.chamberProfiles || [];
+      const activeProfile = profiles.find((p) => p.id === activeId) || profiles[0];
+      if (activeProfile?.alias) alias = activeProfile.alias;
+    } catch (_) {}
+  }
+
+  let target = alias
+    ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?recovery=true`
+    : (lastEchoUrl
+      ? `${lastEchoUrl}${lastEchoUrl.includes("?") ? "&" : "?"}recovery=true`
+      : "https://studio.milkcat.org/echo?recovery=true");
+
+  await chrome.tabs.create({ url: target });
+}
+
+recoveryExport?.addEventListener("click", async () => {
+  try {
+    await openRecoveryTab();
   } catch (error) {
-    recoveryStatus.textContent = t("recovery.openFailed", { error: error.message });
+    if (recoveryStatus) recoveryStatus.textContent = t("recovery.openFailed", { error: error.message });
   }
 });
+
+const pairMobileBtn = document.getElementById("pairMobile");
+const pairingContainer = document.getElementById("pairingContainer");
+const pairingQrTarget = document.getElementById("pairingQrTarget");
+const pairingTimer = document.getElementById("pairingTimer");
+const pairingCloseBtn = document.getElementById("pairingClose");
+let pairingInterval = null;
+
+pairMobileBtn?.addEventListener("click", async () => {
+  try {
+    pairMobileBtn.disabled = true;
+    pairMobileBtn.textContent = "⌛ 正在產生配對 QR Code...";
+
+    let userId = "default";
+    let alias = "";
+    try {
+      const { prefix, actorId, profile } = await activePlatformIdentity();
+      userId = profile?.ownerUserId || actorId || "default";
+      const storage = await chrome.storage.local.get([prefix + "identityAlias"]);
+      alias = storage[prefix + "identityAlias"] || profile?.alias || settingsAlias?.value || "";
+    } catch (_) {
+      const profilesData = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"]);
+      const activeId = profilesData.activeChamberProfileId;
+      const profiles = profilesData.chamberProfiles || [];
+      const activeProfile = profiles.find((p) => p.id === activeId) || profiles[0];
+      if (activeProfile) {
+        userId = activeProfile.ownerUserId || activeProfile.id;
+        alias = activeProfile.alias || settingsAlias?.value || "";
+      }
+    }
+
+    const { address, secret } = await ensureNativeOwnerKey(userId);
+    const response = await fetch("https://studio.milkcat.org/chamber-api/recovery/pair/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ownerUserId: userId,
+        identityAlias: alias,
+        walletAddress: address,
+        walletPrivateKey: secret,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || "無法建立配對連線");
+
+    const pairingId = data.session.pairingId;
+    const targetUrl = alias
+      ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?pair=${encodeURIComponent(pairingId)}`
+      : `https://studio.milkcat.org/echo?pair=${encodeURIComponent(pairingId)}`;
+
+    pairingQrTarget.replaceChildren();
+    if (globalThis.ChamberQRCode) {
+      const canvas = globalThis.ChamberQRCode.render(targetUrl, 200);
+      pairingQrTarget.appendChild(canvas);
+    }
+
+    pairingContainer.style.display = "block";
+
+    const deviceId = "dev_" + pairingId.slice(5);
+    const existing = await chrome.storage.local.get(["chamberPairedDevices"]);
+    const currentList = Array.isArray(existing.chamberPairedDevices) ? existing.chamberPairedDevices : [];
+    currentList.push({
+      id: deviceId,
+      name: `行動裝置 (${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`,
+      pairedAt: new Date().toISOString(),
+    });
+    await chrome.storage.local.set({ chamberPairedDevices: currentList });
+    await refreshPairedDevices();
+
+    let timeLeft = 300;
+    let isClaimed = false;
+    if (pairingInterval) clearInterval(pairingInterval);
+    pairingInterval = setInterval(async () => {
+      timeLeft--;
+      if (timeLeft <= 0) {
+        clearInterval(pairingInterval);
+        pairingTimer.textContent = "⚠️ 配對連結已過期，請重新發送";
+        pairingQrTarget.replaceChildren();
+        return;
+      }
+
+      if (timeLeft % 2 === 0 && !isClaimed) {
+        try {
+          const res = await fetch(`https://studio.milkcat.org/chamber-api/recovery/pair/status?pairingId=${encodeURIComponent(pairingId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status?.claimed) {
+              isClaimed = true;
+              clearInterval(pairingInterval);
+              pairingTimer.style.color = "#4ade80";
+              pairingTimer.textContent = `🎉 手機配對成功 (${data.status.deviceModel || "行動裝置"})！正在關閉...`;
+              const current = await chrome.storage.local.get(["chamberPairedDevices"]);
+              const nextDevices = (current.chamberPairedDevices || []).map((d) => d.id === deviceId ? { ...d, name: `${data.status.deviceModel || "行動裝置"} (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` } : d);
+              await chrome.storage.local.set({ chamberPairedDevices: nextDevices });
+              await refreshPairedDevices();
+              setTimeout(() => {
+                pairingContainer.style.display = "none";
+                pairingTimer.style.color = "#f59e0b";
+              }, 1500);
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
+      const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+      const s = String(timeLeft % 60).padStart(2, "0");
+      pairingTimer.textContent = `⏱️ 配對連結時效剩餘 ${m}:${s}`;
+    }, 1000);
+
+  } catch (error) {
+    if (recoveryStatus) recoveryStatus.textContent = `配對失敗：${error.message}`;
+  } finally {
+    pairMobileBtn.disabled = false;
+    pairMobileBtn.textContent = "📱 綁定新手機 (產生配對 QR Code)";
+  }
+});
+
+const requestsBanner = document.getElementById("requestsBanner");
+const requestsBannerCount = document.getElementById("requestsBannerCount");
+const requestsBannerBtn = document.getElementById("requestsBannerBtn");
+
+async function checkSidePanelRequests() {
+  if (!requestsBanner) return;
+  try {
+    const allData = await chrome.storage.local.get(null);
+    const keys = new Set();
+    for (const [k, v] of Object.entries(allData)) {
+      if ((k.endsWith("identityAlias") || k.endsWith("nativeWalletAddress")) && typeof v === "string" && v.trim()) {
+        keys.add(v.trim());
+      }
+    }
+    const profiles = allData.chamberProfiles || [];
+    for (const p of profiles) {
+      if (p.alias) keys.add(p.alias.trim());
+      if (p.walletAddress) keys.add(p.walletAddress.trim());
+    }
+
+    if (keys.size === 0) {
+      requestsBanner.style.display = "none";
+      return;
+    }
+
+    const requestMap = new Map();
+    for (const queryKey of keys) {
+      try {
+        const res = await fetch(`https://studio.milkcat.org/chamber-api/access/requests?ownerIdentityKey=${encodeURIComponent(queryKey)}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.requests)) {
+            for (const r of data.requests) {
+              requestMap.set(r.id, r);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    const allRequests = Array.from(requestMap.values());
+    const pendingList = allRequests.filter((r) => r.status === "pending");
+
+    if (pendingList.length > 0) {
+      requestsBanner.style.display = "flex";
+      requestsBanner.style.background = "rgba(225, 29, 72, 0.18)";
+      requestsBanner.style.borderColor = "#f43f5e";
+      if (requestsBannerCount) {
+        requestsBannerCount.style.color = "#fda4af";
+        requestsBannerCount.textContent = `有 ${pendingList.length} 筆待審核申請（來自：${pendingList[0].requesterAlias || "訪客"}）`;
+      }
+      if (requestsBannerBtn) {
+        requestsBannerBtn.textContent = "審核 →";
+        requestsBannerBtn.style.background = "#e11d48";
+      }
+    } else {
+      requestsBanner.style.display = "flex";
+      requestsBanner.style.background = "rgba(30, 41, 59, 0.6)";
+      requestsBanner.style.borderColor = "#334155";
+      if (requestsBannerCount) {
+        requestsBannerCount.style.color = "#94a3b8";
+        requestsBannerCount.textContent = "目前無待審核申請";
+      }
+      if (requestsBannerBtn) {
+        requestsBannerBtn.textContent = "紀錄 →";
+        requestsBannerBtn.style.background = "#334155";
+      }
+    }
+  } catch (_) {}
+}
+
+requestsBannerBtn?.addEventListener("click", async () => {
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "sunlake";
+    chrome.tabs.create({ url: `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?requests=true` });
+  } catch (_) {
+    chrome.tabs.create({ url: "https://studio.milkcat.org/echo/sunlake/all?requests=true" });
+  }
+});
+
+setInterval(checkSidePanelRequests, 15_000);
+setTimeout(checkSidePanelRequests, 1000);
+
+const pairedDevicesList = document.getElementById("pairedDevicesList");
+
+async function refreshPairedDevices() {
+  if (!pairedDevicesList) return;
+  const data = await chrome.storage.local.get(["chamberPairedDevices"]);
+  const devices = Array.isArray(data.chamberPairedDevices) ? data.chamberPairedDevices : [];
+  pairedDevicesList.replaceChildren();
+
+  if (devices.length === 0) {
+    const emptyMsg = document.createElement("div");
+    emptyMsg.className = "post-meta";
+    emptyMsg.style.fontSize = "11px";
+    emptyMsg.style.color = "#64748b";
+    emptyMsg.textContent = "尚未綁定任何行動裝置。";
+    pairedDevicesList.appendChild(emptyMsg);
+    return;
+  }
+
+  devices.forEach((device) => {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.justifyContent = "space-between";
+    row.style.padding = "6px 8px";
+    row.style.margin = "4px 0";
+    row.style.borderRadius = "6px";
+    row.style.background = "#1e293b";
+    row.style.border = "1px solid #334155";
+
+    const label = document.createElement("div");
+    label.style.fontSize = "11px";
+    label.style.color = "#e2e8f0";
+    label.textContent = `📱 ${device.name || "行動裝置"} (${new Date(device.pairedAt).toLocaleDateString()})`;
+
+    const btnGroup = document.createElement("div");
+    btnGroup.style.display = "flex";
+    btnGroup.style.gap = "4px";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "secondary-action compact-action";
+    editBtn.style.padding = "2px 6px";
+    editBtn.style.fontSize = "10px";
+    editBtn.textContent = "✏️ 命名";
+    editBtn.addEventListener("click", async () => {
+      const newName = prompt("請輸入自訂裝置名稱（例如：iPhone 15 Pro 或 黑色 Pixel）：", device.name || "");
+      if (newName === null) return;
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      const current = await chrome.storage.local.get(["chamberPairedDevices"]);
+      const nextDevices = (current.chamberPairedDevices || []).map((d) => d.id === device.id ? { ...d, name: trimmed } : d);
+      await chrome.storage.local.set({ chamberPairedDevices: nextDevices });
+      await refreshPairedDevices();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "secondary-action compact-action";
+    removeBtn.style.padding = "2px 8px";
+    removeBtn.style.fontSize = "10px";
+    removeBtn.style.color = "#f87171";
+    removeBtn.textContent = "解除綁定";
+    removeBtn.addEventListener("click", async () => {
+      if (!confirm(`確定要解除「${device.name || "此行動裝置"}」的綁定嗎？`)) return;
+      const current = await chrome.storage.local.get(["chamberPairedDevices"]);
+      const nextDevices = (current.chamberPairedDevices || []).filter((d) => d.id !== device.id);
+      await chrome.storage.local.set({ chamberPairedDevices: nextDevices });
+      await refreshPairedDevices();
+    });
+
+    btnGroup.append(editBtn, removeBtn);
+    row.append(label, btnGroup);
+    pairedDevicesList.appendChild(row);
+  });
+}
 
 function showSettings() {
   backupView.hidden = true;
@@ -228,6 +579,7 @@ function showSettings() {
   settingsView.hidden = false;
   resultEl.replaceChildren();
   loadSettingsForm().catch((error) => { settingsAliasStatus.textContent = error.message; });
+  refreshPairedDevices().catch(() => {});
 }
 
 function showBackup() {
@@ -289,7 +641,7 @@ rebornGenerate?.addEventListener("click", async () => {
     }
 
     if (identity.platform === "threads") {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["platform-threads.js"] });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "platform-threads.js"] });
       const injected = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (body, imageUrl) => globalThis.ChamberThreadsPlatform?.openComposerAndFill?.(body, imageUrl),
@@ -299,10 +651,23 @@ rebornGenerate?.addEventListener("click", async () => {
       if (!result?.success) throw new Error(t("threads.composerMissing"));
       rebornStatus.textContent = result.imageAttached ? t("reborn.successPlatform", { platform: "Threads" }) : t("reborn.successTextOnly", { platform: "Threads" });
     } else {
-      await sendTabMessageWithRecovery(tab.id, {
-        action: "OPEN_FB_COMPOSER_AND_FILL",
-        payload: { text, imageUrl: card.dataUrl },
-      });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "content.js"] }).catch(() => {});
+      try {
+        await sendTabMessageWithRecovery(tab.id, {
+          action: "OPEN_FB_COMPOSER_AND_FILL",
+          payload: { text, imageUrl: card.dataUrl },
+        });
+      } catch (_) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: (body, imageUrl) => {
+            if (globalThis.ChamberFacebookPlatform?.openComposerAndFill) {
+              globalThis.ChamberFacebookPlatform.openComposerAndFill(body, imageUrl);
+            }
+          },
+          args: [text, card.dataUrl]
+        });
+      }
       rebornStatus.textContent = t("reborn.successPlatform", { platform: "Facebook" });
     }
   } catch (error) {
@@ -451,12 +816,12 @@ async function sendTabMessageWithRecovery(tabId, message) {
       throw error;
     }
     // chrome://extensions Reload invalidates the old content-script context
-    // in already-open tabs. Inject the current script and retry on demand.
+    // in already-open tabs. Inject the current scripts and retry on demand.
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["content.js"]
+      files: ["i18n.js", "content.js"]
     });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 150));
     return sendTabMessage(tabId, message);
   }
 }
@@ -619,7 +984,25 @@ async function backupPost(payload, button) {
       contentLength: String(payload.textContent || payload.content || "").length,
       mediaCount: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.length : 0
     });
-    button.textContent = t("backup.done");
+    button.textContent = "✅ " + t("backup.done");
+    button.style.background = "#059669";
+    button.style.borderColor = "#10b981";
+
+    // Update local backed posts index with new fingerprint
+    try {
+      const sourceKey = canonicalSourceKey(payload.sourceUrl);
+      if (sourceKey) {
+        const stored = await chrome.storage.local.get(["chamberBackedPosts"]);
+        const backedMap = stored.chamberBackedPosts || {};
+        backedMap[sourceKey] = {
+          txId: result.txId,
+          fingerprint: computePostFingerprint(payload.textContent, payload.mediaUrls),
+          backupTime: Date.now()
+        };
+        await chrome.storage.local.set({ chamberBackedPosts: backedMap });
+      }
+    } catch (_) {}
+
     const focusedEchoUrl = (result.echoUrl || "").startsWith("http") ? result.echoUrl : `https://studio.milkcat.org${result.echoUrl || ""}`;
     const timelineEchoUrl = (() => {
       try {
@@ -630,6 +1013,40 @@ async function backupPost(payload, button) {
         return focusedEchoUrl;
       }
     })();
+
+    // Render prominent success box directly inside the backed-up post card
+    const card = button.closest(".post") || button.parentElement;
+    if (card) {
+      card.querySelector(".chamber-backup-success-box")?.remove();
+      const successBox = document.createElement("div");
+      successBox.className = "chamber-backup-success-box";
+      successBox.style.cssText = "margin-top:10px;padding:12px;border-radius:10px;background:rgba(16,185,129,0.18);border:1px solid #10b981;display:flex;flex-direction:column;gap:8px;";
+
+      const titleRow = document.createElement("div");
+      titleRow.style.cssText = "font-size:12px;font-weight:bold;color:#6ee7b7;display:flex;align-items:center;gap:6px;";
+      titleRow.innerHTML = "<span>🎉</span><span>文章已成功備份上鏈！</span>";
+
+      const btnRow = document.createElement("div");
+      btnRow.style.cssText = "display:flex;gap:6px;margin-top:2px;";
+
+      const echoBtn = document.createElement("button");
+      echoBtn.type = "button";
+      echoBtn.style.cssText = "flex:1;background:#059669;color:white;font-size:11px;padding:8px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;";
+      echoBtn.textContent = "🌐 前往我的 Echo 時光牆查看";
+      echoBtn.onclick = () => chrome.tabs.create({ url: timelineEchoUrl });
+
+      const txBtn = document.createElement("button");
+      txBtn.type = "button";
+      txBtn.style.cssText = "background:#1e293b;border:1px solid #475569;color:#93c5fd;font-size:10px;padding:6px 10px;border-radius:6px;cursor:pointer;";
+      txBtn.textContent = "🔗 Arweave 存證";
+      txBtn.onclick = () => chrome.tabs.create({ url: result.arweaveUrl });
+
+      btnRow.append(echoBtn, txBtn);
+      successBox.append(titleRow, btnRow);
+      card.appendChild(successBox);
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
     const links = document.createElement("div");
     links.className = "result-links";
     const link = document.createElement("a");
@@ -954,6 +1371,33 @@ async function selectPost() {
       // an empty caption; a valid media URL is sufficient content.
       canBackup = true;
       button.addEventListener("click", () => backupPost(payload, button));
+
+      // Passive in-browser revision difference detection (Plan B)
+      const sourceKey = canonicalSourceKey(payload.sourceUrl);
+      if (sourceKey) {
+        chrome.storage.local.get(["chamberBackedPosts"], (stored) => {
+          const backedMap = stored.chamberBackedPosts || {};
+          const existing = backedMap[sourceKey];
+          if (existing) {
+            const currentFingerprint = computePostFingerprint(payload.textContent, payload.mediaUrls);
+            if (existing.fingerprint && existing.fingerprint !== currentFingerprint) {
+              button.textContent = "🔄 偵測到社群有新修改 — 一鍵同步修訂版";
+              button.style.background = "#d97706";
+              button.style.borderColor = "#f59e0b";
+              const editNotice = document.createElement("div");
+              editNotice.className = "chamber-revision-notice";
+              editNotice.style.cssText = "font-size:11px;color:#f59e0b;margin-top:6px;padding:4px 8px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);";
+              editNotice.textContent = "💡 此貼文在社群內容與鏈上最新備份不同，點擊按鈕將發布修訂版本 (Revision)。";
+              card.appendChild(editNotice);
+            } else {
+              button.textContent = "✅ " + t("backup.done") + " (最新版)";
+              button.style.background = "rgba(16, 185, 129, 0.2)";
+              button.style.borderColor = "#10b981";
+              button.style.color = "#10b981";
+            }
+          }
+        });
+      }
     }
     const meta = document.createElement("div");
     meta.className = "post-meta";
@@ -1027,6 +1471,26 @@ async function initializePanel() {
   await ChamberI18n.init();
   languageSelect.value = ChamberI18n.getLocale();
   renderVersion();
+
+  // Initialize theme support
+  const themeSelect = document.getElementById("themeSelect");
+  try {
+    const stored = await chrome.storage.local.get(["chamber_timeline_theme", "chamber_theme"]);
+    const currentTheme = stored.chamber_theme || stored.chamber_timeline_theme || "obsidian";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+    if (themeSelect) themeSelect.value = currentTheme;
+  } catch (_) {}
+
+  if (themeSelect) {
+    themeSelect.addEventListener("change", async (e) => {
+      const val = e.target.value;
+      document.documentElement.setAttribute("data-theme", val);
+      try {
+        await chrome.storage.local.set({ chamber_theme: val, chamber_timeline_theme: val });
+      } catch (_) {}
+    });
+  }
+
   languageSelect.addEventListener("change", async () => {
     await ChamberI18n.setLocale(languageSelect.value);
     location.reload();

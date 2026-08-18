@@ -4,15 +4,55 @@
   <meta charset="UTF-8">
   <title>Chamber Control</title>
   <style>
-    :root {
-      --bg-gradient: linear-gradient(135deg, #090d16, #111827, #1e1b4b);
-      --card-bg: rgba(255, 255, 255, 0.04);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --primary-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
-      --accent-gradient: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    :root, [data-theme="obsidian"] {
+      --bg-gradient: linear-gradient(135deg, #0b0f17, #111827, #0f172a);
+      --card-bg: rgba(17, 24, 39, 0.95);
+      --card-border: #1e293b;
+      --primary-gradient: linear-gradient(135deg, #10b981, #059669);
+      --accent-gradient: linear-gradient(135deg, #34d399, #10b981);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --success-color: #10b981;
+    }
+    [data-theme="cyber"] {
+      --bg-gradient: linear-gradient(135deg, #050814, #0d1527, #082f49);
+      --card-bg: rgba(13, 21, 39, 0.95);
+      --card-border: #1e2d4a;
+      --primary-gradient: linear-gradient(135deg, #06b6d4, #0891b2);
+      --accent-gradient: linear-gradient(135deg, #38bdf8, #0284c7);
+      --text-main: #f0fdfa;
+      --text-muted: #94a3b8;
+      --success-color: #06b6d4;
+    }
+    [data-theme="amber"] {
+      --bg-gradient: linear-gradient(135deg, #140f0c, #1c1511, #451a03);
+      --card-bg: rgba(28, 21, 17, 0.95);
+      --card-border: #38281d;
+      --primary-gradient: linear-gradient(135deg, #d97706, #b45309);
+      --accent-gradient: linear-gradient(135deg, #fbbf24, #d97706);
+      --text-main: #fef3c7;
+      --text-muted: #d97706;
+      --success-color: #f59e0b;
+    }
+    [data-theme="emerald"] {
+      --bg-gradient: linear-gradient(135deg, #05120d, #0a1b14, #064e3b);
+      --card-bg: rgba(10, 27, 20, 0.95);
+      --card-border: #143829;
+      --primary-gradient: linear-gradient(135deg, #059669, #047857);
+      --accent-gradient: linear-gradient(135deg, #6ee7b7, #059669);
+      --text-main: #ecfdf5;
+      --text-muted: #6ee7b7;
+      --success-color: #10b981;
+    }
+    [data-theme="sakura"] {
+      --bg-gradient: linear-gradient(135deg, #190c14, #23101b, #500724);
+      --card-bg: rgba(35, 16, 27, 0.95);
+      --card-border: #421c32;
+      --primary-gradient: linear-gradient(135deg, #db2777, #be185d);
+      --accent-gradient: linear-gradient(135deg, #f472b6, #db2777);
+      --text-main: #fdf2f8;
+      --text-muted: #f472b6;
+      --success-color: #ec4899;
     }
 
     body {

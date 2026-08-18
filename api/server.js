@@ -41,6 +41,7 @@ const {
   finishAuthentication,
   rotateVaultRecord,
 } = require("./recovery-vault");
+const { createPairingSession, claimPairingSession, getPairingSessionStatus } = require("./pairing");
 
 const app = express();
 const PORT = 3011;
@@ -433,6 +434,34 @@ router.post("/recovery/vault/rotate", async (req, res) => {
   } catch (error) {
     return res.status(/session/i.test(error.message || "") ? 401 : 400).json({ error: error.message || "Failed to rotate Recovery Vault record" });
   }
+});
+
+// ── Mobile QR Pairing Ephemeral Session Store ──
+router.post("/recovery/pair/create", async (req, res) => {
+  try {
+    const session = createPairingSession(req.body || {});
+    console.info(`[Pairing] Created QR pairing session (${session.pairingId})`);
+    return res.status(201).json({ success: true, session });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Failed to create pairing session" });
+  }
+});
+
+router.post("/recovery/pair/claim", async (req, res) => {
+  try {
+    const payload = claimPairingSession(req.body?.pairingId, req.body?.deviceModel);
+    console.info(`[Pairing] Claimed QR pairing session (${req.body?.pairingId}) for device: ${payload.deviceModel}`);
+    return res.json({ success: true, payload });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Failed to claim pairing session" });
+  }
+});
+
+router.get("/recovery/pair/status", (req, res) => {
+  const pairingId = req.query.pairingId;
+  if (!pairingId) return res.status(400).json({ error: "Missing pairingId" });
+  const status = getPairingSessionStatus(pairingId);
+  return res.json({ success: true, status });
 });
 
 // ── POST /backup — main upload endpoint ──

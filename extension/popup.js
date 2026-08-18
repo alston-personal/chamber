@@ -6,6 +6,12 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Load and apply theme
+  chrome.storage.local.get(["chamber_timeline_theme", "chamber_theme"], (stored) => {
+    const currentTheme = stored.chamber_theme || stored.chamber_timeline_theme || "obsidian";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+  });
+
   // Elements
   const dashboardView = document.getElementById("dashboardView");
   const settingsView = document.getElementById("settingsView");

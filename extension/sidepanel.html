@@ -5,41 +5,107 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chamber</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    :root, [data-theme="obsidian"] {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+      --bg-page: #0b0f17;
+      --bg-card: #111827;
+      --bg-card-secondary: #172554;
+      --border-card: #1e293b;
+      --border-card-hover: #334155;
+      --accent-primary: #10b981;
+      --accent-hover: #059669;
+      --accent-text: #34d399;
+      --accent-glow: rgba(16, 185, 129, 0.2);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+    }
+    [data-theme="cyber"] {
+      --bg-page: #050814;
+      --bg-card: #0d1527;
+      --bg-card-secondary: #0f1c3f;
+      --border-card: #1e2d4a;
+      --border-card-hover: #38bdf8;
+      --accent-primary: #06b6d4;
+      --accent-hover: #0891b2;
+      --accent-text: #38bdf8;
+      --accent-glow: rgba(6, 182, 212, 0.25);
+      --text-primary: #f0fdfa;
+      --text-secondary: #94a3b8;
+    }
+    [data-theme="amber"] {
+      --bg-page: #140f0c;
+      --bg-card: #1c1511;
+      --bg-card-secondary: #2d1c14;
+      --border-card: #38281d;
+      --border-card-hover: #f59e0b;
+      --accent-primary: #d97706;
+      --accent-hover: #b45309;
+      --accent-text: #fbbf24;
+      --accent-glow: rgba(245, 158, 11, 0.25);
+      --text-primary: #fef3c7;
+      --text-secondary: #d97706;
+    }
+    [data-theme="emerald"] {
+      --bg-page: #05120d;
+      --bg-card: #0a1b14;
+      --bg-card-secondary: #0f2b1f;
+      --border-card: #143829;
+      --border-card-hover: #10b981;
+      --accent-primary: #059669;
+      --accent-hover: #047857;
+      --accent-text: #6ee7b7;
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --text-primary: #ecfdf5;
+      --text-secondary: #6ee7b7;
+    }
+    [data-theme="sakura"] {
+      --bg-page: #190c14;
+      --bg-card: #23101b;
+      --bg-card-secondary: #351328;
+      --border-card: #421c32;
+      --border-card-hover: #f472b6;
+      --accent-primary: #db2777;
+      --accent-hover: #be185d;
+      --accent-text: #f472b6;
+      --accent-glow: rgba(244, 114, 182, 0.25);
+      --text-primary: #fdf2f8;
+      --text-secondary: #f472b6;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 18px; color: #e5e7eb; background: #0f172a; overflow-x: hidden; }
-    h1 { margin: 0 0 4px; color: #a5b4fc; font-size: 24px; }
-    .sub { margin: 0 0 18px; color: #94a3b8; font-size: 12px; }
-    .card { padding: 14px; margin: 12px 0; border: 1px solid #334155; border-radius: 14px; background: #172554; }
-    .label { color: #94a3b8; font-size: 11px; }
-    #pageUrl { margin-top: 5px; color: #cbd5e1; font-size: 12px; overflow-wrap: anywhere; }
+    body { margin: 0; padding: 18px; color: var(--text-primary); background: var(--bg-page); overflow-x: hidden; transition: background 0.3s ease, color 0.3s ease; }
+    h1 { margin: 0 0 4px; color: var(--accent-text); font-size: 24px; }
+    .sub { margin: 0 0 18px; color: var(--text-secondary); font-size: 12px; }
+    .card { padding: 14px; margin: 12px 0; border: 1px solid var(--border-card); border-radius: 14px; background: var(--bg-card); transition: border-color 0.2s ease, background 0.2s ease; }
+    .label { color: var(--text-secondary); font-size: 11px; }
+    #pageUrl { margin-top: 5px; color: var(--text-primary); font-size: 12px; overflow-wrap: anywhere; opacity: 0.9; }
     #postList { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; width: 100%; }
-    .post { min-width: 0; width: 100%; max-width: 100%; padding: 11px; overflow: hidden; border: 1px solid #334155; border-radius: 10px; background: #111827; }
-    .post-text { margin-bottom: 9px; color: #e2e8f0; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .post { min-width: 0; width: 100%; max-width: 100%; padding: 11px; overflow: hidden; border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-page); }
+    .post-text { margin-bottom: 9px; color: var(--text-primary); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
     .post-thumb { display: block; width: 100%; max-width: 100%; height: auto; max-height: 130px; object-fit: cover; margin: 0 0 9px; border-radius: 7px; }
-    .post-meta { margin-bottom: 8px; color: #64748b; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .post-meta { margin-bottom: 8px; color: var(--text-secondary); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .post button { padding: 8px; font-size: 11px; }
-    button { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 9px; color: white; background: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, .28); font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease, opacity .16s ease; }
-    button:not(:disabled):hover { background: #6366f1; box-shadow: 0 6px 16px rgba(79, 70, 229, .38); transform: translateY(-1px); }
+    button { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 9px; color: white; background: var(--accent-primary); box-shadow: 0 4px 12px var(--accent-glow); font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease, opacity .16s ease; }
+    button:not(:disabled):hover { background: var(--accent-hover); box-shadow: 0 6px 16px var(--accent-glow); transform: translateY(-1px); }
     button:not(:disabled):active { transform: translateY(0); }
-    button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+    button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
     button:disabled { cursor: not-allowed; opacity: .38; filter: grayscale(.65); box-shadow: none; }
-    #status { min-height: 20px; margin-top: 12px; color: #cbd5e1; font-size: 12px; line-height: 1.5; }
-    #result a { color: #93c5fd; font-size: 12px; overflow-wrap: anywhere; }
+    #status { min-height: 20px; margin-top: 12px; color: var(--text-primary); font-size: 12px; line-height: 1.5; }
+    #result a { color: var(--accent-text); font-size: 12px; overflow-wrap: anywhere; }
     .result-links { display: grid; gap: 6px; min-width: 0; }
-    .version { margin-top: 24px; color: #64748b; font-size: 10px; text-align: center; }
-    .secondary-action { margin-top: 8px; border-color: #6366f1; background: rgba(79, 70, 229, .12); color: #e0e7ff; box-shadow: none; }
-    .secondary-action:not(:disabled):hover { border-color: #a5b4fc; background: rgba(79, 70, 229, .3); color: #fff; }
+    .version { margin-top: 24px; color: var(--text-secondary); font-size: 10px; text-align: center; }
+    .secondary-action { margin-top: 8px; border-color: var(--accent-primary); background: var(--accent-glow); color: var(--accent-text); box-shadow: none; }
+    .secondary-action:not(:disabled):hover { border-color: var(--accent-text); background: var(--accent-glow); color: #fff; }
     .field-action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
     .compact-action { width: auto; min-width: 88px; margin-top: 0; padding: 9px 12px; }
-    .navigation-action { border-color: #64748b; background: transparent; color: #e2e8f0; box-shadow: none; }
-    .navigation-action:not(:disabled):hover { border-color: #a5b4fc; background: rgba(99, 102, 241, .18); }
+    .navigation-action { border-color: var(--border-card); background: transparent; color: var(--text-primary); box-shadow: none; }
+    .navigation-action:not(:disabled):hover { border-color: var(--accent-text); background: var(--accent-glow); }
     .danger-note { margin: 12px 0 8px; padding: 10px; border: 1px solid #92400e; border-radius: 9px; background: #451a03; color: #fed7aa; font-size: 11px; line-height: 1.5; }
     .video-limit-note { margin: 8px 0; padding: 9px 10px; border: 1px solid #92400e; border-radius: 8px; background: #451a03; color: #fde68a; font-size: 11px; line-height: 1.45; }
-    textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid #334155; border-radius: 9px; background: #111827; color: #e2e8f0; font: inherit; font-size: 12px; line-height: 1.55; }
+    textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid var(--border-card); border-radius: 9px; background: var(--bg-page); color: var(--text-primary); font: inherit; font-size: 12px; line-height: 1.55; }
     .top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .language-picker { width: auto; min-width: 118px; padding: 6px 8px; border: 1px solid #334155; border-radius: 8px; background: #111827; color: #e2e8f0; font-size: 11px; }
-    .platform-picker { width: 100%; margin: 6px 0 12px; padding: 9px; border: 1px solid #475569; border-radius: 8px; background: #111827; color: #e2e8f0; font-size: 12px; font-weight: 700; }
+    .language-picker { width: auto; min-width: 100px; padding: 5px 7px; border: 1px solid var(--border-card); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 11px; }
+    .platform-picker { width: 100%; margin: 6px 0 12px; padding: 9px; border: 1px solid var(--border-card); border-radius: 8px; background: var(--bg-page); color: var(--text-primary); font-size: 12px; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -48,13 +114,33 @@
       <h1>Chamber</h1>
       <p class="sub" data-i18n="brand.subtitle">去中心化社交備份室</p>
     </div>
-    <label class="label" for="languageSelect">
-      <span data-i18n="language.label">語言</span>
-      <select id="languageSelect" class="language-picker">
-        <option value="zh-TW" data-i18n="language.zhTW">繁體中文</option>
-        <option value="en" data-i18n="language.en">English</option>
-      </select>
-    </label>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <button id="myEchoTimelineBtn" type="button" class="secondary-action compact-action" style="font-size:11px;padding:5px 10px;display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:8px;">
+        <span>🌐</span> <span>我的時光牆</span>
+      </button>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <select id="themeSelect" class="language-picker" title="切換主題風格">
+          <option value="obsidian">🖤 極簡黑曜</option>
+          <option value="cyber">🌌 賽博霓虹</option>
+          <option value="amber">🍯 琥珀秘境</option>
+          <option value="emerald">🌲 翡翠森境</option>
+          <option value="sakura">🌸 櫻花暗夜</option>
+        </select>
+        <select id="languageSelect" class="language-picker">
+          <option value="zh-TW" data-i18n="language.zhTW">繁體中文</option>
+          <option value="en" data-i18n="language.en">English</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div id="requestsBanner" style="display:none;margin:10px 0 14px;padding:10px 12px;border-radius:10px;background:rgba(225,29,72,0.18);border:1px solid #f43f5e;align-items:center;justify-content:space-between;gap:8px;">
+    <div style="min-width:0;">
+      <div style="font-size:12px;font-weight:bold;color:#fecdd3;display:flex;align-items:center;gap:4px;">
+        <span>🔔</span> <span>文章閱讀申請</span>
+      </div>
+      <div id="requestsBannerCount" style="font-size:11px;color:#fda4af;margin-top:2px;">有 1 筆待審核申請</div>
+    </div>
+    <button id="requestsBannerBtn" type="button" class="secondary-action compact-action" style="background:#e11d48;color:white;border:none;font-weight:700;font-size:11px;padding:6px 12px;cursor:pointer;">審核 →</button>
   </div>
   <div id="backupView">
   <div class="card">
@@ -94,7 +180,20 @@
       <input id="settingsWallet" type="text" placeholder="留空使用託管錢包" data-i18n-placeholder="settings.walletPlaceholder" style="width:100%;padding:10px;border:1px solid #334155;border-radius:8px;background:#111827;color:#e2e8f0;">
       <div class="danger-note" data-i18n="settings.recoveryExplanation">復原採 2-of-3：A 留在目前 Chrome 的 Chamber Extension；B 加密保存於 Chamber Recovery Vault 並由 Passkey 保護；C 是您離線保存的緊急復原碼。Echo 只提供操作介面，不保存完整金鑰。</div>
       <button id="recoveryExport" class="secondary-action" type="button" data-i18n="settings.openRecovery">🛡️ 開啟金鑰復原設定 →</button>
+      <button id="pairMobile" type="button" style="margin-top:10px;width:100%;padding:10px 14px;border-radius:8px;background:linear-gradient(135deg, #4f46e5, #6366f1);color:#ffffff;font-weight:600;font-size:13px;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.4);">📱 綁定新手機 (產生配對 QR Code)</button>
+      <div id="pairingContainer" style="display:none;margin-top:12px;padding:12px;border:1px solid #6366f1;border-radius:12px;background:#0f172a;text-align:center;">
+        <div style="font-size:12px;font-weight:bold;color:#a5b4fc;">📱 請用手機相機照此 QR Code</div>
+        <div id="pairingQrTarget" style="margin:10px auto;display:flex;justify-content:center;"></div>
+        <div id="pairingTimer" style="font-size:11px;color:#f59e0b;margin-top:4px;">⏱️ 配對連結時效剩餘 05:00</div>
+        <button id="pairingClose" class="secondary-action compact-action" type="button" style="margin-top:8px;">關閉配對視窗</button>
+      </div>
       <div id="recoveryStatus" class="post-meta" style="white-space:normal;" data-i18n="settings.recoveryUnknown">尚未確認是否已建立 Recovery Vault 與緊急復原碼 C。</div>
+      <div style="margin-top:14px;border-top:1px solid #334155;padding-top:12px;">
+        <div class="label" style="font-size:12px;color:#a5b4fc;">📱 已綁定行動裝置</div>
+        <div id="pairedDevicesList" style="margin-top:6px;">
+          <div class="post-meta" style="font-size:11px;color:#64748b;">尚未綁定任何行動裝置。</div>
+        </div>
+      </div>
       <button id="settingsSave" type="button" data-i18n="settings.save">儲存並套用</button>
       <button id="settingsBack" class="secondary-action navigation-action" type="button" data-i18n="settings.back">← 返回文章備份</button>
     </div>
@@ -113,6 +212,7 @@
   <div id="versionLabel" class="version"></div>
   <script src="i18n.js"></script>
   <script src="mvp-validation.js"></script>
+  <script src="qrcode.js"></script>
   <script src="declaration-card.js"></script>
   <script src="sidepanel.js"></script>
 </body>

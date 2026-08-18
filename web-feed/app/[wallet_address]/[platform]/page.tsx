@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ethers } from "ethers";
 import { startAuthentication, startRegistration, WebAuthnAbortService } from "@simplewebauthn/browser";
 import Link from "next/link";
@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useI18n } from "@/components/locale-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { feedTranslate } from "@/lib/feed-i18n";
+import CatMorphingCard from "../../components/CatMorphingCard";
 
 interface MediaSchema {
   primary_fb_cdn?: string;
@@ -32,6 +33,9 @@ interface PostPayload {
   fb_user_id: string;
   author_wallet: string;
   timestamp: number;
+  published_at?: number | null;
+  authorName?: string | null;
+  source_author?: { name?: string; url?: string | null } | null;
   is_encrypted: boolean;
   content: string; // Plaintext or encrypted stringified JSON
   media: MediaSchema;
@@ -53,6 +57,33 @@ interface EncryptedBlob {
   encrypted: boolean;
 }
 
+const TIMELINE_THEMES = [
+  { id: "obsidian", name: "極簡黑曜", icon: "⬛", desc: "鈦灰石墨經典沉穩", badge: "經典" },
+  { id: "cyber", name: "賽博霓光", icon: "🌌", desc: "深空宇宙星夜霓虹", badge: "極客" },
+  { id: "amber", name: "復古暖琥珀", icon: "🍂", desc: "復古牛皮紙典雅暖光", badge: "質感" },
+  { id: "emerald", name: "深林青翠", icon: "🌿", desc: "自然翡翠沉靜深綠", badge: "靜謐" },
+  { id: "sakura", name: "櫻花暮夜", icon: "🌸", desc: "暮色櫻粉金屬光澤", badge: "限定" },
+  { id: "custom", name: "自訂主題", icon: "🎨", desc: "自訂色彩或匯入主題包", badge: "客製" },
+];
+
+export interface CustomThemeConfig {
+  name: string;
+  bgPage: string;
+  bgCard: string;
+  borderCard: string;
+  accentPrimary: string;
+  accentText: string;
+}
+
+const DEFAULT_CUSTOM_THEME: CustomThemeConfig = {
+  name: "我的客製主題",
+  bgPage: "#0a0f1d",
+  bgCard: "#121b2f",
+  borderCard: "#1f2e4d",
+  accentPrimary: "#38bdf8",
+  accentText: "#7dd3fc",
+};
+
 interface PostItem {
   txId: string;
   payload: PostPayload;
@@ -70,8 +101,8 @@ interface ExtensionIdentity {
   walletAddress: string;
   identityAlias: string;
   identityDisplayName: string;
-  sharingKeyId: string;
-  sharingPublicKey: JsonWebKey;
+  sharingKeyId?: string;
+  sharingPublicKey?: JsonWebKey | null;
   accessCapability: string;
 }
 
@@ -80,6 +111,7 @@ interface ReadingRequest {
   postTxId: string;
   requesterWallet: string;
   requesterAlias?: string;
+  requesterNote?: string;
   requesterKeyId: string;
   requesterPublicKey: JsonWebKey;
   status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
@@ -155,8 +187,20 @@ export default function PlatformFeed({
   const [recoveryStatus, setRecoveryStatus] = useState<string>("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState<string>("");
   const [pendingRecovery, setPendingRecovery] = useState<PendingRecovery | null>(null);
+  const [copiedC, setCopiedC] = useState<boolean>(false);
   const [passkeyProvider, setPasskeyProvider] = useState<"password-manager" | "system">("password-manager");
   const [recoveryConfigured, setRecoveryConfigured] = useState<boolean>(false);
+  const [pairingStatus, setPairingStatus] = useState<string>("");
+  const [showPairingModal, setShowPairingModal] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortMode, setSortMode] = useState<"backup" | "published">("backup");
+  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
+  const [currentTheme, setCurrentTheme] = useState<string>("obsidian");
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState<boolean>(false);
+  const [showThemeModal, setShowThemeModal] = useState<boolean>(false);
+  const [customTheme, setCustomTheme] = useState<CustomThemeConfig>(DEFAULT_CUSTOM_THEME);
+  const [themeJsonInput, setThemeJsonInput] = useState<string>("");
+  const [themeModalTab, setThemeModalTab] = useState<"picker" | "json">("picker");
   const albumTouchStartX = useRef<number | null>(null);
   const albumLastWheelAt = useRef<number>(0);
   const autoUnlockKey = useRef<string>("");
@@ -487,19 +531,115 @@ export default function PlatformFeed({
     });
 
     if (typeof window !== "undefined") {
+      if (searchParams.get("requests") === "true") {
+        setShowReadingRequests(true);
+      }
       const saved = localStorage.getItem("chamber_logged_in_wallet");
       if (saved) {
         setViewerWallet(saved);
       }
+      try {
+        const savedCustom = localStorage.getItem("chamber_custom_theme_config");
+        if (savedCustom) {
+          const parsed = JSON.parse(savedCustom);
+          setCustomTheme(parsed);
+        }
+      } catch (_) {}
+
+      const savedTheme = localStorage.getItem("chamber_timeline_theme") || "obsidian";
+      setCurrentTheme(savedTheme);
+      applyTheme(savedTheme);
     }
-  }, [params]);
+  }, [params, searchParams]);
+
+  // Auto-redirect if URL was /echo/all or /echo/all/all and user is connected via extension
+  useEffect(() => {
+    if (walletAddress === "all" && extensionIdentity?.identityAlias && extensionIdentity.identityAlias !== "all") {
+      window.location.replace(`https://studio.milkcat.org/echo/${encodeURIComponent(extensionIdentity.identityAlias)}/all${window.location.search}`);
+    }
+  }, [walletAddress, extensionIdentity?.identityAlias]);
+
+  const applyTheme = (themeId: string, configToUse?: CustomThemeConfig) => {
+    setCurrentTheme(themeId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chamber_timeline_theme", themeId);
+      document.documentElement.setAttribute("data-theme", themeId);
+      if (themeId === "custom") {
+        const cfg = configToUse || customTheme;
+        document.documentElement.style.setProperty("--bg-page", cfg.bgPage);
+        document.documentElement.style.setProperty("--bg-card", cfg.bgCard);
+        document.documentElement.style.setProperty("--border-card", cfg.borderCard);
+        document.documentElement.style.setProperty("--accent-primary", cfg.accentPrimary);
+        document.documentElement.style.setProperty("--accent-text", cfg.accentText);
+        document.documentElement.style.setProperty("--accent-glow", `${cfg.accentPrimary}33`);
+        document.documentElement.style.setProperty("--node-color", cfg.accentPrimary);
+        document.documentElement.style.setProperty("--tag-bg", cfg.bgCard);
+      } else {
+        document.documentElement.style.removeProperty("--bg-page");
+        document.documentElement.style.removeProperty("--bg-card");
+        document.documentElement.style.removeProperty("--border-card");
+        document.documentElement.style.removeProperty("--accent-primary");
+        document.documentElement.style.removeProperty("--accent-text");
+        document.documentElement.style.removeProperty("--accent-glow");
+        document.documentElement.style.removeProperty("--node-color");
+        document.documentElement.style.removeProperty("--tag-bg");
+      }
+    }
+    setIsThemeMenuOpen(false);
+  };
+
+  const selectTheme = (themeId: string) => {
+    if (themeId === "custom") {
+      setShowThemeModal(true);
+    } else {
+      applyTheme(themeId);
+    }
+  };
+
+  const saveAndApplyCustomTheme = (newConfig: CustomThemeConfig) => {
+    setCustomTheme(newConfig);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chamber_custom_theme_config", JSON.stringify(newConfig));
+    }
+    applyTheme("custom", newConfig);
+    setShowThemeModal(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
+    const checkLocalMobileIdentity = (): ExtensionIdentity | null => {
+      if (typeof window === "undefined") return null;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith("nativeWalletPrivateKey")) {
+          const prefix = key.replace("nativeWalletPrivateKey", "");
+          const address = localStorage.getItem(prefix + "nativeWalletAddress") || localStorage.getItem("chamber_logged_in_wallet") || "";
+          const alias = localStorage.getItem(prefix + "identityAlias") || walletAddress || "";
+          if (address) {
+            return {
+              walletAddress: address,
+              identityAlias: alias,
+              identityDisplayName: alias,
+              sharingKeyId: "",
+              sharingPublicKey: null,
+              accessCapability: "owner",
+            };
+          }
+        }
+      }
+      return null;
+    };
+
+    const initialLocal = checkLocalMobileIdentity();
+    if (initialLocal) {
+      setExtensionIdentity(initialLocal);
+    }
+
     const syncExtensionIdentity = () => requestExtensionIdentity().then((identity) => {
       if (!cancelled) setExtensionIdentity(identity);
     }).catch(() => {
-      if (!cancelled) setExtensionIdentity(null);
+      const localMobile = checkLocalMobileIdentity();
+      if (!cancelled && localMobile) setExtensionIdentity(localMobile);
     });
     syncExtensionIdentity();
     window.addEventListener("focus", syncExtensionIdentity);
@@ -513,6 +653,63 @@ export default function PlatformFeed({
 
   useEffect(() => {
     if (searchParams.get("recovery") === "true") setShowRecovery(true);
+  }, [searchParams]);
+
+  function parseDeviceModel() {
+    if (typeof navigator === "undefined") return "行動裝置";
+    const ua = navigator.userAgent;
+    if (/iPhone/i.test(ua)) return "iPhone (iOS)";
+    if (/iPad/i.test(ua)) return "iPad (iPadOS)";
+    if (/Android/i.test(ua)) {
+      const match = ua.match(/Android\s+[\d\.]+;\s*([^;)]+)/);
+      return match ? match[1].trim() : "Android 手機";
+    }
+    if (/Macintosh/i.test(ua)) return "Mac";
+    if (/Windows/i.test(ua)) return "Windows PC";
+    return "行動裝置";
+  }
+
+  useEffect(() => {
+    const pairId = searchParams.get("pair");
+    if (!pairId) return;
+
+    setShowPairingModal(true);
+    setPairingStatus("⌛ 正在讀取並驗證手機 QR Code 配對憑證...");
+
+    fetch("https://studio.milkcat.org/chamber-api/recovery/pair/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pairingId: pairId, deviceModel: parseDeviceModel() }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success || !data.payload) throw new Error(data.error || "配對連結無效或已過期");
+        const payload = data.payload;
+        const prefix = `user_${payload.ownerUserId}_`;
+        const effectiveAlias = payload.identityAlias || walletAddress || "";
+        localStorage.setItem(prefix + "nativeWalletAddress", payload.walletAddress);
+        localStorage.setItem(prefix + "nativeWalletPrivateKey", payload.walletPrivateKey);
+        localStorage.setItem(prefix + "identityAlias", effectiveAlias);
+        localStorage.setItem("chamber_logged_in_wallet", payload.walletAddress);
+
+        setExtensionIdentity({
+          walletAddress: payload.walletAddress,
+          identityAlias: effectiveAlias,
+          identityDisplayName: effectiveAlias,
+          sharingKeyId: "",
+          sharingPublicKey: null,
+          accessCapability: "owner",
+        });
+
+        setPairingStatus("🎉 手機配對成功！已升格為受信任裝置，文章解密已解鎖！");
+        setTimeout(() => {
+          setShowPairingModal(false);
+          window.location.href = window.location.pathname;
+        }, 1500);
+      })
+      .catch((err) => {
+        setPairingStatus(`❌ 手機配對失敗：${err.message}`);
+      });
   }, [searchParams]);
 
   useEffect(() => {
@@ -530,10 +727,135 @@ export default function PlatformFeed({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, [albumViewer]);
+
+
+
+  // Client-Side Cryptographic Decryption Function (Supporting both Chrome Extension and Mobile Local Storage WebCrypto)
+  const requestExtensionDecrypt = async (
+    ciphertext: string,
+    iv: string,
+    mode: "text" | "bytes" = "text",
+    keyAccess: { ownerKeyEnvelope?: Record<string, unknown> | null; recipientKeyEnvelope?: Record<string, unknown> | null } = {}
+  ): Promise<{ plaintext: string; data: string }> => {
+    const base64ToBytes = (str: string) => {
+      const bin = atob(str);
+      return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    };
+    const bytesToBase64 = (bytes: Uint8Array) => {
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
+    };
+
+    const targetCipherBytes = base64ToBytes(ciphertext);
+    const targetIvBytes = base64ToBytes(iv);
+
+    // 1. If we have recipientKeyEnvelope and guest sharing key in localStorage, decrypt with native ECDH in browser!
+    if (keyAccess?.recipientKeyEnvelope && (keyAccess.recipientKeyEnvelope as any).ephemeral_public_key) {
+      let guestPrivKeyJwk: JsonWebKey | null = null;
+      if (typeof window !== "undefined") {
+        const guestKeyJson = localStorage.getItem("chamber_guest_sharing_key");
+        if (guestKeyJson) {
+          try { guestPrivKeyJwk = JSON.parse(guestKeyJson).sharingPrivateKey; } catch (_) {}
+        }
+      }
+      if (guestPrivKeyJwk) {
+        try {
+          const env = keyAccess.recipientKeyEnvelope as any;
+          const privKey = await crypto.subtle.importKey("jwk", guestPrivKeyJwk, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+          const pubKey = await crypto.subtle.importKey("jwk", env.ephemeral_public_key, { name: "ECDH", namedCurve: "P-256" }, false, []);
+          const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: pubKey }, privKey, 256));
+          const digest = await crypto.subtle.digest("SHA-256", shared);
+          const wrappingKey = await crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["decrypt"]);
+          const postKeyBytes = new Uint8Array(await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: base64ToBytes(env.iv) },
+            wrappingKey,
+            base64ToBytes(env.wrapped_key)
+          ));
+          const postKey = await crypto.subtle.importKey("raw", postKeyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+          const decryptedBytes = new Uint8Array(await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: targetIvBytes },
+            postKey,
+            targetCipherBytes
+          ));
+          return {
+            plaintext: mode === "bytes" ? "" : new TextDecoder().decode(decryptedBytes),
+            data: mode === "bytes" ? bytesToBase64(decryptedBytes) : "",
+          };
+        } catch (decryptErr) {
+          console.error("[Chamber] Guest ECDH recipient decryption error:", decryptErr);
+        }
+      }
+    }
+
+    // 2. If we have local private key stored in mobile localStorage, perform instant local WebCrypto decryption!
+    let localPrivateKey = "";
+    if (typeof window !== "undefined") {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith("nativeWalletPrivateKey")) {
+          localPrivateKey = localStorage.getItem(key) || "";
+          if (localPrivateKey) break;
+        }
+      }
+    }
+
+    if (localPrivateKey) {
+      const deriveKey = async (secretHex: string) => {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secretHex));
+        return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+      };
+
+      if (keyAccess?.ownerKeyEnvelope && (keyAccess.ownerKeyEnvelope as any).wrapped_key) {
+        const env = keyAccess.ownerKeyEnvelope as any;
+        const ownerKey = await deriveKey(localPrivateKey);
+        const postKeyBytes = new Uint8Array(await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: base64ToBytes(env.iv) },
+          ownerKey,
+          base64ToBytes(env.wrapped_key)
+        ));
+        const postKey = await crypto.subtle.importKey("raw", postKeyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+        const decryptedBytes = new Uint8Array(await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: targetIvBytes },
+          postKey,
+          targetCipherBytes
+        ));
+        return {
+          plaintext: mode === "bytes" ? "" : new TextDecoder().decode(decryptedBytes),
+          data: mode === "bytes" ? bytesToBase64(decryptedBytes) : "",
+        };
+      } else {
+        const ownerKey = await deriveKey(localPrivateKey);
+        const decryptedBytes = new Uint8Array(await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: targetIvBytes },
+          ownerKey,
+          targetCipherBytes
+        ));
+        return {
+          plaintext: mode === "bytes" ? "" : new TextDecoder().decode(decryptedBytes),
+          data: mode === "bytes" ? bytesToBase64(decryptedBytes) : "",
+        };
+      }
+    }
+
+    // 3. Fallback to Chrome Extension message bridge
+    return new Promise<{ plaintext: string; data: string }>((resolve, reject) => {
+      const requestId = `decrypt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const timeout = window.setTimeout(() => { window.removeEventListener("message", onMessage); reject(new Error(ft("decryptTimeout"))); }, 30000);
+      const onMessage = (event: MessageEvent) => {
+        if (event.source !== window || event.origin !== window.location.origin || event.data?.type !== "DECRYPT_ECHO_CONTENT_RESPONSE" || event.data.requestId !== requestId) return;
+        window.clearTimeout(timeout); window.removeEventListener("message", onMessage);
+        if (!event.data.success) reject(new Error(event.data.error || ft("ownerDecryptFailed")));
+        else resolve({ plaintext: event.data.plaintext || "", data: event.data.data || "" });
+      };
+      window.addEventListener("message", onMessage);
+      window.postMessage({ source: "echo-portal", type: "DECRYPT_ECHO_CONTENT", requestId, ciphertext, iv, mode, ...keyAccess }, window.location.origin);
+    });
+  };
 
   useEffect(() => {
     if (!walletAddress) return;
@@ -686,16 +1008,23 @@ export default function PlatformFeed({
             b.payload.timestamp - a.payload.timestamp
           );
 
+          // Filter out legacy encrypted posts without key_envelope (which cannot support recipient access grants)
+          // unless explicitly requested via ?legacy=true
+          const showLegacy = searchParams.get("legacy") === "true";
+          const compatiblePosts = showLegacy
+            ? fetchedPosts
+            : fetchedPosts.filter((post) => !post.payload.is_encrypted || Boolean(post.payload.key_envelope));
+
           // Same source URL means the same logical post. Keep only the latest
           // revision by default; `history=true` is the explicit audit view.
           if (focusTxId) {
-            const focused = fetchedPosts.filter((post) => post.txId === focusTxId);
+            const focused = compatiblePosts.filter((post) => post.txId === focusTxId);
             setPosts((current) => preservePostRuntimeState(focused, current));
             return;
           }
           const latestBySource = new Map<string, PostItem>();
           const dedupedPosts: PostItem[] = [];
-          for (const post of fetchedPosts) {
+          for (const post of compatiblePosts) {
             const sourceUrl = post.payload.logical_source_id || canonicalSourceKey(post.payload.source_url);
             if (!sourceUrl || showHistory) {
               dedupedPosts.push(post);
@@ -774,24 +1103,36 @@ export default function PlatformFeed({
     };
   }, [walletAddress, resolvedIdentityKey, currentPlatform, activeTag, searchParams]);
 
-  // Client-Side Cryptographic Decryption Function
-  const requestExtensionDecrypt = (
-    ciphertext: string,
-    iv: string,
-    mode: "text" | "bytes" = "text",
-    keyAccess: { ownerKeyEnvelope?: Record<string, unknown> | null; recipientKeyEnvelope?: Record<string, unknown> | null } = {}
-  ) => new Promise<{ plaintext: string; data: string }>((resolve, reject) => {
-    const requestId = `decrypt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const timeout = window.setTimeout(() => { window.removeEventListener("message", onMessage); reject(new Error(ft("decryptTimeout"))); }, 30000);
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== window || event.origin !== window.location.origin || event.data?.type !== "DECRYPT_ECHO_CONTENT_RESPONSE" || event.data.requestId !== requestId) return;
-      window.clearTimeout(timeout); window.removeEventListener("message", onMessage);
-      if (!event.data.success) reject(new Error(event.data.error || ft("ownerDecryptFailed")));
-      else resolve({ plaintext: event.data.plaintext || "", data: event.data.data || "" });
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage({ source: "echo-portal", type: "DECRYPT_ECHO_CONTENT", requestId, ciphertext, iv, mode, ...keyAccess }, window.location.origin);
-  });
+  const sortedAndFilteredPosts = useMemo(() => {
+    let result = [...posts];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((p) => {
+        const text = (p.decryptedContent || p.payload.content || "").toLowerCase();
+        const author = (p.payload.source_author?.name || p.payload.authorName || "").toLowerCase();
+        const platform = (p.payload.platform || "").toLowerCase();
+        const tags = (p.payload.tags || []).join(" ").toLowerCase();
+        return text.includes(q) || author.includes(q) || platform.includes(q) || tags.includes(q);
+      });
+    }
+
+    result.sort((a, b) => {
+      if (sortMode === "backup") {
+        const timeA = a.backupTime || a.payload.backup_timestamp || a.payload.timestamp || 0;
+        const timeB = b.backupTime || b.payload.backup_timestamp || b.payload.timestamp || 0;
+        return timeB - timeA;
+      } else {
+        const timeA = a.payload.published_at || a.payload.timestamp || 0;
+        const timeB = b.payload.published_at || b.payload.timestamp || 0;
+        return timeB - timeA;
+      }
+    });
+
+    return result;
+  }, [posts, searchQuery, sortMode]);
+
+
 
   // Alias/content-key identifies the stable Chamber timeline. Wallet addresses
   // may rotate during recovery, so they cannot be the sole ownership signal.
@@ -801,7 +1142,8 @@ export default function PlatformFeed({
     (normalizeIdentityAlias(extensionIdentity.identityAlias) &&
       normalizeIdentityAlias(extensionIdentity.identityAlias) === normalizeIdentityAlias(walletAddress)) ||
     (extensionIdentity.walletAddress && ownerWallet &&
-      extensionIdentity.walletAddress.toLowerCase() === ownerWallet.toLowerCase())
+      extensionIdentity.walletAddress.toLowerCase() === ownerWallet.toLowerCase()) ||
+    (extensionIdentity.accessCapability === "owner")
   ));
 
   const isPostOwner = (post: PostItem) => Boolean(extensionOwnsTimeline && (
@@ -815,11 +1157,18 @@ export default function PlatformFeed({
       if (!isPostOwner(post)) throw new Error(ft("legacyOwnerOnly"));
       return {};
     }
-    if (!extensionIdentity?.sharingKeyId) {
+    let requesterKeyId = extensionIdentity?.sharingKeyId;
+    if (!requesterKeyId && typeof window !== "undefined") {
+      const guestKeyJson = localStorage.getItem("chamber_guest_sharing_key");
+      if (guestKeyJson) {
+        try { requesterKeyId = JSON.parse(guestKeyJson).sharingKeyId; } catch (_) {}
+      }
+    }
+    if (!requesterKeyId) {
       if (isPostOwner(post)) return { ownerKeyEnvelope: post.payload.key_envelope };
       throw new Error(ft("installExtension"));
     }
-    const response = await fetch(`https://studio.milkcat.org/chamber-api/access/grants?postTxId=${encodeURIComponent(post.txId)}&requesterKeyId=${encodeURIComponent(extensionIdentity.sharingKeyId)}`, { cache: "no-store" });
+    const response = await fetch(`https://studio.milkcat.org/chamber-api/access/grants?postTxId=${encodeURIComponent(post.txId)}&requesterKeyId=${encodeURIComponent(requesterKeyId)}`, { cache: "no-store" });
     if (response.status === 404 && isPostOwner(post)) {
       return { ownerKeyEnvelope: post.payload.key_envelope };
     }
@@ -917,8 +1266,8 @@ export default function PlatformFeed({
 
     } catch (err: any) {
       console.error("[Chamber] Decryption error:", err);
-      alert(ft("decryptFailed", { error: err.message }));
-      setPosts((current) => current.map((item) => item.txId === post.txId ? { ...item, isDecrypting: false } : item));
+      setStatusMessage(ft("decryptFailed", { error: err.message }));
+      setPosts((current) => current.map((item) => item.txId === post.txId ? { ...item, isDecrypting: false, decryptError: err.message } : item));
     }
   };
 
@@ -993,11 +1342,50 @@ export default function PlatformFeed({
     }, window.location.origin);
   });
 
+  const getOrCreateGuestSharingKey = async () => {
+    let guestKeyJson = localStorage.getItem("chamber_guest_sharing_key");
+    if (guestKeyJson) {
+      try {
+        return JSON.parse(guestKeyJson);
+      } catch (_) {}
+    }
+    const keyPair = await crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
+    const pubJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+    const privJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    const keyId = "guest_" + Math.random().toString(36).slice(2, 10);
+    const guestWallet = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(20))).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const guestData = {
+      walletAddress: guestWallet,
+      identityAlias: "訪客 (Guest)",
+      identityDisplayName: "訪客 (Guest)",
+      sharingKeyId: keyId,
+      sharingPublicKey: pubJwk,
+      sharingPrivateKey: privJwk,
+      accessCapability: "guest",
+    };
+    localStorage.setItem("chamber_guest_sharing_key", JSON.stringify(guestData));
+    return guestData;
+  };
+
   const requestReadingAccess = async (post: PostItem) => {
+    const userPrompt = prompt("【向作者申請閱讀私密文章】\n請輸入您的稱呼或附言（例如：我是高中同學小明、或您的 FB/Threads 帳號），方便作者識別授權：", "");
+    if (userPrompt === null) return;
+
     setAccessBusyId(post.txId);
     try {
-      const identity = extensionIdentity || await requestExtensionIdentity();
-      setExtensionIdentity(identity);
+      let identity: any = extensionIdentity;
+      if (!identity || !identity.sharingKeyId) {
+        try {
+          identity = await requestExtensionIdentity();
+          setExtensionIdentity(identity);
+        } catch (_) {
+          identity = await getOrCreateGuestSharingKey();
+        }
+      }
       const response = await fetch("https://studio.milkcat.org/chamber-api/access/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1006,14 +1394,15 @@ export default function PlatformFeed({
           ownerIdentityKey: post.payload.identity_key || effectiveOwnerIdentityKey,
           ownerAlias: walletAddress,
           requesterWallet: identity.walletAddress,
-          requesterAlias: identity.identityAlias || identity.identityDisplayName || "",
+          requesterAlias: identity.identityAlias || identity.identityDisplayName || "訪客",
+          requesterNote: userPrompt.trim(),
           requesterKeyId: identity.sharingKeyId,
-          requesterPublicKey: identity.sharingPublicKey
-        })
+          requesterPublicKey: identity.sharingPublicKey,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || ft("requestFailed"));
-      setStatusMessage(data.request?.status === "approved" ? ft("approvedUnlocking") : ft("requestSent"));
+      setStatusMessage(data.request?.status === "approved" ? ft("approvedUnlocking") : "✅ 已向作者送出閱讀申請！作者已收到推播通知。");
       if (data.request?.status === "approved") await handleDecryptPost(post, posts.findIndex((item) => item.txId === post.txId));
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : ft("readingRequestFailed"));
@@ -1063,6 +1452,17 @@ export default function PlatformFeed({
       setIsDecryptingAll(false);
     })().catch(() => setIsDecryptingAll(false));
   }, [loading, posts, extensionIdentity?.walletAddress, extensionIdentity?.identityAlias, extensionIdentity?.sharingKeyId, walletAddress, resolvedIdentityKey]);
+
+  // If URL focuses on a single post (?post=TX_ID) and guest has a sharing key, try to unlock that specific post
+  useEffect(() => {
+    if (loading || !posts.length || extensionIdentity?.walletAddress || !focusTxId) return;
+    if (typeof window === "undefined") return;
+    const targetPost = posts.find((p) => p.txId === focusTxId && p.payload.is_encrypted && !p.decryptedContent);
+    if (!targetPost) return;
+    const guestKeyJson = localStorage.getItem("chamber_guest_sharing_key");
+    if (!guestKeyJson) return;
+    handleDecryptPost(targetPost, posts.findIndex((item) => item.txId === targetPost.txId)).catch(() => {});
+  }, [loading, posts, extensionIdentity, focusTxId]);
 
   useEffect(() => {
     if (!effectiveOwnerIdentityKey || !extensionIdentity?.walletAddress || !extensionOwnsTimeline) return;
@@ -1115,22 +1515,32 @@ export default function PlatformFeed({
   const localizedTimelinePath = (platform = currentPlatform) => `${locale === "en" ? "/en" : ""}/${walletAddress}/${platform}`;
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
+    <div
+      data-theme={currentTheme}
+      className="flex flex-col min-h-screen font-sans transition-colors duration-300"
+      style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)" }}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-indigo-950/40 px-4 py-3">
+      <header
+        className="sticky top-0 z-50 backdrop-blur-md px-4 py-3 border-b transition-colors duration-300"
+        style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+      >
         <div className="max-w-xl mx-auto flex items-center justify-between">
           <Link href={localizedTimelinePath("all")} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg transition-colors"
+              style={{ backgroundColor: "var(--accent-primary)", color: "#ffffff" }}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
             </div>
             <div>
-              <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-indigo-200 to-purple-300 bg-clip-text text-transparent">
+              <h1 className="text-sm font-bold tracking-tight text-slate-100">
                 Chamber Portal
               </h1>
-              <p className="text-[10px] text-slate-500 font-mono">studio.milkcat.org/reborn</p>
+              <p className="text-[10px] text-slate-400 font-mono">studio.milkcat.org/reborn</p>
             </div>
           </Link>
 
@@ -1138,11 +1548,12 @@ export default function PlatformFeed({
             {isTimelineOwner && (
               <button
                 onClick={() => setShowReadingRequests((current) => !current)}
-                className="relative text-[10px] sm:text-xs text-slate-300 hover:text-indigo-200 bg-slate-900 hover:bg-indigo-950/50 border border-slate-800 px-2.5 py-2 rounded-full transition-colors"
+                className="relative text-[10px] sm:text-xs text-slate-300 hover:text-white px-2.5 py-2 rounded-full border transition-colors"
+                style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
               >
                 {ft("readingRequests")}
                 {pendingReadingRequests.length > 0 && (
-                  <span className="absolute -right-1 -top-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center">
+                  <span className="absolute -right-1 -top-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center font-bold">
                     {pendingReadingRequests.length}
                   </span>
                 )}
@@ -1150,10 +1561,75 @@ export default function PlatformFeed({
             )}
             <Link
               href={locale === "en" ? "/en/guide" : "/guide"}
-              className="text-[10px] sm:text-xs text-slate-400 hover:text-indigo-300 transition-colors"
+              className="text-[10px] sm:text-xs text-slate-400 hover:text-slate-200 transition-colors"
             >
               {ft("guide")}
             </Link>
+
+            {/* Theme Selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs text-slate-300 hover:text-white border transition-all cursor-pointer shadow-sm"
+                style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+                title="切換時光牆主題"
+              >
+                <span>{TIMELINE_THEMES.find((t) => t.id === currentTheme)?.icon || "🎨"}</span>
+                <span className="hidden sm:inline font-medium text-[11px]">{TIMELINE_THEMES.find((t) => t.id === currentTheme)?.name || "主題"}</span>
+              </button>
+
+              {isThemeMenuOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-64 border rounded-2xl shadow-2xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                  style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+                >
+                  <div className="px-3 py-2 border-b border-slate-700/50 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200">🎨 時光牆風格主題</span>
+                    <button
+                      onClick={() => {
+                        setShowThemeModal(true);
+                        setIsThemeMenuOpen(false);
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded font-bold transition-all text-white"
+                      style={{ backgroundColor: "var(--accent-primary)" }}
+                    >
+                      ＋ 客製/匯入
+                    </button>
+                  </div>
+                  <div className="space-y-1 mt-1.5">
+                    {TIMELINE_THEMES.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => selectTheme(t.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all ${
+                          currentTheme === t.id
+                            ? "text-white font-bold border shadow-sm"
+                            : "hover:bg-white/5 text-slate-300 hover:text-white border border-transparent"
+                        }`}
+                        style={currentTheme === t.id ? { backgroundColor: "var(--bg-page)", borderColor: "var(--accent-primary)" } : {}}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base">{t.icon}</span>
+                          <div>
+                            <div className="text-xs">{t.name}</div>
+                            <div className="text-[9px] text-slate-400">{t.id === "custom" ? customTheme.name : t.desc}</div>
+                          </div>
+                        </div>
+                        <span
+                          className="text-[9px] px-1.5 py-0.5 rounded border"
+                          style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--accent-text)" }}
+                        >
+                          {t.badge}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <LanguageSwitcher compact routeAware />
             <div className="relative">
             {extensionIdentity ? (
@@ -1213,16 +1689,36 @@ export default function PlatformFeed({
               </div>
             ) : (
               <button
-                onClick={() => window.location.reload()}
-                className="text-xs font-semibold border border-amber-800/60 bg-amber-950/30 hover:bg-amber-900/40 text-amber-200 px-4 py-2 rounded-full transition-all duration-200"
+                onClick={() => setShowRecovery(true)}
+                className="text-xs font-semibold border border-indigo-800/60 bg-indigo-950/40 hover:bg-indigo-900/60 hover:border-indigo-500 text-indigo-200 px-3.5 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 shadow-sm"
               >
-                {chamberIdentityLabel}
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>{chamberIdentityLabel}</span>
+                <span className="text-[10px] text-indigo-300 opacity-90">({ft("keyRecoverySettings")})</span>
               </button>
             )}
             </div>
           </div>
         </div>
       </header>
+
+      {showPairingModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
+          <section className="w-full max-w-md rounded-2xl border-2 border-indigo-500/80 bg-slate-900 p-6 text-center shadow-2xl shadow-indigo-950/80 animate-fade-in">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-950 border border-indigo-500/60 text-2xl">
+              📱
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-indigo-100">手機 QR Code 快速配對</h2>
+            <p className="mt-2 text-xs leading-6 text-slate-300">{pairingStatus}</p>
+            <button
+              onClick={() => setShowPairingModal(false)}
+              className="mt-5 w-full rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-700 hover:text-white"
+            >
+              關閉
+            </button>
+          </section>
+        </div>
+      )}
 
       {showRecovery && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
@@ -1237,66 +1733,101 @@ export default function PlatformFeed({
               <button onClick={() => setShowRecovery(false)} className="rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-800 hover:text-white">✕</button>
             </div>
 
-            <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              {recoveryConfigured ? (
-                <div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-lg" aria-hidden="true">✅</span>
-                    <div>
-                      <h3 className="text-sm font-semibold text-emerald-300">{ft("recoveryReadyTitle")}</h3>
-                      <p className="mt-1 text-[11px] leading-5 text-slate-500">{ft("recoveryReadyBody")}</p>
-                    </div>
-                  </div>
-                  <details className="mt-3 border-t border-slate-800 pt-3">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-slate-400 hover:text-amber-300">{ft("rotateCSummary")}</summary>
-                    <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label={ft("rotateProviderLabel")}>
-                      <button type="button" onClick={() => setPasskeyProvider("password-manager")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "password-manager" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("passwordManager")}</button>
-                      <button type="button" onClick={() => setPasskeyProvider("system")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "system" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("systemPasskey")}</button>
-                    </div>
-                    <p className="mt-2 text-[10px] leading-4 text-amber-200/70">{ft("rotateWarning")}</p>
-                    <button type="button" onClick={rotateRecoveryCode} disabled={recoveryBusy} className="mt-2 w-full rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-900/40 disabled:opacity-50">{ft("rotateCButton")}</button>
-                  </details>
+            {pendingRecovery && (
+              <div className="mt-4 rounded-2xl border-2 border-amber-500/80 bg-amber-950/40 p-4 shadow-xl shadow-amber-950/40 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚠️</span>
+                  <h3 className="text-sm font-bold text-amber-200">{ft("emergencyCTitle")}</h3>
                 </div>
-              ) : (
-                <>
-                  <h3 className="text-sm font-semibold text-slate-200">{ft("recoverySetupTitle")}</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-slate-500">{ft("recoverySetupBody")}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label={ft("passkeyProviderLabel")}>
-                    <button
-                      type="button"
-                      onClick={() => setPasskeyProvider("password-manager")}
-                      disabled={recoveryBusy}
-                      className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "password-manager" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
-                    >
-                      {ft("passwordManager")}
-                      <span className="mt-1 block text-[9px] font-normal opacity-75">{ft("passwordManagerExamples")}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPasskeyProvider("system")}
-                      disabled={recoveryBusy}
-                      className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "system" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
-                    >
-                      {ft("systemPasskey")}
-                      <span className="mt-1 block text-[9px] font-normal opacity-75">{ft("systemPasskeyExamples")}</span>
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[10px] leading-4 text-slate-500">{ft("providerHint")}</p>
+                <p className="mt-1 text-xs leading-5 text-amber-100/90">{ft("emergencyCBody")}</p>
+                <textarea readOnly value={pendingRecovery.recoveryCodeC} rows={4} className="mt-3 w-full resize-none rounded-xl border border-amber-600/60 bg-slate-950 p-3 font-mono text-xs text-amber-200 outline-none focus:border-amber-400 select-all" />
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
-                    onClick={setupRecoveryVault}
-                    disabled={recoveryBusy || Boolean(pendingRecovery)}
-                    className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(pendingRecovery.recoveryCodeC);
+                      setCopiedC(true);
+                      setRecoveryStatus(ft("cCopied"));
+                      setTimeout(() => setCopiedC(false), 3000);
+                    }}
+                    className={`rounded-xl px-3 py-2.5 text-xs font-bold transition-all shadow-md ${copiedC ? "bg-emerald-500 text-white" : "bg-amber-500 text-slate-950 hover:bg-amber-400"}`}
                   >
-                    {recoveryBusy ? ft("processing") : pendingRecovery ? ft("saveCFirst") : ft("setupRecoveryButton")}
+                    {copiedC ? "✅ 已複製到剪貼簿！" : ft("copyC")}
                   </button>
-                </>
-              )}
-            </div>
+                  <button
+                    onClick={confirmRecoverySaved}
+                    disabled={recoveryBusy}
+                    className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md"
+                  >
+                    {ft("cSavedElsewhere")}
+                  </button>
+                </div>
+              </div>
+            )}
 
-            <details className="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-300 hover:text-indigo-200">{ft("restoreToolSummary")}</summary>
+            {extensionIdentity && (
+              <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                {recoveryConfigured ? (
+                  <div>
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">✅</span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-emerald-300">{ft("recoveryReadyTitle")}</h3>
+                        <p className="mt-1 text-[11px] leading-5 text-slate-500">{ft("recoveryReadyBody")}</p>
+                      </div>
+                    </div>
+                    <details className="mt-3 border-t border-slate-800 pt-3">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-400 hover:text-amber-300">{ft("rotateCSummary")}</summary>
+                      <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label={ft("rotateProviderLabel")}>
+                        <button type="button" onClick={() => setPasskeyProvider("password-manager")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "password-manager" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("passwordManager")}</button>
+                        <button type="button" onClick={() => setPasskeyProvider("system")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "system" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("systemPasskey")}</button>
+                      </div>
+                      <p className="mt-2 text-[10px] leading-4 text-amber-200/70">{ft("rotateWarning")}</p>
+                      <button type="button" onClick={rotateRecoveryCode} disabled={recoveryBusy} className="mt-2 w-full rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-900/40 disabled:opacity-50">{ft("rotateCButton")}</button>
+                    </details>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-semibold text-slate-200">{ft("recoverySetupTitle")}</h3>
+                    <p className="mt-1 text-[11px] leading-5 text-slate-500">{ft("recoverySetupBody")}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label={ft("passkeyProviderLabel")}>
+                      <button
+                        type="button"
+                        onClick={() => setPasskeyProvider("password-manager")}
+                        disabled={recoveryBusy}
+                        className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "password-manager" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
+                      >
+                        {ft("passwordManager")}
+                        <span className="mt-1 block text-[9px] font-normal opacity-75">{ft("passwordManagerExamples")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPasskeyProvider("system")}
+                        disabled={recoveryBusy}
+                        className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "system" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
+                      >
+                        {ft("systemPasskey")}
+                        <span className="mt-1 block text-[9px] font-normal opacity-75">{ft("systemPasskeyExamples")}</span>
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[10px] leading-4 text-slate-500">{ft("providerHint")}</p>
+                    <button
+                      onClick={setupRecoveryVault}
+                      disabled={recoveryBusy || Boolean(pendingRecovery)}
+                      className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                    >
+                      {recoveryBusy ? ft("processing") : pendingRecovery ? ft("saveCFirst") : ft("setupRecoveryButton")}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className={`mt-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 ${!extensionIdentity ? "border-indigo-800/50" : ""}`}>
+              <h3 className="text-sm font-semibold text-indigo-200 flex items-center gap-1.5">
+                <span>📱 {ft("restoreToolSummary")}</span>
+              </h3>
               <div className="mt-3 border-t border-slate-800 pt-3">
-                <p className="text-[11px] leading-5 text-slate-500">{ft("restoreToolBody")}</p>
+                <p className="text-[11px] leading-5 text-slate-400">{ft("restoreToolBody")}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label={ft("restoreProviderLabel")}>
                   <button type="button" onClick={() => setPasskeyProvider("password-manager")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "password-manager" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("passwordManager")}</button>
                   <button type="button" onClick={() => setPasskeyProvider("system")} disabled={recoveryBusy} className={`rounded-lg border px-2 py-2 text-[11px] font-semibold ${passkeyProvider === "system" ? "border-indigo-500 bg-indigo-950/70 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}>{ft("systemPasskey")}</button>
@@ -1313,43 +1844,21 @@ export default function PlatformFeed({
                 <button
                   onClick={restoreRecoveryVault}
                   disabled={recoveryBusy}
-                  className="mt-2 w-full rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 shadow-md"
                 >
                   {ft("restoreBC")}
                 </button>
-                <button
-                  onClick={restoreWithLocalAAndVaultB}
-                  disabled={recoveryBusy}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-transparent px-4 py-2.5 text-xs font-semibold text-slate-400 hover:border-indigo-700 hover:text-indigo-200 disabled:opacity-50"
-                >
-                  {ft("repairAB")}
-                </button>
+                {extensionIdentity && (
+                  <button
+                    onClick={restoreWithLocalAAndVaultB}
+                    disabled={recoveryBusy}
+                    className="mt-2 w-full rounded-xl border border-slate-700 bg-transparent px-4 py-2.5 text-xs font-semibold text-slate-400 hover:border-indigo-700 hover:text-indigo-200 disabled:opacity-50"
+                  >
+                    {ft("repairAB")}
+                  </button>
+                )}
               </div>
-            </details>
-
-            {pendingRecovery && (
-              <div className="mt-3 rounded-xl border border-amber-700/60 bg-amber-950/20 p-4">
-                <h3 className="text-sm font-semibold text-amber-200">{ft("emergencyCTitle")}</h3>
-                <p className="mt-1 text-[11px] leading-5 text-amber-100/70">{ft("emergencyCBody")}</p>
-                <textarea readOnly value={pendingRecovery.recoveryCodeC} rows={4} className="mt-3 w-full resize-none rounded-lg border border-amber-800/70 bg-slate-950 p-3 font-mono text-[10px] text-amber-200" />
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(pendingRecovery.recoveryCodeC);
-                    setRecoveryStatus(ft("cCopied"));
-                  }}
-                  className="mt-2 w-full rounded-lg bg-amber-800/50 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-700/60"
-                >
-                  {ft("copyC")}
-                </button>
-                <button
-                  onClick={confirmRecoverySaved}
-                  disabled={recoveryBusy}
-                  className="mt-2 w-full rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  {ft("cSavedElsewhere")}
-                </button>
-              </div>
-            )}
+            </div>
 
             {recoveryStatus && (
               <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs leading-5 text-slate-300">{recoveryStatus}</div>
@@ -1360,10 +1869,24 @@ export default function PlatformFeed({
 
       {/* Main Flow */}
       <main className="flex-1 w-full max-w-xl mx-auto px-4 py-6">
-        {!extensionIdentity && encryptedRemainingCount > 0 && (
-          <div className="mb-5 rounded-xl border border-amber-800/60 bg-amber-950/20 p-3 text-xs leading-5 text-amber-200">
-            <div className="font-semibold">{ft("identityUnavailableTitle")}</div>
-            <div className="mt-1 text-[10px] text-amber-100/70">{ft("identityUnavailableBody")}</div>
+        {!extensionIdentity && (
+          <div className="mb-5 rounded-xl border border-amber-500/40 bg-slate-900/95 p-4 text-xs leading-5 text-amber-100 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-bold text-sm text-amber-300 flex items-center gap-1.5">
+                  <span>📱 該手機仍未綁定 Chamber 主人身分</span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-300/85 leading-relaxed">
+                  此裝置尚未綁定解密身分。若您是時光牆主人，請使用電腦版 Chamber 擴充功能產生 QR Code 進行一鍵綁定；若您是訪客好友，可於下方文章點擊「向作者申請閱讀」。
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRecovery(true)}
+                className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center gap-1.5"
+              >
+                🔐 密碼/復原碼解鎖
+              </button>
+            </div>
           </div>
         )}
         {extensionIdentity && ownerWallet && !isTimelineOwner && (
@@ -1391,6 +1914,11 @@ export default function PlatformFeed({
                     </div>
                     {request.requesterAlias && <div className="mt-0.5 font-mono text-[9px] text-slate-600">{request.requesterWallet.slice(0, 8)}…{request.requesterWallet.slice(-6)}</div>}
                     <div className="mt-1 text-[9px] text-slate-500">{ft("requestPost", { post: `${request.postTxId.slice(0, 10)}…`, date: new Date(request.createdAt).toLocaleString(locale) })}</div>
+                    {request.requesterNote && (
+                      <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-900/50 text-[11px] text-indigo-200">
+                        <span className="font-bold text-indigo-400">💬 申請附言：</span>{request.requesterNote}
+                      </div>
+                    )}
                     {request.status === "pending" ? (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
@@ -1398,7 +1926,7 @@ export default function PlatformFeed({
                           disabled={accessBusyId === request.id}
                           className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                         >
-                          {ft("approvePost")}
+                          {!request.requesterAlias || request.requesterAlias.includes("訪客") ? "⏳ 核准 24 小時限時閱讀" : "✅ 核准好友永久閱讀"}
                         </button>
                         <button
                           onClick={() => decideReadingRequest(request, "rejected")}
@@ -1510,26 +2038,102 @@ export default function PlatformFeed({
           </div>
         )}
 
+        {/* Search Bar & Sorting Controls */}
+        <div
+          className="mb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 backdrop-blur p-3.5 rounded-2xl shadow-lg border transition-all"
+          style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+        >
+          <div className="relative flex-1">
+            <span className="absolute left-3.5 top-2.5 text-xs text-slate-400">🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜尋文章內容、標籤、作者..."
+              className="w-full rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none border transition-all"
+              style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-2 text-xs text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 shrink-0 font-medium">排序：</span>
+            <div
+              className="flex rounded-xl p-0.5 border text-[11px]"
+              style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+            >
+              <button
+                type="button"
+                onClick={() => setSortMode("backup")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  sortMode === "backup" ? "text-white shadow font-bold" : "text-slate-400 hover:text-slate-200"
+                }`}
+                style={sortMode === "backup" ? { backgroundColor: "var(--accent-primary)" } : {}}
+              >
+                ⚡ 最新備份
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode("published")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  sortMode === "published" ? "text-white shadow font-bold" : "text-slate-400 hover:text-slate-200"
+                }`}
+                style={sortMode === "published" ? { backgroundColor: "var(--accent-primary)" } : {}}
+              >
+                📅 原始發文
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Timeline Post Flow */}
-        <div className="relative border-l border-slate-800 ml-4 pl-6 space-y-6">
+        <div
+          className="relative border-l ml-4 pl-6 sm:pl-8 space-y-8"
+          style={{ borderColor: "var(--border-card)" }}
+        >
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-500">
-              <div className="w-6 h-6 rounded-full border-2 border-t-indigo-500 border-indigo-900/30 animate-spin"></div>
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+              <div
+                className="w-6 h-6 rounded-full border-2 animate-spin"
+                style={{ borderTopColor: "var(--accent-primary)", borderColor: "var(--border-card)" }}
+              ></div>
               <p className="text-xs">{ft("loadingPosts")}</p>
             </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
-              <p className="text-xs">{ft("noPosts")}</p>
+          ) : sortedAndFilteredPosts.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <p className="text-xs">{searchQuery ? "找不到符合搜尋條件的文章" : ft("noPosts")}</p>
             </div>
           ) : (
-            posts.map((post, idx) => {
-              const formattedTime = new Date(post.payload.timestamp * 1000).toLocaleString(locale, {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit"
-              });
+            sortedAndFilteredPosts.map((post, idx) => {
+              const originalTime = post.payload.published_at || post.payload.timestamp;
+              const formattedPublishedTime = originalTime
+                ? new Date(originalTime * 1000).toLocaleString(locale, {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "";
+
+              const backupTimeRaw = post.backupTime || post.payload.backup_timestamp;
+              const backupFormattedTime = backupTimeRaw
+                ? new Date(backupTimeRaw * 1000).toLocaleString(locale, {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "";
 
               // Tag elements helper
               const postTags = post.payload.tags || [];
@@ -1538,58 +2142,137 @@ export default function PlatformFeed({
                 : [post.payload.media?.primary_fb_cdn, post.payload.media?.fallback_backup].filter(Boolean) as string[];
               const mediaUrls = post.payload.is_encrypted ? (post.decryptedMedia || []) : storedMediaUrls;
 
+              const contentText = post.payload.is_encrypted ? (post.decryptedContent || "") : (post.payload.content || "");
+              const isExpanded = Boolean(expandedPosts[post.txId]);
+              const hasLongText = (contentText || "").length > 180 || ((contentText || "").split("\n").length > 4);
+              const isCollapsible = hasLongText || mediaUrls.length > 1;
+
+              if (currentTheme === "cat" || searchParams.get("skin") === "cat") {
+                return (
+                  <CatMorphingCard
+                    key={post.txId}
+                    post={post}
+                    isPostOwner={isPostOwner(post)}
+                    isExpanded={isExpanded}
+                    onToggleExpand={() => setExpandedPosts((prev) => ({ ...prev, [post.txId]: !isExpanded }))}
+                    onDecrypt={() => handleDecryptPost(post, idx)}
+                    onRequestAccess={() => requestReadingAccess(post)}
+                    isDecrypting={post.isDecrypting}
+                    accessBusy={accessBusyId === post.txId}
+                    irysHost={irysHost}
+                    ft={ft}
+                    locale={locale}
+                    onOpenAlbum={openAlbumViewer}
+                  />
+                );
+              }
+
               return (
                 <div key={post.txId} className="relative group">
-                  <div className="absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full bg-slate-950 border-2 border-indigo-500 group-hover:border-purple-500 transition-all"></div>
+                  {/* Timeline Node */}
+                  <div
+                    className="absolute -left-[31px] sm:-left-[39px] top-3.5 w-3.5 h-3.5 rounded-full border-2 transition-all shadow-sm"
+                    style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--accent-primary)" }}
+                  ></div>
 
-                  <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-900 rounded-2xl p-4.5 hover:border-slate-800 transition-all">
+                  {/* Card Container with Dynamic Theme styling */}
+                  <article
+                    className={`rounded-2xl p-5 sm:p-6 shadow-xl border transition-all duration-300 relative ${
+                      currentTheme === "cat" || searchParams.get("skin") === "cat" ? "cat-card" : ""
+                    }`}
+                    style={{
+                      backgroundColor: "var(--bg-card)",
+                      borderColor: "var(--border-card)",
+                      boxShadow: "0 10px 30px -10px var(--accent-glow)",
+                    }}
+                  >
+                    {/* Private Experimental Cat Morphing Ears */}
+                    {(currentTheme === "cat" || searchParams.get("skin") === "cat") && (
+                      <div className="cat-card-ears">
+                        <div className="cat-ear-left" />
+                        <div className="cat-ear-right" />
+                      </div>
+                    )}
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-3.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-indigo-400">
+                    <div className="flex items-start justify-between gap-3 mb-4 pb-3.5 border-b border-slate-700/30">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs shadow-inner shrink-0"
+                          style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--accent-text)" }}
+                        >
                           {post.payload.platform?.toUpperCase().slice(0, 2) || "MS"}
                         </div>
-                        <div>
-                          <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                             {ft("fromPlatform", { platform: post.payload.platform || "Chamber" })}
-                             {post.payload.source_url && (
-                               <a
-                                 href={post.payload.source_url}
-                                 target="_blank"
-                                 rel="noreferrer"
-                                 className="text-[9px] bg-indigo-950/40 text-indigo-400 border border-indigo-900/40 px-1.5 py-0.5 rounded font-bold hover:underline hover:text-indigo-300"
-                               >
-                                 {ft("viewSource")}
-                               </a>
-                             )}
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <div className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2">
+                            <span>{ft("fromPlatform", { platform: post.payload.platform || "Chamber" })}</span>
+                            {post.payload.source_url && (
+                              <a
+                                href={post.payload.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] px-2 py-0.5 rounded border transition-all font-medium hover:text-white"
+                                style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--accent-text)" }}
+                              >
+                                {ft("viewSource")}
+                              </a>
+                            )}
                           </div>
-                          <div className="text-[9px] text-slate-500 font-mono">{formattedTime}</div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] sm:text-[11px] text-slate-400 font-mono">
+                            {formattedPublishedTime && <span>📅 原文：{formattedPublishedTime}</span>}
+                            {backupFormattedTime && (
+                              <span className="font-semibold" style={{ color: "var(--accent-text)" }}>
+                                🛡️ 備份：{backupFormattedTime}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <a
                         href={`${irysHost}/${post.txId}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-mono bg-indigo-950/20 px-2 py-0.5 rounded border border-indigo-900/20"
+                        className="shrink-0 text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all hover:text-white"
+                        style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--accent-text)" }}
                       >
-                        TX: {post.txId.slice(0, 8)}...
+                        TX: {post.txId.slice(0, 8)}…
                       </a>
                     </div>
 
-                    {/* Content */}
-                    <div className="text-xs leading-relaxed text-slate-300 mb-3 whitespace-pre-wrap">
+                    {/* Content Section (Comfortable Reading & Spacious Line Height) */}
+                    <div className="text-sm sm:text-[15px] leading-7 sm:leading-8 text-slate-100 font-normal tracking-wide">
                       {post.payload.is_encrypted ? (
                         post.decryptedContent ? (
-                          <div className="bg-emerald-950/10 border border-emerald-900/30 p-3 rounded-xl text-slate-200 relative whitespace-pre-wrap break-words">
-                            <span className="absolute top-2 right-2 text-[9px] bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded font-mono">{ft("decrypted")}</span>
-                            {post.decryptedContent}
+                          <div
+                            className="p-4 sm:p-5 rounded-2xl relative border flex flex-col gap-2.5"
+                            style={{
+                              backgroundColor: "rgba(16, 185, 129, 0.08)",
+                              borderColor: "var(--accent-primary)",
+                            }}
+                          >
+                            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "rgba(16, 185, 129, 0.2)" }}>
+                              <span className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: "var(--accent-text)" }}>
+                                <span>🔓</span> <span>{ft("decrypted")}</span>
+                              </span>
+                              <span
+                                className="text-[9px] px-2 py-0.5 rounded font-mono font-bold text-white shadow-sm"
+                                style={{ backgroundColor: "var(--accent-primary)" }}
+                              >
+                                SECURE
+                              </span>
+                            </div>
+                            <div className={`whitespace-pre-wrap break-words leading-7 sm:leading-8 ${!isExpanded && isCollapsible ? "line-clamp-4 max-h-[140px] overflow-hidden" : ""}`}>
+                              {post.decryptedContent}
+                            </div>
                           </div>
                         ) : (
-                          <div className="bg-slate-950 border border-indigo-950/40 p-4 rounded-xl text-center flex flex-col items-center gap-2.5">
-                            <div className="text-lg">🔒</div>
+                          <div
+                            className="p-6 rounded-2xl text-center flex flex-col items-center gap-3 border"
+                            style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                          >
+                            <div className="text-2xl">🔒</div>
                             <div>
-                              <div className="text-xs font-semibold text-slate-300">{ft("privatePost")}</div>
-                              <p className="text-[9px] text-slate-500 mt-1">
+                              <div className="text-sm font-bold text-slate-100">{ft("privatePost")}</div>
+                              <p className="text-xs text-slate-400 mt-1">
                                 {isPostOwner(post) ? ft("ownerAutoUnlock") : ft("approvedOnly")}
                               </p>
                             </div>
@@ -1597,61 +2280,69 @@ export default function PlatformFeed({
                               <button
                                 onClick={() => handleDecryptPost(post, idx)}
                                 disabled={post.isDecrypting}
-                                className="text-xs bg-indigo-600/80 hover:bg-indigo-500 text-indigo-100 px-4.5 py-1.5 rounded-lg border border-indigo-500/20 transition-all"
+                                className="text-xs text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md"
+                                style={{ backgroundColor: "var(--accent-primary)" }}
                               >
                                 {post.isDecrypting ? ft("autoUnlocking") : ft("unlockAgain")}
                               </button>
                             ) : post.payload.key_envelope ? (
-                              <div className="flex flex-col gap-2">
-                                <button
-                                  onClick={() => requestReadingAccess(post)}
-                                  disabled={accessBusyId === post.txId}
-                                  className="text-xs bg-indigo-600/80 hover:bg-indigo-500 text-indigo-100 px-4.5 py-1.5 rounded-lg border border-indigo-500/20 transition-all disabled:opacity-50"
-                                >
-                                  {accessBusyId === post.txId ? ft("sending") : ft("requestAuthor")}
-                                </button>
+                              <div className="flex flex-col items-center gap-2.5">
                                 <button
                                   onClick={() => handleDecryptPost(post, idx)}
                                   disabled={post.isDecrypting}
-                                  className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                                  className="text-xs text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer hover:brightness-110 active:scale-95"
+                                  style={{ backgroundColor: "var(--accent-primary)" }}
                                 >
-                                  {ft("grantedRetry")}
+                                  {post.isDecrypting ? "🔑 正在驗證授權與解密..." : "🔓 點擊解密閱讀 (若已獲作者核准)"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => requestReadingAccess(post)}
+                                  disabled={accessBusyId === post.txId}
+                                  className="text-[11px] text-slate-400 hover:text-slate-200 underline decoration-slate-600 transition-colors cursor-pointer"
+                                >
+                                  {accessBusyId === post.txId ? ft("sending") : "尚未申請？點此向作者申請閱讀 →"}
                                 </button>
                               </div>
                             ) : (
-                              <div className="text-[10px] text-amber-400">{ft("legacyMustRebackup")}</div>
+                              <div className="text-xs text-amber-400">{ft("legacyMustRebackup")}</div>
                             )}
                           </div>
                         )
                       ) : (
-                        post.payload.content
+                        <div className={`whitespace-pre-wrap break-words leading-7 sm:leading-8 ${!isExpanded && isCollapsible ? "line-clamp-4 max-h-[140px] overflow-hidden" : ""}`}>
+                          {post.payload.content}
+                        </div>
                       )}
                     </div>
 
                     {post.isDecrypting && Boolean(post.mediaDecryptTotal) && (
-                      <div className="mt-2 text-[10px] text-indigo-300">
+                      <div className="mt-2 text-xs text-slate-400 font-mono">
                         {ft("decryptingAlbum", { done: post.mediaDecryptCompleted || 0, total: post.mediaDecryptTotal || 0 })}
                         {Boolean(post.mediaDecryptFailed) && ft("imageFailures", { count: post.mediaDecryptFailed || 0 })}
                       </div>
                     )}
                     {!post.isDecrypting && Boolean(post.mediaDecryptFailed) && (
-                      <div className="mt-2 text-[10px] text-amber-400">
+                      <div className="mt-2 text-xs text-amber-400 font-mono">
                         {ft("albumPartial", { success: (post.mediaDecryptTotal || 0) - (post.mediaDecryptFailed || 0), total: post.mediaDecryptTotal || 0 })}
                       </div>
                     )}
 
                     {post.payload.media?.video && (
-                      <div className="mt-3.5 rounded-xl border border-indigo-900/40 bg-indigo-950/20 p-3">
+                      <div
+                        className="mt-4 rounded-xl border p-3.5"
+                        style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] font-semibold text-indigo-200">
+                            <div className="text-xs font-bold text-slate-200">
                               {ft("videoSource", { status: post.payload.media.video_backup_status === "complete"
                                 ? ft("videoComplete")
                                 : post.payload.media.video_backup_status === "poster_only"
                                   ? ft("videoPoster")
                                   : ft("videoLinkOnly") })}
                             </div>
-                            <div className="mt-1 text-[9px] text-slate-500 break-all">
+                            <div className="mt-1 text-[10px] text-slate-400 break-all font-mono">
                               {post.payload.media.video_source_url || post.payload.source_url || ft("noVideoUrl")}
                             </div>
                           </div>
@@ -1660,7 +2351,8 @@ export default function PlatformFeed({
                               href={post.payload.media.video_source_url || post.payload.source_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="shrink-0 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg transition-colors"
+                              className="shrink-0 text-xs px-3.5 py-2 rounded-xl text-white font-bold transition-all shadow"
+                              style={{ backgroundColor: "var(--accent-primary)" }}
                             >
                               {ft("openVideo")}
                             </a>
@@ -1669,9 +2361,83 @@ export default function PlatformFeed({
                       </div>
                     )}
 
+                    {/* Media Gallery (In-Card Seamless Integration) */}
+                    {mediaUrls.length > 0 && (
+                      <div className="mt-4">
+                        {!isExpanded && isCollapsible ? (
+                          /* Compact Preview Mode (Single Thumbnail with Badge) */
+                          <div
+                            onClick={() => openAlbumViewer(mediaUrls, 0, post.payload.media?.album ? ft("album") : ft("backupMedia"))}
+                            className="relative max-h-[240px] rounded-2xl overflow-hidden border cursor-zoom-in group/thumb shadow-md"
+                            style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                          >
+                            <img
+                              src={mediaUrls[0]}
+                              alt="Post media preview"
+                              className="object-cover w-full h-[220px] group-hover/thumb:scale-102 transition-transform duration-300"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                const fallback = post.payload.media?.fallback_backup || "";
+                                if (!post.payload.is_encrypted && fallback && target.src !== fallback) target.src = fallback;
+                              }}
+                            />
+                            {mediaUrls.length > 1 && (
+                              <div
+                                className="absolute bottom-3 right-3 backdrop-blur border px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xl flex items-center gap-1.5"
+                                style={{ backgroundColor: "rgba(0, 0, 0, 0.8)", borderColor: "var(--accent-primary)" }}
+                              >
+                                <span>📷</span> <span>共 {mediaUrls.length} 張照片 (點擊查看)</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Expanded Full Grid Mode */
+                          <div
+                            className="rounded-2xl overflow-hidden border"
+                            style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                          >
+                            <div
+                              className="flex items-center justify-between px-3.5 py-2.5 border-b text-xs text-slate-300"
+                              style={{ borderColor: "var(--border-card)" }}
+                            >
+                              <span className="font-semibold">{post.payload.media?.video
+                                ? ft("videoPosterLabel")
+                                : post.payload.media?.album || mediaUrls.length > 1 ? ft("albumCount", { count: mediaUrls.length }) : ft("media")}</span>
+                              {post.payload.media?.album_complete === false && (
+                                <span className="text-amber-400 font-bold">{ft("incompleteMedia")}</span>
+                              )}
+                            </div>
+                            <div className={`grid gap-2 p-2 ${mediaUrls.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
+                              {mediaUrls.map((mediaUrl, mediaIndex) => (
+                                <button
+                                  type="button"
+                                  key={`${post.txId}-media-${mediaIndex}`}
+                                  onClick={() => openAlbumViewer(mediaUrls, mediaIndex, post.payload.media?.album ? ft("album") : ft("backupMedia"))}
+                                  className="aspect-square flex items-center justify-center overflow-hidden rounded-xl cursor-zoom-in group/img border"
+                                  style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+                                  title={ft("openAlbum")}
+                                >
+                                  <img
+                                    src={mediaUrl}
+                                    alt={`Platform media ${mediaIndex + 1}`}
+                                    className="object-cover w-full h-full group-hover/img:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      const fallback = mediaIndex === 0 ? post.payload.media?.fallback_backup : "";
+                                      if (!post.payload.is_encrypted && fallback && target.src !== fallback) target.src = fallback;
+                                    }}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Tags List block */}
                     {postTags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-3.5">
+                      <div className="flex flex-wrap gap-1.5 mt-4">
                         {postTags.map((tag) => (
                           <Link
                             key={tag}
@@ -1680,11 +2446,8 @@ export default function PlatformFeed({
                               ...(showHistory ? { history: "true" } : {}),
                               ...(network === "mainnet" ? { network: "mainnet" } : {})
                             }).toString()}`}
-                            className={`text-[9px] px-2 py-0.5 rounded font-mono font-semibold transition-all ${
-                              activeTag === tag
-                                ? "bg-indigo-900/80 text-indigo-300 border border-indigo-700/50"
-                                : "bg-slate-950 hover:bg-slate-800 text-indigo-400"
-                            }`}
+                            className="text-xs px-2.5 py-1 rounded-lg font-mono font-medium transition-all border hover:text-white"
+                            style={activeTag === tag ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)", color: "var(--text-secondary)" }}
                           >
                             #{tag}
                           </Link>
@@ -1692,47 +2455,235 @@ export default function PlatformFeed({
                       </div>
                     )}
 
-                    {/* Media */}
-                    {mediaUrls.length > 0 && (
-                      <div className="mt-3.5 rounded-xl overflow-hidden border border-slate-900 bg-slate-950">
-                        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-900 text-[10px] text-slate-400">
-                          <span>{post.payload.media?.video
-                            ? ft("videoPosterLabel")
-                            : post.payload.media?.album || mediaUrls.length > 1 ? ft("albumCount", { count: mediaUrls.length }) : ft("media")}</span>
-                          {post.payload.media?.album_complete === false && (
-                            <span className="text-amber-400">{ft("incompleteMedia")}</span>
-                          )}
-                        </div>
-                        <div className={`grid gap-1.5 ${mediaUrls.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-                          {mediaUrls.map((mediaUrl, mediaIndex) => (
-                            <button
-                              type="button"
-                              key={`${post.txId}-media-${mediaIndex}`}
-                              onClick={() => openAlbumViewer(mediaUrls, mediaIndex, post.payload.media?.album ? ft("album") : ft("backupMedia"))}
-                              className="aspect-square flex items-center justify-center overflow-hidden bg-slate-950 cursor-zoom-in"
-                              title={ft("openAlbum")}
-                            >
-                              <img
-                                src={mediaUrl}
-                                alt={`Platform media ${mediaIndex + 1}`}
-                                className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
-                                onError={(e) => {
-                                  const target = e.currentTarget;
-                                  const fallback = mediaIndex === 0 ? post.payload.media?.fallback_backup : "";
-                                  if (!post.payload.is_encrypted && fallback && target.src !== fallback) target.src = fallback;
-                                }}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                    {/* Unified Full Post Expand / Collapse Action Bar */}
+                    {isCollapsible && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPosts((prev) => ({ ...prev, [post.txId]: !isExpanded }))}
+                        className="mt-4 w-full py-2.5 px-4 rounded-xl border font-semibold text-xs text-slate-200 hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
+                        style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                      >
+                        {currentTheme === "cat" || searchParams.get("skin") === "cat" ? (
+                          isExpanded ? (
+                            <><span>🐾</span> <span>喵！咬住收合 ▲</span></>
+                          ) : (
+                            <>
+                              <span>🐾</span>
+                              <span>喵！張嘴看完整內文 {mediaUrls.length > 1 ? `與相簿 (共 ${mediaUrls.length} 張)` : ""} ▼</span>
+                            </>
+                          )
+                        ) : (
+                          isExpanded ? (
+                            <><span>▲</span> <span>收合完整文章</span></>
+                          ) : (
+                            <>
+                              <span>▼</span>
+                              <span>展開完整文章 {mediaUrls.length > 1 ? `與相簿 (共 ${mediaUrls.length} 張)` : ""}</span>
+                            </>
+                          )
+                        )}
+                      </button>
                     )}
-                  </div>
+                  </article>
                 </div>
               );
             })
           )}
         </div>
+
+        {/* Custom Theme Studio Modal (客製與匯入主題) */}
+        {showThemeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div
+              className="w-full max-w-md border rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200"
+              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-700/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎨</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">客製與匯入主題 (Theme Studio)</h3>
+                    <p className="text-[10px] text-slate-400">自訂配色或匯入主題 JSON 設定檔</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowThemeModal(false)}
+                  className="text-slate-400 hover:text-white text-base"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex rounded-xl p-1 border text-xs" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
+                <button
+                  type="button"
+                  onClick={() => setThemeModalTab("picker")}
+                  className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${themeModalTab === "picker" ? "text-white shadow" : "text-slate-400"}`}
+                  style={themeModalTab === "picker" ? { backgroundColor: "var(--accent-primary)" } : {}}
+                >
+                  🖌️ 調色盤自訂
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThemeModalTab("json");
+                    setThemeJsonInput(JSON.stringify(customTheme, null, 2));
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${themeModalTab === "json" ? "text-white shadow" : "text-slate-400"}`}
+                  style={themeModalTab === "json" ? { backgroundColor: "var(--accent-primary)" } : {}}
+                >
+                  📥 JSON 匯入/匯出
+                </button>
+              </div>
+
+              {themeModalTab === "picker" ? (
+                <div className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">主題名稱</label>
+                    <input
+                      type="text"
+                      value={customTheme.name}
+                      onChange={(e) => setCustomTheme({ ...customTheme, name: e.target.value })}
+                      className="w-full rounded-xl px-3 py-2 border text-slate-100 focus:outline-none"
+                      style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">背景色 (Page)</label>
+                      <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
+                        <input
+                          type="color"
+                          value={customTheme.bgPage}
+                          onChange={(e) => setCustomTheme({ ...customTheme, bgPage: e.target.value })}
+                          className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
+                        />
+                        <span className="font-mono text-[11px] text-slate-300">{customTheme.bgPage}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">卡片底色 (Card)</label>
+                      <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
+                        <input
+                          type="color"
+                          value={customTheme.bgCard}
+                          onChange={(e) => setCustomTheme({ ...customTheme, bgCard: e.target.value })}
+                          className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
+                        />
+                        <span className="font-mono text-[11px] text-slate-300">{customTheme.bgCard}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">強調主色 (Accent)</label>
+                      <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
+                        <input
+                          type="color"
+                          value={customTheme.accentPrimary}
+                          onChange={(e) => setCustomTheme({ ...customTheme, accentPrimary: e.target.value, accentText: e.target.value })}
+                          className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
+                        />
+                        <span className="font-mono text-[11px] text-slate-300">{customTheme.accentPrimary}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">邊框線條 (Border)</label>
+                      <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
+                        <input
+                          type="color"
+                          value={customTheme.borderCard}
+                          onChange={(e) => setCustomTheme({ ...customTheme, borderCard: e.target.value })}
+                          className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
+                        />
+                        <span className="font-mono text-[11px] text-slate-300">{customTheme.borderCard}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Preview Box */}
+                  <div
+                    className="p-3.5 rounded-xl border mt-3"
+                    style={{ backgroundColor: customTheme.bgCard, borderColor: customTheme.borderCard }}
+                  >
+                    <div className="text-xs font-bold" style={{ color: customTheme.accentText }}>
+                      即時效果預覽 ({customTheme.name})
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-1">這是一段文字預覽效果，文字清晰且舒適！</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 text-xs">
+                  <label className="block text-slate-300 font-semibold">貼上 Theme JSON 設定檔：</label>
+                  <textarea
+                    value={themeJsonInput}
+                    onChange={(e) => setThemeJsonInput(e.target.value)}
+                    rows={7}
+                    placeholder={`{\n  "name": "我的客製主題",\n  "bgPage": "#0a0f1d",\n  "bgCard": "#121b2f",\n  "borderCard": "#1f2e4d",\n  "accentPrimary": "#38bdf8",\n  "accentText": "#7dd3fc"\n}`}
+                    className="w-full rounded-xl p-3 border font-mono text-[11px] text-slate-200 focus:outline-none"
+                    style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          const parsed = JSON.parse(themeJsonInput);
+                          if (!parsed.bgPage || !parsed.bgCard || !parsed.accentPrimary) {
+                            alert("JSON 格式不正確，缺少必要欄位！");
+                            return;
+                          }
+                          setCustomTheme(parsed);
+                          saveAndApplyCustomTheme(parsed);
+                        } catch (err: any) {
+                          alert("無效的 JSON 字串：" + err.message);
+                        }
+                      }}
+                      className="flex-1 py-2 rounded-xl text-white font-bold text-xs"
+                      style={{ backgroundColor: "var(--accent-primary)" }}
+                    >
+                      📥 解析並套用 JSON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(customTheme, null, 2));
+                        alert("已複製主題 JSON 到剪貼簿！可分享給其他使用者！");
+                      }}
+                      className="px-3 py-2 rounded-xl border text-slate-300 hover:text-white text-xs font-semibold"
+                      style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                    >
+                      📤 複製 JSON
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => saveAndApplyCustomTheme(customTheme)}
+                  className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-lg transition-all"
+                  style={{ backgroundColor: "var(--accent-primary)" }}
+                >
+                  💾 儲存並套用主題
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowThemeModal(false)}
+                  className="px-4 py-2.5 rounded-xl border text-slate-400 hover:text-white text-xs font-medium"
+                  style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="py-6 border-t border-indigo-950/20 text-center text-[9px] text-slate-600 font-mono">

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f17;
+  --foreground: #f8fafc;
 }
 
 @theme inline {
@@ -12,15 +12,141 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Theme Engine Presets */
+:root, [data-theme="obsidian"] {
+  --bg-page: #0b0f17;
+  --bg-card: rgba(17, 24, 39, 0.95);
+  --border-card: #1e293b;
+  --border-card-hover: #334155;
+  --accent-primary: #10b981;
+  --accent-text: #34d399;
+  --accent-glow: rgba(16, 185, 129, 0.2);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --node-color: #64748b;
+  --tag-bg: #0f172a;
+}
+
+[data-theme="cyber"] {
+  --bg-page: #050814;
+  --bg-card: rgba(13, 21, 39, 0.95);
+  --border-card: #1e2d4a;
+  --border-card-hover: #38bdf8;
+  --accent-primary: #06b6d4;
+  --accent-text: #38bdf8;
+  --accent-glow: rgba(6, 182, 212, 0.25);
+  --text-primary: #f0fdfa;
+  --text-secondary: #94a3b8;
+  --node-color: #0ea5e9;
+  --tag-bg: #030712;
+}
+
+[data-theme="amber"] {
+  --bg-page: #140f0c;
+  --bg-card: rgba(28, 21, 17, 0.95);
+  --border-card: #38281d;
+  --border-card-hover: #f59e0b;
+  --accent-primary: #d97706;
+  --accent-text: #fbbf24;
+  --accent-glow: rgba(245, 158, 11, 0.25);
+  --text-primary: #fef3c7;
+  --text-secondary: #d97706;
+  --node-color: #f59e0b;
+  --tag-bg: #1c1511;
+}
+
+[data-theme="emerald"] {
+  --bg-page: #05120d;
+  --bg-card: rgba(10, 27, 20, 0.95);
+  --border-card: #143829;
+  --border-card-hover: #10b981;
+  --accent-primary: #059669;
+  --accent-text: #6ee7b7;
+  --accent-glow: rgba(16, 185, 129, 0.25);
+  --text-primary: #ecfdf5;
+  --text-secondary: #6ee7b7;
+  --node-color: #10b981;
+  --tag-bg: #081a14;
+}
+
+[data-theme="sakura"] {
+  --bg-page: #190c14;
+  --bg-card: rgba(35, 16, 27, 0.95);
+  --border-card: #421c32;
+  --border-card-hover: #f472b6;
+  --accent-primary: #db2777;
+  --accent-text: #f472b6;
+  --accent-glow: rgba(244, 114, 182, 0.25);
+  --text-primary: #fdf2f8;
+  --text-secondary: #f472b6;
+  --node-color: #ec4899;
+  --tag-bg: #210d1a;
+}
+
+[data-theme="cat"] {
+  --bg-page: #0d0f17;
+  --bg-card: rgba(18, 22, 36, 0.95);
+  --border-card: #2e384d;
+  --border-card-hover: #fb923c;
+  --accent-primary: #f97316;
+  --accent-text: #fdba74;
+  --accent-glow: rgba(249, 115, 22, 0.25);
+  --text-primary: #fff7ed;
+  --text-secondary: #fdba74;
+  --node-color: #fb923c;
+  --tag-bg: #1c1917;
+}
+
+/* Cat Morphing Animations */
+@keyframes catEarWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+.cat-card-ears {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 32px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.cat-ear-left, .cat-ear-right {
+  width: 32px;
+  height: 20px;
+  background: var(--border-card);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.cat-ear-left::after, .cat-ear-right::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  right: 6px;
+  bottom: 0;
+  background: rgba(244, 114, 182, 0.4);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.cat-card:hover .cat-ear-left {
+  animation: catEarWiggle 0.6s ease;
+}
+
+.cat-card:hover .cat-ear-right {
+  animation: catEarWiggle 0.6s ease 0.1s;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-page, #0b0f17);
+  color: var(--text-primary, #f8fafc);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }

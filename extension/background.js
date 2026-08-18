@@ -54,6 +54,76 @@ self.addEventListener("unhandledrejection", (event) => {
   reportBackgroundError(event.reason, "background:unhandledrejection");
 });
 
+// Poll for pending reading requests and display badge / notification
+async function checkPendingReadingRequests() {
+  try {
+    const allData = await chrome.storage.local.get(null);
+    const keys = new Set();
+    for (const [k, v] of Object.entries(allData)) {
+      if ((k.endsWith("identityAlias") || k.endsWith("nativeWalletAddress")) && typeof v === "string" && v.trim()) {
+        keys.add(v.trim());
+      }
+    }
+    const profiles = allData.chamberProfiles || [];
+    for (const p of profiles) {
+      if (p.alias) keys.add(p.alias.trim());
+      if (p.walletAddress) keys.add(p.walletAddress.trim());
+    }
+
+    if (keys.size === 0) return;
+
+    const requestMap = new Map();
+    for (const queryKey of keys) {
+      try {
+        const res = await fetch(`${CHAMBER_API_BASE}/access/requests?ownerIdentityKey=${encodeURIComponent(queryKey)}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.requests)) {
+            for (const r of data.requests) {
+              requestMap.set(r.id, r);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    const allRequests = Array.from(requestMap.values());
+    const pendingCount = allRequests.filter((r) => r.status === "pending").length;
+
+    if (pendingCount > 0) {
+      chrome.action.setBadgeText({ text: String(pendingCount) });
+      chrome.action.setBadgeBackgroundColor({ color: "#e11d48" });
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+    }
+
+    if (pendingCount > 0 && chrome.notifications) {
+      const lastNotified = await chrome.storage.local.get(["lastNotifiedRequestCount"]);
+      if (lastNotified.lastNotifiedRequestCount !== pendingCount) {
+        await chrome.storage.local.set({ lastNotifiedRequestCount: pendingCount });
+        chrome.notifications.create("reading_request_alert", {
+          type: "basic",
+          iconUrl: "icons/icon-128.png",
+          title: "🔔 [Chamber] 收到新的文章閱讀申請",
+          message: `有 ${pendingCount} 位讀者向您申請解鎖閱讀加密文章，點擊前往 Echo 審核授權。`,
+          priority: 2,
+        });
+      }
+    }
+  } catch (_) {}
+}
+
+setInterval(checkPendingReadingRequests, 15_000);
+setTimeout(checkPendingReadingRequests, 2000);
+
+if (chrome.notifications) {
+  chrome.notifications.onClicked.addListener((notificationId) => {
+    if (notificationId === "reading_request_alert") {
+      chrome.tabs.create({ url: "https://studio.milkcat.org/echo/all?requests=true" });
+    }
+  });
+}
+
 // Retrieve config from chrome storage and resolve the active wallet / key tier
 async function getExtensionConfig(fbUserId) {
   const userId = fbUserId || "default";
@@ -756,57 +826,61 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+async function resolveActiveUserId() {
+  const data = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId", "lastFbUserId"]);
+  const activeId = data.activeChamberProfileId;
+  const profiles = Array.isArray(data.chamberProfiles) ? data.chamberProfiles : [];
+  const activeProfile = profiles.find((p) => p.id === activeId) || profiles[0];
+  if (activeProfile?.ownerUserId) return activeProfile.ownerUserId;
+  if (data.lastFbUserId && data.lastFbUserId !== "default") return data.lastFbUserId;
+  return activeProfile?.id || data.lastFbUserId || "default";
+}
+
   if (request.action === "PREPARE_RECOVERY_VAULT") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      prepareRecoveryVault(meta.lastFbUserId || "default")
-        .then((result) => sendResponse({ success: true, ...result }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault setup failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => prepareRecoveryVault(userId))
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault setup failed" }));
     return true;
   }
 
   if (request.action === "CONFIRM_RECOVERY_VAULT") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      confirmRecoveryVault(meta.lastFbUserId || "default", request.setId)
-        .then(() => sendResponse({ success: true }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault confirmation failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => confirmRecoveryVault(userId, request.setId))
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault confirmation failed" }));
     return true;
   }
 
   if (request.action === "FINALIZE_RECOVERY_VAULT") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      finalizeRecoveryVault(meta.lastFbUserId || "default", request.setId, request.accountId)
-        .then((result) => sendResponse({ success: true, ...result }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault finalization failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => finalizeRecoveryVault(userId, request.setId, request.accountId))
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault finalization failed" }));
     return true;
   }
 
   if (request.action === "RESTORE_RECOVERY_VAULT") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      restoreFromRecoveryVault(request.shareB, request.recoveryCodeC, meta.lastFbUserId || "default")
-        .then((result) => sendResponse({ success: true, ...result }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault restore failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => restoreFromRecoveryVault(request.shareB, request.recoveryCodeC, userId))
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault restore failed" }));
     return true;
   }
 
   if (request.action === "GET_RECOVERY_VAULT_STATUS") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      recoveryVaultStatus(meta.lastFbUserId || "default")
-        .then((result) => sendResponse({ success: true, ...result }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault status failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => recoveryVaultStatus(userId))
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "Recovery Vault status failed" }));
     return true;
   }
 
   if (request.action === "RESTORE_RECOVERY_AB") {
-    chrome.storage.local.get(["lastFbUserId"], (meta) => {
-      restoreFromLocalAAndVaultB(request.shareB, meta.lastFbUserId || "default")
-        .then((result) => sendResponse({ success: true, ...result }))
-        .catch((error) => sendResponse({ success: false, error: error.message || "A+B recovery failed" }));
-    });
+    resolveActiveUserId()
+      .then((userId) => restoreFromLocalAAndVaultB(request.shareB, userId))
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, error: error.message || "A+B recovery failed" }));
     return true;
   }
 

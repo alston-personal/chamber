@@ -50,10 +50,13 @@
     ctx.font = "16px system-ui, sans-serif";
     ctx.fillText(t("declaration.cardTagline"), 300, 172);
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=6366f1&bgcolor=020617&data=${encodeURIComponent(timelineUrl)}`;
+    // Draw QR Code locally using ChamberQRCode engine (100% offline, zero network requests)
     try {
-      const qrImage = await loadImage(qrUrl);
-      ctx.drawImage(qrImage, 175, 225, 250, 250);
+      if (global.ChamberQRCode?.drawToContext) {
+        global.ChamberQRCode.drawToContext(ctx, timelineUrl, 175, 225, 250, "#6366f1", "#020617");
+      } else {
+        throw new Error("ChamberQRCode not loaded");
+      }
     } catch (_) {
       ctx.fillStyle = "#020617";
       ctx.fillRect(175, 225, 250, 250);

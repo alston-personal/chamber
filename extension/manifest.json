@@ -1,16 +1,18 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "0.7.2",
+  "version": "0.8.13",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_TW",
+  "minimum_chrome_version": "116",
   "permissions": [
     "storage",
     "activeTab",
     "scripting",
     "tabs",
     "cookies",
-    "sidePanel"
+    "sidePanel",
+    "notifications"
   ],
   "host_permissions": [
     "*://*.facebook.com/*",
