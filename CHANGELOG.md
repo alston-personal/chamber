@@ -4,6 +4,19 @@ All notable changes to the Chamber Extension, Echo Portal, and Passkey Recovery 
 
 ---
 
+## 🎯 [0.9.5] - 2026-08-18
+### 🚀 Added & Fixed (全球五大語言支援、IG/X 貼文選取範圍精準鎖定與側邊欄全語系翻譯)
+- 🌐 **全球 5 大語系完整支援 (排除簡體中文)**：
+  - 新增支援 **繁體中文 (`zh-TW`)**、**English (`en`)**、**Español (`es`)**、**日本語 (`ja`)**、**Français (`fr`)**、**Português (`pt`)**。
+  - 修復「我的時光牆」、主題選單、閱讀申請橫幅、配對視窗與轉世聲明預設範本等所有未翻譯中文殘留，切換語系 100% 即時全域在地化。
+  - 轉世聲明預設文字動態連動目前選取的平台 (`{platform}`) 與語系，告別在 X 轉世時出現 Facebook 的問題。
+- 🎯 **Instagram & X 精準單一貼文邊界鎖定 (`platform-instagram.js` & `platform-x.js`)**：
+  - **根本修復範圍過大問題**：重構 `postContainerFor`，在向上查找時遇 `main`、`body` 或檢測到多篇貼文 ID 時嚴格煞車，徹底防止選取到整個 IG/X Feed 動態牆。
+  - **內文精準提取**：Instagram 內文鎖定貼文正文容器 (`h1`、`div._a9zs`、`span._a9zs`)，自動過濾側邊欄導覽列（「首頁、Reel、訊息、搜尋、建立...」）、留言串、贊助與推薦貼文。
+  - X / Twitter 同步鎖定 `[data-testid="tweetText"]` 與特定 Link Card，防止抓入側邊欄與其他推文。
+
+---
+
 ## 🔗 [0.9.4] - 2026-08-18
 ### 🚀 Added & Enhanced (X / Twitter 連結預覽卡片、外顯網址與卡片圖片深度備份)
 - 🔗 **X (Twitter) Link Card 與預覽卡片深度擷取**：

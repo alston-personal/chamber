@@ -282,14 +282,13 @@ async function renderProfiles() {
 
   selectButton.disabled = !mapped;
   rebornButton.disabled = !mapped;
-
   if (platform) {
     selectButton.textContent = t("backup.selectPlatform", { platform: selectedName });
   } else {
-    selectButton.textContent = `🚀 前往 ${selectedName} 並選取文章`;
+    selectButton.textContent = t("backup.goToPlatformAndSelect", { platform: selectedName });
   }
 
-  selectButton.title = mapped ? (platform ? t("account.selectTitlePlatform", { platform: selectedName }) : `前往 ${selectedName} 並選取文章`) : t("account.mappingRequiredTitle");
+  selectButton.title = mapped ? (platform ? t("account.selectTitlePlatform", { platform: selectedName }) : t("backup.goToPlatformAndSelect", { platform: selectedName })) : t("account.mappingRequiredTitle");
   if (!mapped) {
     setStatus(t("account.mappingRequired"), true);
   } else {
@@ -318,42 +317,31 @@ async function openRecoveryTab() {
     lastEchoUrl = data[prefix + "lastEchoUrl"] || "";
   } catch (_) {
     try {
-      const profilesData = await chrome.storage.local.get(["chamberProfiles", "activeChamberProfileId"]);
-      const activeId = profilesData.activeChamberProfileId;
-      const profiles = profilesData.chamberProfiles || [];
-      const activeProfile = profiles.find((p) => p.id === activeId) || profiles[0];
-      if (activeProfile?.alias) alias = activeProfile.alias;
+      const state = await getActiveProfile();
+      const profile = state.profiles.find((item) => item.id === state.activeId);
+      alias = profile?.alias || "";
     } catch (_) {}
   }
-
-  let target = alias
-    ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?recovery=true`
-    : (lastEchoUrl
-      ? `${lastEchoUrl}${lastEchoUrl.includes("?") ? "&" : "?"}recovery=true`
-      : "https://studio.milkcat.org/echo?recovery=true");
-
-  await chrome.tabs.create({ url: target });
+  const recoveryUrl = alias
+    ? `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?recovery=manage`
+    : (lastEchoUrl || "https://studio.milkcat.org/echo");
+  chrome.tabs.create({ url: recoveryUrl });
 }
 
-recoveryExport?.addEventListener("click", async () => {
-  try {
-    await openRecoveryTab();
-  } catch (error) {
-    if (recoveryStatus) recoveryStatus.textContent = t("recovery.openFailed", { error: error.message });
-  }
-});
+recoveryExport?.addEventListener("click", openRecoveryTab);
 
 const pairMobileBtn = document.getElementById("pairMobile");
 const pairingContainer = document.getElementById("pairingContainer");
 const pairingQrTarget = document.getElementById("pairingQrTarget");
 const pairingTimer = document.getElementById("pairingTimer");
+const pairedDevicesList = document.getElementById("pairedDevicesList");
 const pairingCloseBtn = document.getElementById("pairingClose");
 let pairingInterval = null;
 
 pairMobileBtn?.addEventListener("click", async () => {
   try {
     pairMobileBtn.disabled = true;
-    pairMobileBtn.textContent = "⌛ 正在產生配對 QR Code...";
+    pairMobileBtn.textContent = t("pairing.generating");
 
     let userId = "default";
     let alias = "";
@@ -386,7 +374,7 @@ pairMobileBtn?.addEventListener("click", async () => {
     });
 
     const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.error || "無法建立配對連線");
+    if (!response.ok || !data.success) throw new Error(data.error || "Failed to create pairing session");
 
     const pairingId = data.session.pairingId;
     const targetUrl = alias
@@ -406,7 +394,7 @@ pairMobileBtn?.addEventListener("click", async () => {
     const currentList = Array.isArray(existing.chamberPairedDevices) ? existing.chamberPairedDevices : [];
     currentList.push({
       id: deviceId,
-      name: `行動裝置 (${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`,
+      name: `${t("pairing.deviceDefault")} (${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`,
       pairedAt: new Date().toISOString(),
     });
     await chrome.storage.local.set({ chamberPairedDevices: currentList });
@@ -419,7 +407,7 @@ pairMobileBtn?.addEventListener("click", async () => {
       timeLeft--;
       if (timeLeft <= 0) {
         clearInterval(pairingInterval);
-        pairingTimer.textContent = "⚠️ 配對連結已過期，請重新發送";
+        pairingTimer.textContent = t("pairing.expired");
         pairingQrTarget.replaceChildren();
         return;
       }
@@ -433,9 +421,9 @@ pairMobileBtn?.addEventListener("click", async () => {
               isClaimed = true;
               clearInterval(pairingInterval);
               pairingTimer.style.color = "#4ade80";
-              pairingTimer.textContent = `🎉 手機配對成功 (${data.status.deviceModel || "行動裝置"})！正在關閉...`;
+              pairingTimer.textContent = t("pairing.success", { device: data.status.deviceModel || t("pairing.deviceDefault") });
               const current = await chrome.storage.local.get(["chamberPairedDevices"]);
-              const nextDevices = (current.chamberPairedDevices || []).map((d) => d.id === deviceId ? { ...d, name: `${data.status.deviceModel || "行動裝置"} (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` } : d);
+              const nextDevices = (current.chamberPairedDevices || []).map((d) => d.id === deviceId ? { ...d, name: `${data.status.deviceModel || t("pairing.deviceDefault")} (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` } : d);
               await chrome.storage.local.set({ chamberPairedDevices: nextDevices });
               await refreshPairedDevices();
               setTimeout(() => {
@@ -450,14 +438,14 @@ pairMobileBtn?.addEventListener("click", async () => {
 
       const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
       const s = String(timeLeft % 60).padStart(2, "0");
-      pairingTimer.textContent = `⏱️ 配對連結時效剩餘 ${m}:${s}`;
+      pairingTimer.textContent = t("pairing.timerRemaining", { time: `${m}:${s}` });
     }, 1000);
 
   } catch (error) {
-    if (recoveryStatus) recoveryStatus.textContent = `配對失敗：${error.message}`;
+    if (recoveryStatus) recoveryStatus.textContent = t("pairing.failed", { error: error.message });
   } finally {
     pairMobileBtn.disabled = false;
-    pairMobileBtn.textContent = "📱 綁定新手機 (產生配對 QR Code)";
+    pairMobileBtn.textContent = t("pairing.pairMobile");
   }
 });
 
@@ -510,10 +498,10 @@ async function checkSidePanelRequests() {
       requestsBanner.style.borderColor = "#f43f5e";
       if (requestsBannerCount) {
         requestsBannerCount.style.color = "#fda4af";
-        requestsBannerCount.textContent = `有 ${pendingList.length} 筆待審核申請（來自：${pendingList[0].requesterAlias || "訪客"}）`;
+        requestsBannerCount.textContent = t("requests.pendingCount", { count: pendingList.length, requester: pendingList[0].requesterAlias || "Guest" });
       }
       if (requestsBannerBtn) {
-        requestsBannerBtn.textContent = "審核 →";
+        requestsBannerBtn.textContent = t("requests.reviewBtn");
         requestsBannerBtn.style.background = "#e11d48";
       }
     } else {
@@ -522,10 +510,10 @@ async function checkSidePanelRequests() {
       requestsBanner.style.borderColor = "#334155";
       if (requestsBannerCount) {
         requestsBannerCount.style.color = "#94a3b8";
-        requestsBannerCount.textContent = "目前無待審核申請";
+        requestsBannerCount.textContent = t("requests.noPending");
       }
       if (requestsBannerBtn) {
-        requestsBannerBtn.textContent = "紀錄 →";
+        requestsBannerBtn.textContent = t("requests.historyBtn");
         requestsBannerBtn.style.background = "#334155";
       }
     }
@@ -539,14 +527,29 @@ requestsBannerBtn?.addEventListener("click", async () => {
     const alias = profile?.alias || "sunlake";
     chrome.tabs.create({ url: `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all?requests=true` });
   } catch (_) {
-    chrome.tabs.create({ url: "https://studio.milkcat.org/echo/sunlake/all?requests=true" });
+    chrome.tabs.create({ url: "https://studio.milkcat.org/echo" });
   }
+});
+
+const myEchoTimelineBtnEl = document.getElementById("myEchoTimelineBtn");
+myEchoTimelineBtnEl?.addEventListener("click", async () => {
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "sunlake";
+    chrome.tabs.create({ url: `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/all` });
+  } catch (_) {
+    chrome.tabs.create({ url: "https://studio.milkcat.org/echo" });
+  }
+});
+
+pairingCloseBtn?.addEventListener("click", () => {
+  if (pairingInterval) clearInterval(pairingInterval);
+  pairingContainer.style.display = "none";
 });
 
 setInterval(checkSidePanelRequests, 15_000);
 setTimeout(checkSidePanelRequests, 1000);
-
-const pairedDevicesList = document.getElementById("pairedDevicesList");
 
 async function refreshPairedDevices() {
   if (!pairedDevicesList) return;
@@ -559,7 +562,7 @@ async function refreshPairedDevices() {
     emptyMsg.className = "post-meta";
     emptyMsg.style.fontSize = "11px";
     emptyMsg.style.color = "#64748b";
-    emptyMsg.textContent = "尚未綁定任何行動裝置。";
+    emptyMsg.textContent = t("pairing.noDevices");
     pairedDevicesList.appendChild(emptyMsg);
     return;
   }
@@ -578,7 +581,7 @@ async function refreshPairedDevices() {
     const label = document.createElement("div");
     label.style.fontSize = "11px";
     label.style.color = "#e2e8f0";
-    label.textContent = `📱 ${device.name || "行動裝置"} (${new Date(device.pairedAt).toLocaleDateString()})`;
+    label.textContent = `📱 ${device.name || t("pairing.deviceDefault")} (${new Date(device.pairedAt).toLocaleDateString()})`;
 
     const btnGroup = document.createElement("div");
     btnGroup.style.display = "flex";
@@ -589,9 +592,9 @@ async function refreshPairedDevices() {
     editBtn.className = "secondary-action compact-action";
     editBtn.style.padding = "2px 6px";
     editBtn.style.fontSize = "10px";
-    editBtn.textContent = "✏️ 命名";
+    editBtn.textContent = t("pairing.editName");
     editBtn.addEventListener("click", async () => {
-      const newName = prompt("請輸入自訂裝置名稱（例如：iPhone 15 Pro 或 黑色 Pixel）：", device.name || "");
+      const newName = prompt(t("pairing.promptName"), device.name || "");
       if (newName === null) return;
       const trimmed = newName.trim();
       if (!trimmed) return;
@@ -607,9 +610,9 @@ async function refreshPairedDevices() {
     removeBtn.style.padding = "2px 8px";
     removeBtn.style.fontSize = "10px";
     removeBtn.style.color = "#f87171";
-    removeBtn.textContent = "解除綁定";
+    removeBtn.textContent = t("pairing.unpair");
     removeBtn.addEventListener("click", async () => {
-      if (!confirm(`確定要解除「${device.name || "此行動裝置"}」的綁定嗎？`)) return;
+      if (!confirm(t("pairing.confirmUnpair", { name: device.name || t("pairing.deviceDefault") }))) return;
       const current = await chrome.storage.local.get(["chamberPairedDevices"]);
       const nextDevices = (current.chamberPairedDevices || []).filter((d) => d.id !== device.id);
       await chrome.storage.local.set({ chamberPairedDevices: nextDevices });
@@ -628,15 +631,19 @@ function showSettings() {
   settingsView.hidden = false;
   resultEl.replaceChildren();
   loadSettingsForm().catch((error) => { settingsAliasStatus.textContent = error.message; });
-  refreshPairedDevices().catch(() => {});
 }
 
 function showBackup() {
   settingsView.hidden = true;
   rebornView.hidden = true;
   backupView.hidden = false;
-  loadPageInfo().catch(() => {});
+  resultEl.replaceChildren();
+  loadPageInfo().catch((error) => setStatus(error.message, true));
 }
+
+rebornText.addEventListener("input", () => {
+  delete rebornText.dataset.autoGenerated;
+});
 
 async function showReborn() {
   const identity = await activePlatformIdentity();
@@ -653,7 +660,10 @@ async function showReborn() {
   const name = platformName(identity.platform);
   const description = document.getElementById("rebornDescription");
   if (description) description.textContent = t("reborn.descriptionPlatform", { platform: name });
-  if (!rebornText.value.trim()) rebornText.value = identity.platform === "threads" ? t("declaration.defaultTextThreads") : ChamberDeclaration.getDefaultText();
+  if (!rebornText.value.trim() || rebornText.dataset.autoGenerated === "true") {
+    rebornText.value = t("declaration.defaultText", { platform: name });
+    rebornText.dataset.autoGenerated = "true";
+  }
   rebornStatus.textContent = t("reborn.identity", { alias: profile.alias });
 }
 

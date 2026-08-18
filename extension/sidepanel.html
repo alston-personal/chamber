@@ -163,19 +163,23 @@
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <button id="myEchoTimelineBtn" type="button" class="secondary-action compact-action" style="font-size:11px;padding:5px 10px;display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:8px;">
-        <span>🌐</span> <span>我的時光牆</span>
+        <span>🌐</span> <span data-i18n="header.myEchoTimeline">我的時光牆</span>
       </button>
       <div style="display:flex;align-items:center;gap:4px;">
-        <select id="themeSelect" class="language-picker" title="切換主題風格">
-          <option value="obsidian">🖤 極簡黑曜</option>
-          <option value="cyber">🌌 賽博霓虹</option>
-          <option value="amber">🍯 琥珀秘境</option>
-          <option value="emerald">🌲 翡翠森境</option>
-          <option value="sakura">🌸 櫻花暗夜</option>
+        <select id="themeSelect" class="language-picker" data-i18n-title="theme.label">
+          <option value="obsidian" data-i18n="theme.obsidian">🖤 極簡黑曜</option>
+          <option value="cyber" data-i18n="theme.cyber">🌌 賽博霓虹</option>
+          <option value="amber" data-i18n="theme.amber">🍯 琥珀秘境</option>
+          <option value="emerald" data-i18n="theme.emerald">🌲 翡翠森境</option>
+          <option value="sakura" data-i18n="theme.sakura">🌸 櫻花暗夜</option>
         </select>
-        <select id="languageSelect" class="language-picker">
+        <select id="languageSelect" class="language-picker" data-i18n-title="language.label">
           <option value="zh-TW" data-i18n="language.zhTW">繁體中文</option>
           <option value="en" data-i18n="language.en">English</option>
+          <option value="es" data-i18n="language.es">Español</option>
+          <option value="ja" data-i18n="language.ja">日本語</option>
+          <option value="fr" data-i18n="language.fr">Français</option>
+          <option value="pt" data-i18n="language.pt">Português</option>
         </select>
       </div>
     </div>
@@ -183,11 +187,11 @@
   <div id="requestsBanner" style="display:none;margin:10px 0 14px;padding:10px 12px;border-radius:10px;background:rgba(225,29,72,0.18);border:1px solid #f43f5e;align-items:center;justify-content:space-between;gap:8px;">
     <div style="min-width:0;">
       <div style="font-size:12px;font-weight:bold;color:#fecdd3;display:flex;align-items:center;gap:4px;">
-        <span>🔔</span> <span>文章閱讀申請</span>
+        <span>🔔</span> <span data-i18n="requests.title">文章閱讀申請</span>
       </div>
-      <div id="requestsBannerCount" style="font-size:11px;color:#fda4af;margin-top:2px;">有 1 筆待審核申請</div>
+      <div id="requestsBannerCount" style="font-size:11px;color:#fda4af;margin-top:2px;"></div>
     </div>
-    <button id="requestsBannerBtn" type="button" class="secondary-action compact-action" style="background:#e11d48;color:white;border:none;font-weight:700;font-size:11px;padding:6px 12px;cursor:pointer;">審核 →</button>
+    <button id="requestsBannerBtn" type="button" class="secondary-action compact-action" style="background:#e11d48;color:white;border:none;font-weight:700;font-size:11px;padding:6px 12px;cursor:pointer;"></button>
   </div>
   <div id="backupView">
   <div class="card">
@@ -229,18 +233,18 @@
       <input id="settingsWallet" type="text" placeholder="留空使用託管錢包" data-i18n-placeholder="settings.walletPlaceholder" style="width:100%;padding:10px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-page);color:var(--text-primary);">
       <div class="danger-note" data-i18n="settings.recoveryExplanation">復原採 2-of-3：A 留在目前 Chrome 的 Chamber Extension；B 加密保存於 Chamber Recovery Vault 並由 Passkey 保護；C 是您離線保存的緊急復原碼。Echo 只提供操作介面，不保存完整金鑰。</div>
       <button id="recoveryExport" class="secondary-action" type="button" data-i18n="settings.openRecovery">🛡️ 開啟金鑰復原設定 →</button>
-      <button id="pairMobile" class="secondary-action" type="button" style="margin-top:10px;width:100%;font-weight:600;">📱 綁定新手機 (產生配對 QR Code)</button>
+      <button id="pairMobile" class="secondary-action" type="button" style="margin-top:10px;width:100%;font-weight:600;" data-i18n="pairing.pairMobile">📱 綁定新手機 (產生配對 QR Code)</button>
       <div id="pairingContainer" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--accent-primary);border-radius:12px;background:var(--bg-card-secondary);text-align:center;">
-        <div style="font-size:12px;font-weight:bold;color:var(--accent-text);">📱 請用手機相機照此 QR Code</div>
+        <div style="font-size:12px;font-weight:bold;color:var(--accent-text);" data-i18n="pairing.scanPrompt">📱 請用手機相機照此 QR Code</div>
         <div id="pairingQrTarget" style="margin:10px auto;display:flex;justify-content:center;"></div>
-        <div id="pairingTimer" style="font-size:11px;color:var(--accent-text);margin-top:4px;">⏱️ 配對連結時效剩餘 05:00</div>
-        <button id="pairingClose" class="secondary-action compact-action" type="button" style="margin-top:8px;">關閉配對視窗</button>
+        <div id="pairingTimer" style="font-size:11px;color:var(--accent-text);margin-top:4px;"></div>
+        <button id="pairingClose" class="secondary-action compact-action" type="button" style="margin-top:8px;" data-i18n="pairing.close">關閉配對視窗</button>
       </div>
       <div id="recoveryStatus" class="post-meta" style="white-space:normal;" data-i18n="settings.recoveryUnknown">尚未確認是否已建立 Recovery Vault 與緊急復原碼 C。</div>
       <div style="margin-top:14px;border-top:1px solid var(--border-card);padding-top:12px;">
-        <div class="label" style="font-size:12px;color:var(--accent-text);">📱 已綁定行動裝置</div>
+        <div class="label" style="font-size:12px;color:var(--accent-text);" data-i18n="pairing.pairedTitle">📱 已綁定行動裝置</div>
         <div id="pairedDevicesList" style="margin-top:6px;">
-          <div class="post-meta" style="font-size:11px;color:var(--text-secondary);">尚未綁定任何行動裝置。</div>
+          <div class="post-meta" style="font-size:11px;color:var(--text-secondary);" data-i18n="pairing.noDevices">尚未綁定任何行動裝置。</div>
         </div>
       </div>
       <button id="settingsSave" type="button" data-i18n="settings.save">儲存並套用</button>

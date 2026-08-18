@@ -43,23 +43,26 @@
   }
 
   function postContainerFor(target) {
-    const semantic = target?.closest?.('article, [role="article"], div[role="dialog"] article, div._aagv');
-    if (semantic && postLinksIn(semantic).length) return semantic;
-    let fallback = null;
-    for (let node = target, depth = 0; node && depth < 18; node = node.parentElement, depth += 1) {
-      const identities = unique(postLinksIn(node).map(({ parsed }) => parsed.shortcode));
-      if (identities.length < 1) {
-        if (fallback && identities.length > 1) break;
-        continue;
+    if (!target) return null;
+    const direct = target.closest?.('article, div[role="dialog"] article, div[role="dialog"]');
+    if (direct) return direct;
+
+    let candidate = null;
+    for (let node = target, depth = 0; node && depth < 16; node = node.parentElement, depth += 1) {
+      if (node.tagName === "BODY" || node.tagName === "HTML" || node.tagName === "MAIN" || node.tagName === "NAV" || node.tagName === "ASIDE" || node.tagName === "HEADER") break;
+      const links = postLinksIn(node);
+      const count = unique(links.map(({ parsed }) => parsed.shortcode)).length;
+      if (count === 1) {
+        candidate = node;
+        if (node.querySelector('time[datetime]') || node.querySelectorAll('button, svg').length >= 3) {
+          return node;
+        }
+      } else if (count > 1) {
+        // Stop before going up into multi-post timeline
+        break;
       }
-      const hasBody = Array.from(node.querySelectorAll?.('img, video, span[dir="auto"], h1') || []).some(visible);
-      if (!hasBody) continue;
-      fallback ||= node;
-      const hasTime = Boolean(node.querySelector('time[datetime]'));
-      const controls = node.querySelectorAll('button, [role="button"], svg').length;
-      if (hasTime && controls >= 2) return node;
     }
-    return fallback;
+    return candidate || target.closest?.('article') || null;
   }
 
   function structuredText(node) {
@@ -159,18 +162,43 @@
       try { moreBtn.click(); } catch (_) {}
     }
 
-    const captionNodes = Array.from(container.querySelectorAll('h1, div._a9zs, span._aacu, span[dir="auto"]')).filter((node) => {
-      if (!visible(node)) return false;
-      const text = String(node.innerText || node.textContent || "").trim();
-      return text && !ACTION_TEXT.test(text) && normalizeHandle(text) !== normalizeHandle(author);
-    });
-
-    const lines = [];
-    for (const node of captionNodes) {
-      const txt = structuredText(node);
-      if (txt && !lines.includes(txt) && !ACTION_TEXT.test(txt)) lines.push(txt);
+    // 1. Direct Instagram caption containers (h1 in post modal, div._a9zs / span._a9zs in feed)
+    const captionNode = container.querySelector('h1, div._a9zs, span._a9zs, div._a9zm span, div[class*="caption"] span');
+    if (captionNode && visible(captionNode)) {
+      const txt = structuredText(captionNode);
+      if (txt && !ACTION_TEXT.test(txt)) return txt;
     }
-    return lines.join("\n").replace(/(?:\n|^)(?:more|see more|顯示更多|查看更多)$/i, "").trim();
+
+    // 2. Candidate caption spans next to author
+    const candidateSpans = Array.from(container.querySelectorAll('div._a9zr span, div._a9zs span, span._aacu'))
+      .filter((node) => {
+        if (!visible(node)) return false;
+        if (node.closest('nav, aside, ul[class*="comment"], div[role="menu"]')) return false;
+        const text = String(node.innerText || node.textContent || "").trim();
+        if (!text || text.length < 2) return false;
+        if (ACTION_TEXT.test(text)) return false;
+        if (normalizeHandle(text) === normalizeHandle(author)) return false;
+        return true;
+      });
+
+    if (candidateSpans.length > 0) {
+      return structuredText(candidateSpans[0]);
+    }
+
+    // 3. Fallback: Search strictly inside article/main content without traversing to feed/nav
+    const textBlocks = Array.from(container.querySelectorAll('div[dir="auto"], span[dir="auto"]'))
+      .filter((node) => {
+        if (!visible(node)) return false;
+        if (node.closest('nav, aside, header, footer, ul[class*="comment"], div[role="menu"]')) return false;
+        const text = String(node.innerText || node.textContent || "").trim();
+        if (!text || text.length < 3) return false;
+        if (ACTION_TEXT.test(text)) return false;
+        if (/(?:首頁|Reel|訊息|搜尋|通知|建立|主控板|個人檔案|Meta|翻譯年糕|為你推薦|贊助|原始音訊|讚|留言|分享|儲存|Home|Explore|Messages|Notifications|Create|Profile|Sponsored|Suggested|Likes|Comments)/i.test(text)) return false;
+        if (normalizeHandle(text) === normalizeHandle(author)) return false;
+        return true;
+      });
+
+    return textBlocks.length > 0 ? structuredText(textBlocks[0]) : "";
   }
 
   function extract(container, expectedHandle, preferredSourceUrl = "") {

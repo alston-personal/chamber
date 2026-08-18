@@ -44,23 +44,25 @@
   }
 
   function postContainerFor(target) {
-    const semantic = target?.closest?.('article[data-testid="tweet"], article, div[data-testid="cellInnerDiv"]');
-    if (semantic && postLinksIn(semantic).length) return semantic;
-    let fallback = null;
-    for (let node = target, depth = 0; node && depth < 18; node = node.parentElement, depth += 1) {
-      const identities = unique(postLinksIn(node).map(({ parsed }) => parsed.tweetId));
-      if (identities.length < 1) {
-        if (fallback && identities.length > 1) break;
-        continue;
+    if (!target) return null;
+    const direct = target.closest?.('article[data-testid="tweet"], article, div[data-testid="cellInnerDiv"]');
+    if (direct) return direct;
+
+    let candidate = null;
+    for (let node = target, depth = 0; node && depth < 16; node = node.parentElement, depth += 1) {
+      if (node.tagName === "BODY" || node.tagName === "HTML" || node.tagName === "MAIN" || node.tagName === "NAV" || node.tagName === "ASIDE" || node.tagName === "HEADER" || node.tagName === "SECTION") break;
+      const links = postLinksIn(node);
+      const count = unique(links.map(({ parsed }) => parsed.tweetId)).length;
+      if (count === 1) {
+        candidate = node;
+        if (node.querySelector('time[datetime]') || node.querySelectorAll('button, svg').length >= 3) {
+          return node;
+        }
+      } else if (count > 1) {
+        break;
       }
-      const hasBody = Array.from(node.querySelectorAll?.('[data-testid="tweetText"], img, video')).some(visible);
-      if (!hasBody) continue;
-      fallback ||= node;
-      const hasTime = Boolean(node.querySelector('time[datetime]'));
-      const controls = node.querySelectorAll('button, [role="button"], svg').length;
-      if (hasTime && controls >= 2) return node;
     }
-    return fallback;
+    return candidate || target.closest?.('article') || null;
   }
 
   function structuredText(node) {
@@ -228,7 +230,7 @@
     }
 
     const tweetTextNode = container.querySelector('[data-testid="tweetText"]');
-    const baseText = tweetTextNode ? structuredText(tweetTextNode) : structuredText(container);
+    const baseText = tweetTextNode ? structuredText(tweetTextNode) : "";
     return extractCardAndLinks(container, baseText);
   }
 
