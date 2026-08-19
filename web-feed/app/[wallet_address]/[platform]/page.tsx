@@ -60,7 +60,6 @@ interface EncryptedBlob {
 
 const TIMELINE_THEMES = [
   { id: "obsidian", name: "極簡黑曜", icon: "⬛", desc: "鈦灰石墨經典沉穩", badge: "經典" },
-  { id: "leopard", name: "擬真石虎", icon: "🐯", desc: "台灣石虎超擬真吞吐卡片", badge: "獨家" },
   { id: "cyber", name: "賽博霓光", icon: "🌌", desc: "深空宇宙星夜霓虹", badge: "極客" },
   { id: "amber", name: "復古暖琥珀", icon: "🍂", desc: "復古牛皮紙典雅暖光", badge: "質感" },
   { id: "emerald", name: "深林青翠", icon: "🌿", desc: "自然翡翠沉靜深綠", badge: "靜謐" },
@@ -2535,12 +2534,9 @@ export default function PlatformFeed({
               const hasLongText = (contentText || "").length > 180 || ((contentText || "").split("\n").length > 4);
               const isCollapsible = hasLongText || mediaUrls.length > 1;
 
-              if (
-                currentTheme === "leopard" ||
-                currentTheme === "cat" ||
-                searchParams.get("skin") === "cat" ||
-                searchParams.get("skin") === "leopard"
-              ) {
+              const creatorSkin = searchParams.get("skin") || (walletAddress?.toLowerCase().includes("sunlake") || resolvedIdentityKey?.toLowerCase().includes("sunlake") ? "leopard" : "classic");
+
+              if (creatorSkin === "leopard" || creatorSkin === "cat") {
                 return (
                   <RealLeopardCatCard
                     key={post.txId}
