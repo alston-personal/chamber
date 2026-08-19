@@ -911,19 +911,12 @@ function activateElement(el) {
 function fillText(textbox, text) {
   if (!textbox) return;
 
-  const now = Date.now();
-  if (window.__chamberLastFillTime && (now - window.__chamberLastFillTime < 3500)) {
-    console.log("[Chamber] FillText debounced (already ran within 3.5s). Skipping.");
-    return;
-  }
-
   const existing = (textbox.innerText || textbox.textContent || "").trim();
   if (existing.includes("本人樂觀開朗之 Web3 轉世聲明") || existing.includes("Web3 Reborn Declaration") || (existing.length > 50 && existing.includes("Chamber"))) {
     console.log("[Chamber] Reborn declaration already populated in composer. Skipping.");
     return;
   }
 
-  window.__chamberLastFillTime = now;
   textbox.focus();
 
   try {
@@ -939,32 +932,11 @@ function fillText(textbox, text) {
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
 
-  // Convert newlines to HTML blocks so Draft.js/React rich editor preserves layout
-  const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const htmlText = text
-    .split("\n")
-    .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
-    .join("");
-
   try {
     document.execCommand('insertText', false, text);
   } catch (_) {}
 
-  // Only fallback to insertHTML if textbox is still completely empty
-  if (!textbox.textContent.trim()) {
-    try {
-      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const htmlText = text
-        .split("\n")
-        .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
-        .join("");
-      document.execCommand('insertHTML', false, htmlText);
-    } catch (_) {}
-  }
-
-  textbox.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
-  textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-  console.log("[Chamber] Auto-filled composer textbox with single-shot text.");
+  console.log("[Chamber] Auto-filled composer textbox.");
 }
 
 async function fillTextAndImage(textbox, text, imageUrl) {

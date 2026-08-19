@@ -414,12 +414,26 @@
 
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new post|create|新增貼文|建立|發佈|貼文/i;
-    const button = Array.from(document.querySelectorAll('a, button, [role="button"], svg, div[role="menuitem"]')).find((node) => {
-      const label = `${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""} ${node.innerText || node.textContent || ""}`.trim();
-      return visible(node) && labels.test(label);
-    });
-    const clickTarget = button?.closest('a, button, [role="button"]') || button;
-    clickTarget?.click();
+    const elements = Array.from(document.querySelectorAll('svg, a, div[role="button"], [role="link"], span, button'));
+    let clickTarget = null;
+    for (const el of elements) {
+      const label = [
+        el.getAttribute("aria-label"),
+        el.getAttribute("title"),
+        el.innerText || el.textContent
+      ].filter(Boolean).join(" ");
+      if (labels.test(label) && label.length < 40 && visible(el)) {
+        clickTarget = el.closest('a, button, div[role="button"], div[role="menuitem"]') || el;
+        break;
+      }
+    }
+    if (clickTarget) {
+      clickTarget.click();
+    } else {
+      const svg = Array.from(document.querySelectorAll('svg[aria-label*="New post" i], svg[aria-label*="建立" i], svg[aria-label*="Create" i]')).find(visible);
+      const target = svg?.closest('a, button, div') || svg;
+      target?.click();
+    }
 
     let imageAttached = false;
     if (imageUrl) {

@@ -455,8 +455,12 @@
     textbox.focus();
     const current = (textbox.innerText || textbox.textContent || "").trim();
     if (!current.includes("本人樂觀開朗") && !current.includes("Chamber")) {
+      const range = document.createRange();
+      range.selectNodeContents(textbox);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
       document.execCommand("insertText", false, text);
-      textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     }
 
     return { success: true, imageAttached };

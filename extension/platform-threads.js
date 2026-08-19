@@ -310,24 +310,26 @@
 
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new thread|create|post|新增串文|建立|發佈/i;
-    const button = Array.from(document.querySelectorAll('button, [role="button"]')).find((node) => {
+    const button = Array.from(document.querySelectorAll('button, [role="button"], [role="link"], svg')).find((node) => {
       const label = `${node.getAttribute("aria-label") || ""} ${node.innerText || node.textContent || ""}`.trim();
       return visible(node) && labels.test(label) && label.length < 80;
     });
     button?.click();
-    let textbox = null;
-    for (let attempt = 0; attempt < 30 && !textbox; attempt += 1) {
-      textbox = Array.from(document.querySelectorAll('[contenteditable="true"][role="textbox"], textarea')).find(visible) || null;
-      if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
+
+    let modal = null;
+    for (let attempt = 0; attempt < 30 && !modal; attempt += 1) {
+      modal = document.querySelector('div[role="dialog"]');
+      if (!modal) await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    if (!textbox) throw new Error(t("threads.composerMissing"));
+    const targetScope = modal || document;
 
     let imageAttached = false;
     if (imageUrl) {
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        const input = Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
+        const input = (modal ? modal.querySelector('input[type="file"]') : null)
+          || Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
         if (input) {
           const transfer = new DataTransfer();
           transfer.items.add(file);
@@ -339,14 +341,25 @@
       } catch (_) {}
     }
 
-    const activeTextbox = Array.from(document.querySelectorAll('[contenteditable="true"][role="textbox"], textarea')).find(visible) || textbox;
-    activeTextbox.focus();
-    if (activeTextbox.tagName === "TEXTAREA") {
-      activeTextbox.value = text;
-      activeTextbox.dispatchEvent(new Event("input", { bubbles: true }));
+    let textbox = null;
+    for (let attempt = 0; attempt < 25 && !textbox; attempt += 1) {
+      const scope = document.querySelector('div[role="dialog"]') || targetScope;
+      textbox = Array.from(scope.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
+      if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!textbox) throw new Error(t("threads.composerMissing"));
+
+    textbox.focus();
+    if (textbox.tagName === "TEXTAREA") {
+      textbox.value = text;
+      textbox.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
+      const range = document.createRange();
+      range.selectNodeContents(textbox);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
       document.execCommand("insertText", false, text);
-      activeTextbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     }
 
     return { success: true, imageAttached };
