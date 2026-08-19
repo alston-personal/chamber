@@ -37,7 +37,11 @@
   }
 
   function postLinksIn(node) {
-    return Array.from(node?.querySelectorAll?.(POST_LINK_SELECTOR) || [])
+    if (!node) return [];
+    const elements = [];
+    if (node.matches?.(POST_LINK_SELECTOR)) elements.push(node);
+    if (node.querySelectorAll) elements.push(...Array.from(node.querySelectorAll(POST_LINK_SELECTOR)));
+    return elements
       .map((link) => ({ link, parsed: parsePermalink(link.href) }))
       .filter((item) => item.parsed);
   }
@@ -46,6 +50,11 @@
     if (!target) return null;
     const direct = target.closest?.('article, div[role="dialog"] article, div[role="dialog"]');
     if (direct) return direct;
+
+    const directLink = target.closest?.(POST_LINK_SELECTOR);
+    if (directLink) {
+      return directLink.closest('div[style*="aspect-ratio"], div._aabd, a') || directLink;
+    }
 
     let candidate = null;
     for (let node = target, depth = 0; node && depth < 16; node = node.parentElement, depth += 1) {
@@ -58,7 +67,6 @@
           return node;
         }
       } else if (count > 1) {
-        // Stop before going up into multi-post timeline
         break;
       }
     }
@@ -96,7 +104,7 @@
       const text = headerTitle.textContent.trim().replace(/^@/, "");
       if (text && !["explore", "reels"].includes(text.toLowerCase())) return normalizeHandle(text);
     }
-    return "";
+    return getAccountContext()?.handle || "";
   }
 
   function extractPublishedAt(container) {
