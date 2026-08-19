@@ -38,6 +38,19 @@ const zhTW = {
   leopardAlbumTitle: "石虎珍藏相簿",
   wallSkinSetting: "🎨 回聲壁外觀設定", wallSkinDesc: "為您的公開回聲壁選擇專屬神獸或卡片版型",
   saveWallSkin: "儲存回聲壁外觀", skinClassic: "📄 經典極簡黑曜卡片", skinLeopard: "🐯 台灣石虎 3D 翻肚靈獸 (Pro)", proExclusive: "💎 Pro 尊榮限定",
+  themeTitleHeader: "🎨 風格主題", themeTitleHeaderDesc: "切換個人閱讀配色",
+  themeObsidian: "極簡黑曜", themeObsidianDesc: "鈦灰石墨經典沉穩",
+  themeCyber: "賽博霓光", themeCyberDesc: "深空宇宙星夜霓虹",
+  themeAmber: "復古暖琥珀", themeAmberDesc: "復古牛皮紙典雅暖光",
+  themeEmerald: "深林青翠", themeEmeraldDesc: "自然翡翠沉靜深綠",
+  themeSakura: "櫻花暮夜", themeSakuraDesc: "暮色櫻粉金屬光澤",
+  themeCustom: "自訂主題", themeCustomDesc: "自訂色彩或匯入主題包",
+  themeBadgeClassic: "經典", themeBadgeGeek: "極客", themeBadgeTexture: "質感", themeBadgeQuiet: "靜謐", themeBadgeSpecial: "限定", themeBadgeCustom: "客製",
+  themeStudioTitle: "客製與匯入主題 (Theme Studio)", themeStudioSubtitle: "自訂配色或匯入主題 JSON 設定檔",
+  themeTabPicker: "🖌️ 調色盤自訂", themeTabJson: "📥 JSON 匯入/匯出",
+  themeNameLabel: "主題名稱", themeBgPage: "背景色 (Page)", themeBgCard: "卡片底色 (Card)", themeAccent: "強調主色 (Accent)", themeBorder: "邊框線條 (Border)",
+  themeSaveApply: "💾 儲存並套用主題", themeCancel: "取消", themeExportJson: "📤 複製 JSON", themeImportJson: "📥 匯入 JSON",
+  themeCopied: "已複製主題 JSON 到剪貼簿！可分享給其他使用者！", themeImportSuccess: "✅ 成功匯入主題！已自動套用。", themeInvalidJson: "❌ JSON 格式不正確，請檢查語法。",
 } as const;
 
 type FeedKey = keyof typeof zhTW;
@@ -79,6 +92,19 @@ const en: Record<FeedKey, string> = {
   leopardAlbumTitle: "Leopard Cat Album",
   wallSkinSetting: "🎨 Wall Skin Settings", wallSkinDesc: "Choose a guardian mascot or card skin for your public Echo Wall",
   saveWallSkin: "Save Wall Skin", skinClassic: "📄 Classic Obsidian Card", skinLeopard: "🐯 Taiwan Leopard Cat 3D Belly-up (Pro)", proExclusive: "💎 Pro Exclusive",
+  themeTitleHeader: "🎨 Color Theme", themeTitleHeaderDesc: "Switch personal reader palette",
+  themeObsidian: "Obsidian", themeObsidianDesc: "Classic dark graphite stealth",
+  themeCyber: "Cyber Neon", themeCyberDesc: "Deep cosmic cyber glow",
+  themeAmber: "Vintage Amber", themeAmberDesc: "Warm parchment retro glow",
+  themeEmerald: "Deep Emerald", themeEmeraldDesc: "Soothing deep forest green",
+  themeSakura: "Twilight Sakura", themeSakuraDesc: "Metallic dusk pink blush",
+  themeCustom: "Custom Theme", themeCustomDesc: "Custom palette or JSON theme pack",
+  themeBadgeClassic: "Classic", themeBadgeGeek: "Geek", themeBadgeTexture: "Warm", themeBadgeQuiet: "Quiet", themeBadgeSpecial: "Special", themeBadgeCustom: "Custom",
+  themeStudioTitle: "Custom & Import Theme (Theme Studio)", themeStudioSubtitle: "Customize colors or import JSON theme config",
+  themeTabPicker: "🖌️ Palette Picker", themeTabJson: "📥 JSON Import/Export",
+  themeNameLabel: "Theme Name", themeBgPage: "Page Background", themeBgCard: "Card Background", themeAccent: "Accent Color", themeBorder: "Border Line",
+  themeSaveApply: "💾 Save & Apply Theme", themeCancel: "Cancel", themeExportJson: "📤 Copy JSON", themeImportJson: "📥 Import JSON",
+  themeCopied: "Theme JSON copied to clipboard! Ready to share!", themeImportSuccess: "✅ Theme successfully imported and applied.", themeInvalidJson: "❌ Invalid JSON format, please check syntax.",
 };
 
 const dicts: Record<Locale, Record<FeedKey, string>> = {

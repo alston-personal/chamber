@@ -1658,8 +1658,21 @@ export default function PlatformFeed({
                 style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
                 title="切換時光牆主題"
               >
-                <span>{TIMELINE_THEMES.find((t) => t.id === currentTheme)?.icon || "🎨"}</span>
-                <span className="hidden sm:inline font-medium text-[11px]">{TIMELINE_THEMES.find((t) => t.id === currentTheme)?.name || "主題"}</span>
+                <span>{(() => {
+                  const icons: Record<string, string> = { obsidian: "⬛", cyber: "🌌", amber: "🍂", emerald: "🌿", sakura: "🌸", custom: "🎨" };
+                  return icons[currentTheme] || "🎨";
+                })()}</span>
+                <span className="hidden sm:inline font-medium text-[11px]">{(() => {
+                  const names: Record<string, string> = {
+                    obsidian: ft("themeObsidian"),
+                    cyber: ft("themeCyber"),
+                    amber: ft("themeAmber"),
+                    emerald: ft("themeEmerald"),
+                    sakura: ft("themeSakura"),
+                    custom: customTheme.name || ft("themeCustom"),
+                  };
+                  return names[currentTheme] || ft("themeTitleHeader");
+                })()}</span>
               </button>
 
               {isThemeMenuOpen && (
@@ -1668,7 +1681,7 @@ export default function PlatformFeed({
                   style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
                 >
                   <div className="px-3 py-2 border-b border-slate-700/50 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200">🎨 時光牆風格主題</span>
+                    <span className="text-xs font-bold text-slate-200">{ft("themeTitleHeader")}</span>
                     <button
                       onClick={() => {
                         setShowThemeModal(true);
@@ -1677,11 +1690,18 @@ export default function PlatformFeed({
                       className="text-[10px] px-2 py-0.5 rounded font-bold transition-all text-white"
                       style={{ backgroundColor: "var(--accent-primary)" }}
                     >
-                      ＋ 客製/匯入
+                      ＋ {ft("themeBadgeCustom")}
                     </button>
                   </div>
                   <div className="space-y-1 mt-1.5">
-                    {TIMELINE_THEMES.map((t) => (
+                    {[
+                      { id: "obsidian", name: ft("themeObsidian"), icon: "⬛", desc: ft("themeObsidianDesc"), badge: ft("themeBadgeClassic") },
+                      { id: "cyber", name: ft("themeCyber"), icon: "🌌", desc: ft("themeCyberDesc"), badge: ft("themeBadgeGeek") },
+                      { id: "amber", name: ft("themeAmber"), icon: "🍂", desc: ft("themeAmberDesc"), badge: ft("themeBadgeTexture") },
+                      { id: "emerald", name: ft("themeEmerald"), icon: "🌿", desc: ft("themeEmeraldDesc"), badge: ft("themeBadgeQuiet") },
+                      { id: "sakura", name: ft("themeSakura"), icon: "🌸", desc: ft("themeSakuraDesc"), badge: ft("themeBadgeSpecial") },
+                      { id: "custom", name: customTheme.name || ft("themeCustom"), icon: "🎨", desc: ft("themeCustomDesc"), badge: ft("themeBadgeCustom") },
+                    ].map((t) => (
                       <button
                         key={t.id}
                         type="button"
@@ -1697,7 +1717,7 @@ export default function PlatformFeed({
                           <span className="text-base">{t.icon}</span>
                           <div>
                             <div className="text-xs">{t.name}</div>
-                            <div className="text-[9px] text-slate-400">{t.id === "custom" ? customTheme.name : t.desc}</div>
+                            <div className="text-[9px] text-slate-400">{t.desc}</div>
                           </div>
                         </div>
                         <span
@@ -2902,8 +2922,8 @@ export default function PlatformFeed({
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🎨</span>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-100">客製與匯入主題 (Theme Studio)</h3>
-                    <p className="text-[10px] text-slate-400">自訂配色或匯入主題 JSON 設定檔</p>
+                    <h3 className="text-sm font-bold text-slate-100">{ft("themeStudioTitle")}</h3>
+                    <p className="text-[10px] text-slate-400">{ft("themeStudioSubtitle")}</p>
                   </div>
                 </div>
                 <button
@@ -2923,7 +2943,7 @@ export default function PlatformFeed({
                   className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${themeModalTab === "picker" ? "text-white shadow" : "text-slate-400"}`}
                   style={themeModalTab === "picker" ? { backgroundColor: "var(--accent-primary)" } : {}}
                 >
-                  🖌️ 調色盤自訂
+                  {ft("themeTabPicker")}
                 </button>
                 <button
                   type="button"
@@ -2934,14 +2954,14 @@ export default function PlatformFeed({
                   className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${themeModalTab === "json" ? "text-white shadow" : "text-slate-400"}`}
                   style={themeModalTab === "json" ? { backgroundColor: "var(--accent-primary)" } : {}}
                 >
-                  📥 JSON 匯入/匯出
+                  {ft("themeTabJson")}
                 </button>
               </div>
 
               {themeModalTab === "picker" ? (
                 <div className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">主題名稱</label>
+                    <label className="block text-slate-300 font-semibold mb-1">{ft("themeNameLabel")}</label>
                     <input
                       type="text"
                       value={customTheme.name}
@@ -2953,7 +2973,7 @@ export default function PlatformFeed({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">背景色 (Page)</label>
+                      <label className="block text-slate-300 font-semibold mb-1">{ft("themeBgPage")}</label>
                       <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
                         <input
                           type="color"
@@ -2966,7 +2986,7 @@ export default function PlatformFeed({
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">卡片底色 (Card)</label>
+                      <label className="block text-slate-300 font-semibold mb-1">{ft("themeBgCard")}</label>
                       <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
                         <input
                           type="color"
@@ -2979,7 +2999,7 @@ export default function PlatformFeed({
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">強調主色 (Accent)</label>
+                      <label className="block text-slate-300 font-semibold mb-1">{ft("themeAccent")}</label>
                       <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
                         <input
                           type="color"
@@ -2992,7 +3012,7 @@ export default function PlatformFeed({
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">邊框線條 (Border)</label>
+                      <label className="block text-slate-300 font-semibold mb-1">{ft("themeBorder")}</label>
                       <div className="flex items-center gap-2 border rounded-xl px-2 py-1" style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}>
                         <input
                           type="color"
@@ -3011,19 +3031,19 @@ export default function PlatformFeed({
                     style={{ backgroundColor: customTheme.bgCard, borderColor: customTheme.borderCard }}
                   >
                     <div className="text-xs font-bold" style={{ color: customTheme.accentText }}>
-                      即時效果預覽 ({customTheme.name})
+                      Preview: {customTheme.name}
                     </div>
-                    <p className="text-[11px] text-slate-300 mt-1">這是一段文字預覽效果，文字清晰且舒適！</p>
+                    <p className="text-[11px] text-slate-300 mt-1">Lorem ipsum dolor sit amet, decentralized sovereign echo.</p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3 text-xs">
-                  <label className="block text-slate-300 font-semibold">貼上 Theme JSON 設定檔：</label>
+                  <label className="block text-slate-300 font-semibold">JSON Config:</label>
                   <textarea
                     value={themeJsonInput}
                     onChange={(e) => setThemeJsonInput(e.target.value)}
                     rows={7}
-                    placeholder={`{\n  "name": "我的客製主題",\n  "bgPage": "#0a0f1d",\n  "bgCard": "#121b2f",\n  "borderCard": "#1f2e4d",\n  "accentPrimary": "#38bdf8",\n  "accentText": "#7dd3fc"\n}`}
+                    placeholder={`{\n  "name": "My Theme",\n  "bgPage": "#0a0f1d",\n  "bgCard": "#121b2f",\n  "borderCard": "#1f2e4d",\n  "accentPrimary": "#38bdf8",\n  "accentText": "#7dd3fc"\n}`}
                     className="w-full rounded-xl p-3 border font-mono text-[11px] text-slate-200 focus:outline-none"
                     style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
                   />
@@ -3034,30 +3054,31 @@ export default function PlatformFeed({
                         try {
                           const parsed = JSON.parse(themeJsonInput);
                           if (!parsed.bgPage || !parsed.bgCard || !parsed.accentPrimary) {
-                            alert("JSON 格式不正確，缺少必要欄位！");
+                            alert(ft("themeInvalidJson"));
                             return;
                           }
                           setCustomTheme(parsed);
                           saveAndApplyCustomTheme(parsed);
+                          alert(ft("themeImportSuccess"));
                         } catch (err: any) {
-                          alert("無效的 JSON 字串：" + err.message);
+                          alert(ft("themeInvalidJson") + " " + err.message);
                         }
                       }}
                       className="flex-1 py-2 rounded-xl text-white font-bold text-xs"
                       style={{ backgroundColor: "var(--accent-primary)" }}
                     >
-                      📥 解析並套用 JSON
+                      {ft("themeImportJson")}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(JSON.stringify(customTheme, null, 2));
-                        alert("已複製主題 JSON 到剪貼簿！可分享給其他使用者！");
+                        alert(ft("themeCopied"));
                       }}
                       className="px-3 py-2 rounded-xl border text-slate-300 hover:text-white text-xs font-semibold"
                       style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
                     >
-                      📤 複製 JSON
+                      {ft("themeExportJson")}
                     </button>
                   </div>
                 </div>
@@ -3070,7 +3091,7 @@ export default function PlatformFeed({
                   className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-lg transition-all"
                   style={{ backgroundColor: "var(--accent-primary)" }}
                 >
-                  💾 儲存並套用主題
+                  {ft("themeSaveApply")}
                 </button>
                 <button
                   type="button"
@@ -3078,7 +3099,7 @@ export default function PlatformFeed({
                   className="px-4 py-2.5 rounded-xl border text-slate-400 hover:text-white text-xs font-medium"
                   style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
                 >
-                  取消
+                  {ft("themeCancel")}
                 </button>
               </div>
             </div>
