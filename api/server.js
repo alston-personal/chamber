@@ -42,6 +42,16 @@ const {
   DEFAULT_FREE_QUOTA,
 } = require("./quota");
 const {
+  checkIsPro,
+  getAccountBillingStatus,
+  bindReferrer,
+  processProPayment,
+  applyGenesisLicense,
+  processSponsorship,
+  claimAffiliateCommission,
+  getGrowthPoolStats,
+} = require("./billing-ledger");
+const {
   beginRegistration,
   finishRegistration,
   cancelRegistration,
@@ -537,10 +547,106 @@ router.get("/quota", async (req, res) => {
   try {
     const rawKey = req.query.actorId || req.query.fbUserIdHash || req.query.clientId || req.query.alias || "default";
     const entityKey = req.query.fbUserId ? hashFbUserId(req.query.fbUserId) : rawKey;
-    const quota = await getQuota(entityKey);
+    const alias = req.query.alias || null;
+    const quota = await getQuota(entityKey, "free_genesis", alias);
     return res.json({ success: true, ...quota });
   } catch (err) {
     return res.status(500).json({ error: err.message || "Failed to fetch quota" });
+  }
+});
+
+// ── GET /billing/status — Query account Pro & Affiliate status ──
+router.get("/billing/status", async (req, res) => {
+  try {
+    const alias = req.query.alias || "";
+    const status = await getAccountBillingStatus(alias);
+    return res.json({ success: true, ...status });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to fetch billing status" });
+  }
+});
+
+// ── POST /billing/bind-referrer — Bind referrer for new user ──
+router.post("/billing/bind-referrer", async (req, res) => {
+  try {
+    const { alias, referrerAlias } = req.body;
+    if (!alias || !referrerAlias) {
+      return res.status(400).json({ error: "Missing alias or referrerAlias" });
+    }
+    const bound = await bindReferrer(alias, referrerAlias);
+    return res.json({ success: true, bound });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to bind referrer" });
+  }
+});
+
+// ── POST /billing/upgrade — Upgrade to Pro (Stripe / Genesis Key / Direct) ──
+router.post("/billing/upgrade", async (req, res) => {
+  try {
+    const { alias, licenseKey, plan, grossAmount, referrerAlias, paymentMethod } = req.body;
+    if (!alias) return res.status(400).json({ error: "Alias is required" });
+
+    // Handle Genesis License Key
+    if (licenseKey) {
+      const result = await applyGenesisLicense({ alias, licenseKey });
+      return res.json(result);
+    }
+
+    // Handle Regular / Stripe / Crypto Pro Upgrade
+    const result = await processProPayment({
+      alias,
+      grossAmount: grossAmount ? Number(grossAmount) : 2.99,
+      durationDays: plan === "pro_annual" ? 365 : 30,
+      plan: plan || "pro_monthly",
+      referrerAlias: referrerAlias || null,
+      paymentMethod: paymentMethod || "mock_stripe",
+    });
+
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to process Pro upgrade" });
+  }
+});
+
+// ── POST /billing/sponsor — Sponsor a product (100% into Growth Pool) ──
+router.post("/billing/sponsor", async (req, res) => {
+  try {
+    const { alias, itemType, amount, message, paymentMethod } = req.body;
+    const result = await processSponsorship({
+      alias,
+      itemType: itemType || "can_5",
+      amount: amount || 5.0,
+      message: message || "",
+      paymentMethod: paymentMethod || "stripe",
+    });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to process sponsorship" });
+  }
+});
+
+// ── POST /billing/payout — Redeem or withdraw affiliate commission ──
+router.post("/billing/payout", async (req, res) => {
+  try {
+    const { alias, redeemAsPro, payoutAddress } = req.body;
+    const result = await claimAffiliateCommission({
+      alias,
+      redeemAsPro: redeemAsPro === true || redeemAsPro === "true",
+      payoutAddress: payoutAddress || "",
+    });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to process commission claim" });
+  }
+});
+
+// ── GET /billing/growth-pool — Public stats for transparency ──
+router.get("/billing/growth-pool", async (req, res) => {
+  try {
+    const stats = await getGrowthPoolStats();
+    return res.json({ success: true, ...stats });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to fetch growth pool stats" });
   }
 });
 
@@ -586,7 +692,7 @@ router.post("/backup", async (req, res) => {
 
     let quotaResult;
     try {
-      quotaResult = await checkAndConsumeQuota(quotaEntityKey);
+      quotaResult = await checkAndConsumeQuota(quotaEntityKey, "free_genesis", identityAlias || null);
     } catch (quotaErr) {
       return res.status(403).json({
         error: quotaErr.message || "Monthly quota exceeded",

@@ -45,6 +45,8 @@ async function writeStore(store) {
   await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
 }
 
+const { checkIsPro } = require("./billing-ledger");
+
 /**
  * Normalizes the quota entity key (fbUserIdHash, actorId, or clientId)
  */
@@ -53,33 +55,44 @@ function normalizeKey(key) {
   return String(key).trim().toLowerCase();
 }
 
-async function getQuota(entityKey, tier = "free_genesis") {
+async function getQuota(entityKey, tier = "free_genesis", alias = null) {
   const normKey = normalizeKey(entityKey);
   const month = getCurrentMonth();
   const store = await readStore();
   const monthData = store.months?.[month] || {};
   const used = Number(monthData[normKey] || 0);
-  const limit = tier === "pro" ? 1000 : DEFAULT_FREE_QUOTA;
+
+  let activeTier = tier;
+  if (alias && await checkIsPro(alias)) {
+    activeTier = "pro";
+  }
+
+  const limit = activeTier === "pro" ? 1000 : DEFAULT_FREE_QUOTA;
 
   return {
     month,
     used,
     limit,
     remaining: Math.max(0, limit - used),
-    tier,
+    tier: activeTier,
     resetsAt: getNextResetDate(),
   };
 }
 
-async function checkAndConsumeQuota(entityKey, tier = "free_genesis") {
+async function checkAndConsumeQuota(entityKey, tier = "free_genesis", alias = null) {
   const normKey = normalizeKey(entityKey);
   const month = getCurrentMonth();
   const store = await readStore();
   store.months = store.months || {};
   store.months[month] = store.months[month] || {};
 
+  let activeTier = tier;
+  if (alias && await checkIsPro(alias)) {
+    activeTier = "pro";
+  }
+
   const used = Number(store.months[month][normKey] || 0);
-  const limit = tier === "pro" ? 1000 : DEFAULT_FREE_QUOTA;
+  const limit = activeTier === "pro" ? 1000 : DEFAULT_FREE_QUOTA;
 
   if (used >= limit) {
     const err = new Error(`本月免費上鏈額度（${limit} 篇）已用完，額度將於下個月 1 號自動重置。`);

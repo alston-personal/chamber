@@ -273,6 +273,87 @@
       <button id="settingsBack" class="secondary-action navigation-action" type="button" data-i18n="settings.back">← 返回文章備份</button>
     </div>
   </div>
+  <div id="proView" hidden>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="label" style="font-size:14px; color:var(--accent-text); font-weight:bold;">💎 Chamber Pro & 創世推廣中心</div>
+        <span id="proBadgeTag" style="font-size:10px; padding:2px 8px; border-radius:999px; background:var(--accent-glow); border:1px solid var(--accent-primary); color:var(--accent-text); font-weight:bold;">FREE GENESIS</span>
+      </div>
+
+      <!-- Tab navigation -->
+      <div style="display:flex; gap:6px; margin-bottom:14px; border-bottom:1px solid var(--border-card); padding-bottom:8px;">
+        <button id="proTabUpgradeBtn" class="secondary-action compact-action" type="button" style="font-size:11px; padding:4px 8px;">💎 升級 Pro</button>
+        <button id="proTabAffiliateBtn" class="secondary-action compact-action" type="button" style="font-size:11px; padding:4px 8px;">👥 推薦分潤 (15%)</button>
+        <button id="proTabSponsorBtn" class="secondary-action compact-action" type="button" style="font-size:11px; padding:4px 8px;">🥫 贊助社群</button>
+      </div>
+
+      <!-- Section 1: Upgrade -->
+      <div id="proSectionUpgrade">
+        <div class="post-meta" style="white-space:normal; line-height:1.5; margin-bottom:10px;">
+          升級 Chamber Pro 享無限量永久上鏈、4K 無損相簿、1,000 篇/月額度，並解鎖「🐾 台灣石虎 3D 翻肚靈獸」創作者專屬外觀！
+        </div>
+        <button id="proUpgradeBtn" type="button" style="margin-bottom:10px;">💳 立即訂閱 Chamber Pro ($2.99 / 月)</button>
+        
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-card);">
+          <label class="label" for="genesisKeyInput">🎟️ 兌換創世激活碼 (Genesis Key)</label>
+          <div class="field-action-row" style="margin-top:4px;">
+            <input id="genesisKeyInput" type="text" placeholder="例如：CHAMBER-GENESIS-2026" style="min-width:0; width:100%; padding:9px; border:1px solid var(--border-card); border-radius:8px; background:var(--bg-page); color:var(--text-primary); text-transform:uppercase;">
+            <button id="genesisKeySubmit" class="secondary-action compact-action" type="button">兌換</button>
+          </div>
+          <div id="genesisKeyStatus" class="post-meta" style="margin-top:6px; white-space:normal;"></div>
+        </div>
+      </div>
+
+      <!-- Section 2: Affiliate -->
+      <div id="proSectionAffiliate" style="display:none;">
+        <div class="post-meta" style="white-space:normal; line-height:1.5; margin-bottom:10px;">
+          發布轉世聲明或分享專屬推薦連結，每當有創作者透過你升級 Pro，你將獲得 <strong style="color:var(--accent-text);" id="affiliateRateText">15%</strong> 永續循環佣金！
+        </div>
+        
+        <label class="label">🔗 你的專屬推薦連結</label>
+        <div class="field-action-row" style="margin-top:4px; margin-bottom:12px;">
+          <input id="affiliateLinkInput" type="text" readonly style="min-width:0; width:100%; padding:8px; border:1px solid var(--border-card); border-radius:8px; background:var(--bg-page); color:var(--accent-text); font-size:11px; font-family:monospace;">
+          <button id="affiliateLinkCopy" class="secondary-action compact-action" type="button">複製</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+          <div style="padding:10px; border:1px solid var(--border-card); border-radius:8px; background:var(--bg-page); text-align:center;">
+            <div style="font-size:10px; color:var(--text-secondary);">👥 已推薦人數</div>
+            <div id="affiliateReferralsCount" style="font-size:18px; font-weight:bold; color:var(--accent-text); margin-top:2px;">0</div>
+          </div>
+          <div style="padding:10px; border:1px solid var(--border-card); border-radius:8px; background:var(--bg-page); text-align:center;">
+            <div style="font-size:10px; color:var(--text-secondary);">💵 待結算分潤</div>
+            <div id="affiliateUnpaidAmount" style="font-size:18px; font-weight:bold; color:var(--text-primary); margin-top:2px;">$0.00</div>
+          </div>
+        </div>
+
+        <button id="affiliateRedeemProBtn" class="secondary-action" type="button" style="margin-bottom:8px;">🎁 1:1 分潤折抵 Pro 訂閱天數</button>
+        <button id="affiliatePayoutBtn" class="secondary-action" type="button">💵 申請出金提領 (滿 $10)</button>
+        <div id="affiliateActionStatus" class="post-meta" style="margin-top:8px; white-space:normal;"></div>
+      </div>
+
+      <!-- Section 3: Sponsor -->
+      <div id="proSectionSponsor" style="display:none;">
+        <div class="post-meta" style="white-space:normal; line-height:1.5; margin-bottom:10px;">
+          您的每一筆贊助將 <strong>100% 溢注進入官方增長基金</strong>，專款專用於補貼新創作者上鏈折扣與社群推廣，並為您的迴響谷點亮永久榮譽金爪徽章！
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button id="sponsorCanBtn" class="secondary-action" type="button" style="text-align:left; display:flex; justify-content:space-between; align-items:center; padding:10px 14px;">
+            <span>🥫 請石虎吃肉泥罐罐 (獲得 🐾 鏟屎官徽章)</span>
+            <strong style="color:var(--accent-text);">$5 USD</strong>
+          </button>
+          <button id="sponsorPatronBtn" class="secondary-action" type="button" style="text-align:left; display:flex; justify-content:space-between; align-items:center; padding:10px 14px;">
+            <span>🛡️ 創世守護者贊助包 (獲得 🏆 創世守護者徽章)</span>
+            <strong style="color:var(--accent-text);">$20 USD</strong>
+          </button>
+        </div>
+        <div id="sponsorActionStatus" class="post-meta" style="margin-top:8px; white-space:normal;"></div>
+      </div>
+
+      <button id="proBack" class="secondary-action navigation-action" type="button" style="margin-top:14px;">← 返回文章備份</button>
+    </div>
+  </div>
   <div id="rebornView" hidden>
     <div class="card">
       <div class="label" data-i18n="reborn.title">Web3 轉世聲明</div>

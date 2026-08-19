@@ -226,6 +226,26 @@ export default function PlatformFeed({
   const [transferBusy, setTransferBusy] = useState<boolean>(false);
   const [transferStatus, setTransferStatus] = useState<string>("");
   const [transferMode, setTransferMode] = useState<"local" | "custom">("local");
+  const [ownerBilling, setOwnerBilling] = useState<{ isPro: boolean; badges: string[]; tier: string } | null>(null);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref && typeof window !== "undefined") {
+      localStorage.setItem("chamber_referrer", ref.trim().toLowerCase());
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+    fetch(`/chamber-api/billing/status?alias=${encodeURIComponent(walletAddress)}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success) {
+          setOwnerBilling({ isPro: data.isPro, badges: data.badges || [], tier: data.tier });
+        }
+      })
+      .catch(() => {});
+  }, [walletAddress]);
 
   const requestExtensionProfiles = () => new Promise<{ id: string; name: string; alias: string; walletAddress: string }[]>((resolve) => {
     const requestId = `profiles_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -2251,9 +2271,26 @@ export default function PlatformFeed({
               </div>
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-                {ownerDisplayName || walletAddress} <span className="font-normal text-slate-500">({ft("creator")})</span>
-              </h2>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                  {ownerDisplayName || walletAddress} <span className="font-normal text-slate-500">({ft("creator")})</span>
+                </h2>
+                {ownerBilling?.isPro && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm" title="Chamber Pro 創作者">
+                    💎 PRO
+                  </span>
+                )}
+                {ownerBilling?.badges?.includes("genesis_patron") && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm" title="創世守護者">
+                    🏆 創世守護者
+                  </span>
+                )}
+                {ownerBilling?.badges?.includes("cat_feeder") && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm" title="榮譽鏟屎官">
+                    🐾 榮譽鏟屎官
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] text-slate-400 font-mono break-all">{walletAddress}</p>
             </div>
           </div>

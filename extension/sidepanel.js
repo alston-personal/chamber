@@ -502,9 +502,280 @@ async function updateQuotaDisplay() {
   } catch (_) {}
 }
 
+const proView = document.getElementById("proView");
+const proBack = document.getElementById("proBack");
+const proBadgeTag = document.getElementById("proBadgeTag");
+const proTabUpgradeBtn = document.getElementById("proTabUpgradeBtn");
+const proTabAffiliateBtn = document.getElementById("proTabAffiliateBtn");
+const proTabSponsorBtn = document.getElementById("proTabSponsorBtn");
+const proSectionUpgrade = document.getElementById("proSectionUpgrade");
+const proSectionAffiliate = document.getElementById("proSectionAffiliate");
+const proSectionSponsor = document.getElementById("proSectionSponsor");
+const proUpgradeBtn = document.getElementById("proUpgradeBtn");
+const genesisKeyInput = document.getElementById("genesisKeyInput");
+const genesisKeySubmit = document.getElementById("genesisKeySubmit");
+const genesisKeyStatus = document.getElementById("genesisKeyStatus");
+const affiliateRateText = document.getElementById("affiliateRateText");
+const affiliateLinkInput = document.getElementById("affiliateLinkInput");
+const affiliateLinkCopy = document.getElementById("affiliateLinkCopy");
+const affiliateReferralsCount = document.getElementById("affiliateReferralsCount");
+const affiliateUnpaidAmount = document.getElementById("affiliateUnpaidAmount");
+const affiliateRedeemProBtn = document.getElementById("affiliateRedeemProBtn");
+const affiliatePayoutBtn = document.getElementById("affiliatePayoutBtn");
+const affiliateActionStatus = document.getElementById("affiliateActionStatus");
+const sponsorCanBtn = document.getElementById("sponsorCanBtn");
+const sponsorPatronBtn = document.getElementById("sponsorPatronBtn");
+const sponsorActionStatus = document.getElementById("sponsorActionStatus");
+
+async function loadBillingStatus() {
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+    if (!alias) return;
+
+    const res = await fetch(`https://studio.milkcat.org/chamber-api/billing/status?alias=${encodeURIComponent(alias)}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    if (proBadgeTag) {
+      proBadgeTag.textContent = data.isPro ? "💎 PRO CREATOR" : "FREE GENESIS";
+      proBadgeTag.style.background = data.isPro ? "rgba(168, 85, 247, 0.25)" : "var(--accent-glow)";
+      proBadgeTag.style.borderColor = data.isPro ? "#a855f7" : "var(--accent-primary)";
+      proBadgeTag.style.color = data.isPro ? "#d8b4fe" : "var(--accent-text)";
+    }
+
+    if (quotaTierLabel) {
+      quotaTierLabel.textContent = data.isPro ? "Chamber Pro (1,000 篇/月)" : "創世體驗版 (Free Genesis)";
+    }
+
+    if (affiliateRateText) {
+      affiliateRateText.textContent = data.isPro ? "15% (VIP Pro 費率)" : "7% (Free 費率 · 升級 Pro 翻倍至 15%)";
+    }
+
+    if (affiliateLinkInput) {
+      affiliateLinkInput.value = data.referralLink || `https://studio.milkcat.org/echo/${alias}/all?ref=${alias}`;
+    }
+
+    if (affiliateReferralsCount) {
+      affiliateReferralsCount.textContent = String(data.referralsCount || 0);
+    }
+
+    if (affiliateUnpaidAmount) {
+      affiliateUnpaidAmount.textContent = `$${(data.commissionsUnpaid || 0).toFixed(2)}`;
+    }
+  } catch (_) {}
+}
+
+function showPro() {
+  backupView.hidden = true;
+  settingsView.hidden = true;
+  if (rebornView) rebornView.hidden = true;
+  if (proView) proView.hidden = false;
+  loadBillingStatus();
+}
+
+function hidePro() {
+  if (proView) proView.hidden = true;
+  backupView.hidden = false;
+  checkSidePanelQuota();
+}
+
+proTabUpgradeBtn?.addEventListener("click", () => {
+  if (proSectionUpgrade) proSectionUpgrade.style.display = "block";
+  if (proSectionAffiliate) proSectionAffiliate.style.display = "none";
+  if (proSectionSponsor) proSectionSponsor.style.display = "none";
+});
+
+proTabAffiliateBtn?.addEventListener("click", () => {
+  if (proSectionUpgrade) proSectionUpgrade.style.display = "none";
+  if (proSectionAffiliate) proSectionAffiliate.style.display = "block";
+  if (proSectionSponsor) proSectionSponsor.style.display = "none";
+  loadBillingStatus();
+});
+
+proTabSponsorBtn?.addEventListener("click", () => {
+  if (proSectionUpgrade) proSectionUpgrade.style.display = "none";
+  if (proSectionAffiliate) proSectionAffiliate.style.display = "none";
+  if (proSectionSponsor) proSectionSponsor.style.display = "block";
+});
+
+proBack?.addEventListener("click", hidePro);
+
 const quotaProHint = document.getElementById("quotaProHint");
-quotaProHint?.addEventListener("click", () => {
-  alert("🚀 Chamber Pro (進階創作者版) 即將推出！\n\n將享有：\n• 無限量 Arweave 永久上鏈存證\n• 4K 原畫質無損相簿與高畫質影片備份\n• 解鎖全部 VIP 專屬迴響谷 Skin 主題\n• 專屬自訂迴響谷網址 (Custom Domain)");
+quotaProHint?.addEventListener("click", showPro);
+
+genesisKeySubmit?.addEventListener("click", async () => {
+  const key = genesisKeyInput?.value.trim();
+  if (!key) {
+    if (genesisKeyStatus) genesisKeyStatus.textContent = "請先輸入創世激活碼";
+    return;
+  }
+  genesisKeySubmit.disabled = true;
+  if (genesisKeyStatus) genesisKeyStatus.textContent = "⏳ 正在驗證創世激活碼...";
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+    if (!alias) throw new Error("請先在設定中綁定 Chamber 暱稱");
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/upgrade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, licenseKey: key })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "兌換失敗");
+
+    if (genesisKeyStatus) {
+      genesisKeyStatus.textContent = data.message || "🎉 創世激活碼兌換成功！已解鎖 90 天 Chamber Pro！";
+      genesisKeyStatus.style.color = "var(--accent-text)";
+    }
+    loadBillingStatus();
+  } catch (err) {
+    if (genesisKeyStatus) {
+      genesisKeyStatus.textContent = `❌ ${err.message}`;
+      genesisKeyStatus.style.color = "#f43f5e";
+    }
+  } finally {
+    genesisKeySubmit.disabled = false;
+  }
+});
+
+proUpgradeBtn?.addEventListener("click", async () => {
+  proUpgradeBtn.disabled = true;
+  proUpgradeBtn.textContent = "⏳ 正在建立 Pro 訂閱...";
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+    if (!alias) throw new Error("請先在設定中綁定 Chamber 暱稱");
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/upgrade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, plan: "pro_monthly", grossAmount: 2.99 })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "開通失敗");
+
+    alert("🎉 恭喜！Chamber Pro 升級成功！\n\n已為您開通無限上鏈存證與專屬「🐾 台灣石虎 3D 翻肚靈獸」！");
+    loadBillingStatus();
+  } catch (err) {
+    alert(`❌ 升級失敗: ${err.message}`);
+  } finally {
+    proUpgradeBtn.disabled = false;
+    proUpgradeBtn.textContent = "💳 立即訂閱 Chamber Pro ($2.99 / 月)";
+  }
+});
+
+affiliateLinkCopy?.addEventListener("click", async () => {
+  if (affiliateLinkInput?.value) {
+    await navigator.clipboard.writeText(affiliateLinkInput.value);
+    affiliateLinkCopy.textContent = "已複製！";
+    setTimeout(() => { affiliateLinkCopy.textContent = "複製"; }, 2000);
+  }
+});
+
+affiliateRedeemProBtn?.addEventListener("click", async () => {
+  if (!confirm("確定要將目前的待結算分潤 1:1 折抵為 Chamber Pro 訂閱天數嗎？")) return;
+  affiliateRedeemProBtn.disabled = true;
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/payout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, redeemAsPro: true })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "兌換失敗");
+
+    if (affiliateActionStatus) {
+      affiliateActionStatus.textContent = data.message;
+      affiliateActionStatus.style.color = "var(--accent-text)";
+    }
+    loadBillingStatus();
+  } catch (err) {
+    if (affiliateActionStatus) {
+      affiliateActionStatus.textContent = `❌ ${err.message}`;
+      affiliateActionStatus.style.color = "#f43f5e";
+    }
+  } finally {
+    affiliateRedeemProBtn.disabled = false;
+  }
+});
+
+affiliatePayoutBtn?.addEventListener("click", async () => {
+  const payoutAddress = prompt("請輸入您的提領收款錢包地址或銀行帳號（滿 $10 美元可提領）：");
+  if (!payoutAddress) return;
+
+  affiliatePayoutBtn.disabled = true;
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/payout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, redeemAsPro: false, payoutAddress })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "提領申請失敗");
+
+    alert(data.message);
+    loadBillingStatus();
+  } catch (err) {
+    alert(`❌ 提領失敗: ${err.message}`);
+  } finally {
+    affiliatePayoutBtn.disabled = false;
+  }
+});
+
+sponsorCanBtn?.addEventListener("click", async () => {
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/sponsor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, itemType: "can_5", amount: 5.0, message: "請石虎吃罐罐！" })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "贊助失敗");
+
+    alert("🐾 感謝您的愛心贊助！\n\n已為您的迴響谷點亮「🐾 榮譽鏟屎官」金爪徽章！所得 100% 已溢注官方增長基金，正在幫助更多創作者上鏈！");
+    loadBillingStatus();
+  } catch (err) {
+    alert(`❌ 贊助失敗: ${err.message}`);
+  }
+});
+
+sponsorPatronBtn?.addEventListener("click", async () => {
+  try {
+    const state = await getActiveProfile();
+    const profile = state.profiles.find((item) => item.id === state.activeId);
+    const alias = profile?.alias || "";
+
+    const res = await fetch("https://studio.milkcat.org/chamber-api/billing/sponsor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias, itemType: "patron_20", amount: 20.0, message: "創世守護者贊助！" })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "贊助失敗");
+
+    alert("🏆 感謝創世守護者！\n\n已為您的迴響谷點亮「🏆 創世守護者」專屬榮譽！所得 100% 已溢注官方增長基金！");
+    loadBillingStatus();
+  } catch (err) {
+    alert(`❌ 贊助失敗: ${err.message}`);
+  }
 });
 
 const requestsBanner = document.getElementById("requestsBanner");
@@ -735,7 +1006,7 @@ rebornGenerate?.addEventListener("click", async () => {
     const profile = state.profiles.find((item) => item.id === state.activeId);
     if (!profile?.alias) throw new Error(t("reborn.aliasRequired"));
     const timelinePlatform = identity.platform === "threads" ? "threads" : identity.platform === "instagram" ? "instagram" : identity.platform === "x" ? "x" : "fb";
-    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/${timelinePlatform}`;
+    const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(profile.alias)}/${timelinePlatform}?ref=${encodeURIComponent(profile.alias)}`;
     const card = await ChamberDeclaration.generateCard({ timelineUrl, alias: profile.alias });
 
     try {
