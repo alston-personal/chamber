@@ -2265,10 +2265,18 @@ export default function PlatformFeed({
         {/* Creator Info */}
         <div className="mb-6 p-4 bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-900/30 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5 shadow-md">
-              <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center font-bold text-sm text-slate-100">
-                {ownerInitials}
-              </div>
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5 shadow-md overflow-hidden flex-shrink-0">
+              {posts.find(p => (p.payload as any)?.source_author?.avatar || (p.payload as any)?.author_avatar) ? (
+                <img
+                  src={String((posts.find(p => (p.payload as any)?.source_author?.avatar || (p.payload as any)?.author_avatar)?.payload as any)?.source_author?.avatar || (posts.find(p => (p.payload as any)?.author_avatar)?.payload as any)?.author_avatar)}
+                  alt={ownerDisplayName || walletAddress}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center font-bold text-sm text-slate-100">
+                  {ownerInitials}
+                </div>
+              )}
             </div>
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">

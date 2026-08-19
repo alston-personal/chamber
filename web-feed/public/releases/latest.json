@@ -1,10 +1,10 @@
 {
-  "channel": "closed-alpha",
-  "version": "0.11.0",
-  "filename": "chamber-extension-v0.11.0.zip",
-  "downloadPath": "/echo/releases/chamber-extension-v0.11.0.zip",
-  "sha256": "2cf0e19461504a53cb2cd6b4d9015498e632960633ad6b05c450051cdf1711e5",
+  "channel": "stable",
+  "version": "1.0.0",
+  "filename": "chamber-extension-v1.0.0.zip",
+  "downloadPath": "/echo/releases/chamber-extension-v1.0.0.zip",
+  "sha256": "5bda724da024ab06838fea43718237b8c43202b48c98ec46de07f63d2724071d",
   "fileCount": 22,
-  "publishedAt": "2026-08-19T04:41:09.271683+00:00",
+  "publishedAt": "2026-08-19T05:11:33.974653+00:00",
   "network": "Irys Devnet / Arweave Mainnet Ready"
 }
