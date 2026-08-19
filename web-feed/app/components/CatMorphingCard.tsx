@@ -53,10 +53,20 @@ export default function CatMorphingCard({
 
   return (
     <div
-      className="cat-character-card relative max-w-xl mx-auto my-10 select-none group"
+      className="cat-character-card relative max-w-xl mx-auto my-12 select-none group pt-4"
       onMouseEnter={() => setIsWinking(true)}
       onMouseLeave={() => setIsWinking(false)}
     >
+      {/* 🏷️ Top Header Pill Tag (Positioned cleanly above the cat head) */}
+      <div className="flex justify-center mb-2">
+        <div className="inline-flex items-center gap-2 bg-slate-950/90 border border-sky-500/50 px-4 py-1 rounded-full text-[11px] text-sky-200 backdrop-blur shadow-xl whitespace-nowrap">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span className="font-bold uppercase tracking-wider">{platform} 備份</span>
+          <span className="text-slate-500">|</span>
+          <span className="text-slate-400 font-mono text-[10px]">{formattedPublishedTime}</span>
+        </div>
+      </div>
+
       {/* 🐾 1. UPPER CAT HEAD & SNOUT (SVG) */}
       <div className="relative z-30 drop-shadow-2xl">
         <svg
@@ -161,18 +171,10 @@ export default function CatMorphingCard({
             strokeLinecap="round"
           />
 
-          {/* Upper Fangs (visible when mouth is open or closed) */}
+          {/* Upper Fangs */}
           <polygon points="225,145 231,145 228,154" fill="#ffffff" />
           <polygon points="269,145 275,145 272,154" fill="#ffffff" />
         </svg>
-
-        {/* Floating Platform Tag */}
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-950/90 border border-sky-500/50 px-3.5 py-1 rounded-full text-[11px] text-sky-200 backdrop-blur shadow-xl">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span className="font-bold uppercase tracking-wider">{platform} 備份</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-slate-400 font-mono text-[10px]">{formattedPublishedTime}</span>
-        </div>
       </div>
 
       {/* 📜 2. THE ORGANIC MOUTH CAVITY (Opens & Closes) */}
@@ -295,7 +297,7 @@ export default function CatMorphingCard({
       {/* 🐾 3. LOWER JAW & CHIN (Seamlessly Closes with Upper Head) */}
       <div
         className={`relative z-30 drop-shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-          isExpanded ? "mt-0" : "-mt-10 sm:-mt-12"
+          isExpanded ? "mt-0" : "-mt-4 sm:-mt-5"
         }`}
       >
         <svg
@@ -312,8 +314,8 @@ export default function CatMorphingCard({
           />
 
           {/* Lower Center Fangs */}
-          <polygon points="238,10 244,10 241,1" fill="#ffffff" />
-          <polygon points="256,10 262,10 259,1" fill="#ffffff" />
+          <polygon points="238,14 244,14 241,6" fill="#ffffff" />
+          <polygon points="256,14 262,14 259,6" fill="#ffffff" />
 
           {/* Red Collar Band */}
           <path d="M 130 55 Q 250 85 370 55" fill="none" stroke="#ef4444" strokeWidth="6" strokeLinecap="round" />
