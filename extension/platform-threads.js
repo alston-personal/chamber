@@ -308,6 +308,38 @@
     });
   }
 
+  function setEditorText(el, textToInsert) {
+    if (!el) return;
+    el.focus();
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+
+    document.execCommand("selectAll", false, null);
+    let success = false;
+    try {
+      success = document.execCommand("insertText", false, textToInsert);
+    } catch (_) {}
+
+    if (!success || !el.textContent.trim()) {
+      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const htmlText = textToInsert
+        .split("\n")
+        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
+        .join("");
+      try {
+        document.execCommand("insertHTML", false, htmlText);
+      } catch (_) {}
+    }
+
+    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
+  }
+
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new thread|create|post|新增串文|建立|發佈/i;
     const button = Array.from(document.querySelectorAll('button, [role="button"]')).find((node) => {
@@ -321,26 +353,44 @@
       if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!textbox) throw new Error(t("threads.composerMissing"));
-    textbox.focus();
+    
     if (textbox.tagName === "TEXTAREA") {
+      textbox.focus();
       textbox.value = text;
       textbox.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
-      document.execCommand("insertText", false, text);
-      textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+      setEditorText(textbox, text);
     }
+
     let imageAttached = false;
     if (imageUrl) {
-      const response = await fetch(imageUrl);
-      const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-      const input = Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
-      if (input) {
-        const transfer = new DataTransfer();
-        transfer.items.add(file);
-        input.files = transfer.files;
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-        imageAttached = true;
-      }
+      try {
+        const response = await fetch(imageUrl);
+        const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
+        const input = Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
+        if (input) {
+          const transfer = new DataTransfer();
+          transfer.items.add(file);
+          input.files = transfer.files;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          imageAttached = true;
+
+          // Re-verify text retention after Threads attachment DOM update
+          const restore = () => {
+            const currentTextbox = Array.from(document.querySelectorAll('[contenteditable="true"][role="textbox"], textarea')).find(visible);
+            if (currentTextbox && !currentTextbox.innerText?.trim()) {
+              if (currentTextbox.tagName === "TEXTAREA") {
+                currentTextbox.value = text;
+                currentTextbox.dispatchEvent(new Event("input", { bubbles: true }));
+              } else {
+                setEditorText(currentTextbox, text);
+              }
+            }
+          };
+          setTimeout(restore, 400);
+          setTimeout(restore, 900);
+        }
+      } catch (_) {}
     }
     return { success: true, imageAttached };
   }

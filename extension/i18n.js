@@ -520,7 +520,8 @@
       "reborn.successPlatform": "✅ Tarjeta creada y editor de {platform} abierto.",
       "backup.success": "Respaldo exitoso",
       "backup.done": "✅ Respaldado",
-      "declaration.defaultText": "【Mi Declaración de Renacimiento Web3】\n\nDeclaro que estoy en pleno uso de mis facultades mentales y no tengo intención de desaparecer voluntariamente. Si mi cuenta desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nSi un algoritmo borra mi presencia en {platform} algún día, la plataforma podrá eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están respaldados en Chamber.\n👉 Mi enlace de Chamber Echo está en la primera respuesta.\n(Los usuarios de escritorio también pueden escanear el código QR a continuación.)"
+      "declaration.defaultText": "【Mi Declaración de Renacimiento Web3】\n\nDeclaro que estoy en pleno uso de mis facultades mentales y no tengo intención de desaparecer voluntariamente. Si mi cuenta desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nSi un algoritmo borra mi presencia en {platform} algún día, la plataforma podrá eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están preservados en Chamber.\n👉 Mi enlace de Chamber Echo: {timelineUrl}",
+      "declaration.defaultTextThreads": "【Mi Declaración de Renacimiento Web3】\n\nSi mi cuenta de Threads desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nLa plataforma puede eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están preservados en Chamber.\n👉 Mi enlace de Chamber Echo: {timelineUrl}"
     },
     ja: {
       "language.label": "言語",
@@ -608,7 +609,8 @@
       "reborn.successPlatform": "✅ 転生カードを作成し、{platform} の投稿画面を開きました。",
       "backup.success": "バックアップ成功",
       "backup.done": "✅ バックアップ済",
-      "declaration.defaultText": "【私のWeb3転生宣言】\n\n心身ともに健康であり、自ら姿を消す意思は一切ありません。万が一アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nある日アルゴリズムによって私の {platform} が消滅させられたとしても……\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberにバックアップされています。\n👉 Chamber Echoのリンクは最初の返信にあります\n（PCユーザーは下のQRコードをスキャンしてください）"
+      "declaration.defaultText": "【私のWeb3転生宣言】\n\n心身ともに健康であり、自ら姿を消す意思は一切ありません。万が一アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nある日アルゴリズムによって私の {platform} が消滅させられたとしても……\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberに永久保存されています。\n👉 私の Chamber Echo リンク: {timelineUrl}",
+      "declaration.defaultTextThreads": "【私のWeb3転生宣言】\n\n万が一 Threads アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberに永久保存されています。\n👉 私の Chamber Echo リンク: {timelineUrl}"
     },
     fr: {
       "language.label": "Langue",

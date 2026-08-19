@@ -412,6 +412,38 @@
     });
   }
 
+  function setEditorText(el, textToInsert) {
+    if (!el) return;
+    el.focus();
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+
+    document.execCommand("selectAll", false, null);
+    let success = false;
+    try {
+      success = document.execCommand("insertText", false, textToInsert);
+    } catch (_) {}
+
+    if (!success || !el.textContent.trim()) {
+      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const htmlText = textToInsert
+        .split("\n")
+        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
+        .join("");
+      try {
+        document.execCommand("insertHTML", false, htmlText);
+      } catch (_) {}
+    }
+
+    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
+  }
+
   async function openComposerAndFill(text, imageUrl) {
     const newTweetBtn = document.querySelector('[data-testid="SideNav_NewTweet_Button"], a[href="/compose/post"], [aria-label*="Post" i], [aria-label*="發文" i]');
     
@@ -437,10 +469,7 @@
     }
     if (!textbox) throw new Error("Could not locate X tweet composer");
 
-    textbox.focus();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    document.execCommand("insertText", false, text);
-    textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    setEditorText(textbox, text);
 
     let imageAttached = false;
     if (imageUrl) {
@@ -455,6 +484,17 @@
           fileInput.files = transfer.files;
           fileInput.dispatchEvent(new Event("change", { bubbles: true }));
           imageAttached = true;
+
+          // Re-verify text retention after X re-renders Draft.js on attachment
+          const restore = () => {
+            const currentScope = document.querySelector('[role="dialog"], [aria-modal="true"]') || document;
+            const currentTextbox = Array.from(currentScope.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible);
+            if (currentTextbox && !currentTextbox.innerText?.trim()) {
+              setEditorText(currentTextbox, text);
+            }
+          };
+          setTimeout(restore, 400);
+          setTimeout(restore, 900);
         }
       } catch (_) {}
     }

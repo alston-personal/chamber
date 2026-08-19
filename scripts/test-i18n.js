@@ -7,7 +7,7 @@ require("../extension/i18n.js");
 (async () => {
   const i18n = globalThis.ChamberI18n;
   assert.ok(i18n, "Extension i18n API must be available");
-  assert.deepEqual(i18n.supportedLocales, ["zh-TW", "en"]);
+  assert.deepEqual(i18n.supportedLocales, ["zh-TW", "en", "es", "ja", "fr", "pt"]);
 
   const zhKeys = Object.keys(i18n.dictionaries["zh-TW"]).sort();
   const enKeys = Object.keys(i18n.dictionaries.en).sort();

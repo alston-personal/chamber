@@ -412,6 +412,38 @@
     });
   }
 
+  function setEditorText(el, textToInsert) {
+    if (!el) return;
+    el.focus();
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+
+    document.execCommand("selectAll", false, null);
+    let success = false;
+    try {
+      success = document.execCommand("insertText", false, textToInsert);
+    } catch (_) {}
+
+    if (!success || !el.textContent.trim()) {
+      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const htmlText = textToInsert
+        .split("\n")
+        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
+        .join("");
+      try {
+        document.execCommand("insertHTML", false, htmlText);
+      } catch (_) {}
+    }
+
+    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
+  }
+
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new post|create|新增貼文|建立|發佈|貼文/i;
     const button = Array.from(document.querySelectorAll('a, button, [role="button"], svg')).find((node) => {
@@ -440,6 +472,19 @@
         }
       } catch (_) {}
     }
+
+    // Watch for Instagram caption input box appearing during the wizard
+    let watchCount = 0;
+    const watchInterval = setInterval(() => {
+      watchCount++;
+      const captionBox = Array.from(document.querySelectorAll('div[aria-label*="說明" i], div[aria-label*="caption" i], div[role="textbox"]')).find(visible);
+      if (captionBox && !captionBox.innerText?.trim()) {
+        setEditorText(captionBox, text);
+      }
+      if (watchCount > 40) {
+        clearInterval(watchInterval);
+      }
+    }, 400);
 
     return { success: true, imageAttached };
   }

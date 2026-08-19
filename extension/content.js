@@ -920,10 +920,9 @@ function activateElement(el) {
 }
 
 function fillText(textbox, text) {
+  if (!textbox) return;
   textbox.focus();
 
-  // Explicitly set the window selection range to the textbox.
-  // This is required when focusing asynchronously, as window selection might be lost when the popup window closes.
   try {
     const selection = window.getSelection();
     const range = document.createRange();
@@ -944,40 +943,14 @@ function fillText(textbox, text) {
     .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
     .join("");
 
-  document.execCommand('insertHTML', false, htmlText);
+  let ok = document.execCommand('insertHTML', false, htmlText);
+  if (!ok || !textbox.textContent.trim()) {
+    document.execCommand('insertText', false, text);
+  }
+
+  textbox.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
+  textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
-}
-
-function pasteText(textbox, text) {
-  if (!textbox) return false;
-
-  textbox.focus();
-  try {
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(textbox);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  } catch (err) {
-    console.debug("[Chamber] Failed to prime selection for paste:", err);
-  }
-
-  try {
-    const clipboardData = new DataTransfer();
-    clipboardData.setData("text/plain", text);
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData
-    });
-    const accepted = textbox.dispatchEvent(pasteEvent);
-    console.log("[Chamber] Synthetic paste event dispatched:", accepted);
-    return accepted;
-  } catch (err) {
-    console.debug("[Chamber] Synthetic paste event failed:", err);
-    return false;
-  }
 }
 
 function getActiveComposerTextbox() {
@@ -994,7 +967,7 @@ function fillTextAndImage(textbox, text, imageUrl) {
 
   const restoreText = () => {
     const activeTextbox = getActiveComposerTextbox() || textbox;
-    if (!pasteText(activeTextbox, text)) {
+    if (activeTextbox) {
       fillText(activeTextbox, text);
     }
   };
@@ -1011,7 +984,9 @@ function fillTextAndImage(textbox, text, imageUrl) {
           waitForFileInput().then((input) => {
             if (input) {
               triggerUpload(input, blob);
-              setTimeout(restoreText, 800);
+              setTimeout(restoreText, 400);
+              setTimeout(restoreText, 900);
+              setTimeout(restoreText, 1600);
               return;
             }
             console.warn("[Chamber] Photo file input did not render after click.");
@@ -1025,7 +1000,9 @@ function fillTextAndImage(textbox, text, imageUrl) {
       }
 
       triggerUpload(fileInput, blob);
-      setTimeout(restoreText, 800);
+      setTimeout(restoreText, 400);
+      setTimeout(restoreText, 900);
+      setTimeout(restoreText, 1600);
     })
     .catch(err => {
       console.error("[Chamber] Failed to fetch image blob:", err);
