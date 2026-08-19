@@ -31,8 +31,6 @@ export default function RealLeopardCatCard({
   locale,
   onOpenAlbum,
 }: RealLeopardCatCardProps) {
-  const [isWiggling, setIsWiggling] = useState(false);
-
   const originalTime = post.payload.published_at || post.payload.timestamp;
   const formattedPublishedTime = originalTime
     ? new Date(originalTime * 1000).toLocaleString(locale, {
@@ -65,12 +63,8 @@ export default function RealLeopardCatCard({
       {/* 🐯 1. SITTING ALERT LEOPARD CAT (Shown when collapsed) */}
       {!isExpanded ? (
         <div
-          className={`relative z-30 rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)] cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-amber-400 hover:shadow-amber-500/20 ${
-            isWiggling ? "animate-bounce" : ""
-          }`}
+          className="relative z-30 rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)] cursor-pointer transition-all duration-200 hover:border-amber-400 hover:shadow-[0_0_30px_rgba(245,158,11,0.25)]"
           onClick={onToggleExpand}
-          onMouseEnter={() => setIsWiggling(true)}
-          onMouseLeave={() => setIsWiggling(false)}
         >
           {/* Sitting Cat Photo */}
           <div className="relative aspect-square w-full overflow-hidden bg-slate-900">
