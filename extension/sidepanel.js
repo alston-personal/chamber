@@ -304,7 +304,7 @@ async function renderProfiles() {
   const selectedName = platformName(selectedPlatform);
 
   selectButton.disabled = !mapped;
-  rebornButton.disabled = !mapped;
+  rebornButton.disabled = false;
   if (platform) {
     selectButton.textContent = t("backup.selectPlatform", { platform: selectedName });
   } else {
