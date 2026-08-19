@@ -471,6 +471,9 @@
           try { document.execCommand('insertParagraph', false, null); } catch (_) {}
         }
       }
+      try {
+        textbox.dispatchEvent(new Event("input", { bubbles: true }));
+      } catch (_) {}
     }
 
     return { success: true, imageAttached };

@@ -1057,7 +1057,7 @@ rebornGenerate?.addEventListener("click", async () => {
       });
       const result = injected?.[0]?.result;
       rebornStatus.innerHTML = (result?.imageAttached ? t("reborn.successPlatform", { platform: "Instagram" }) : t("reborn.successTextOnly", { platform: "Instagram" })) +
-        `<br><span style="font-size:11px;opacity:0.9;">💡 轉世卡已自動上傳！在「寫下說明」步驟按 Ctrl+V 即可貼上聲明文案。</span>`;
+        `<br><span style="font-size:11px;opacity:0.9;">💡 轉世卡已自動上傳至「新相片貼文」！請點擊右上角「繼續」進入說明步驟後按 Ctrl+V 貼上聲明文案。</span>`;
     } else if (platform === "x") {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "platform-x.js"] });
       const injected = await chrome.scripting.executeScript({
