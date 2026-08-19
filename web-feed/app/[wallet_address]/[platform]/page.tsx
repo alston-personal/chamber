@@ -9,6 +9,7 @@ import { useI18n } from "@/components/locale-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { feedTranslate } from "@/lib/feed-i18n";
 import CatMorphingCard from "../../components/CatMorphingCard";
+import RealLeopardCatCard from "../../components/RealLeopardCatCard";
 
 interface MediaSchema {
   primary_fb_cdn?: string;
@@ -59,6 +60,7 @@ interface EncryptedBlob {
 
 const TIMELINE_THEMES = [
   { id: "obsidian", name: "極簡黑曜", icon: "⬛", desc: "鈦灰石墨經典沉穩", badge: "經典" },
+  { id: "leopard", name: "擬真石虎", icon: "🐯", desc: "台灣石虎超擬真吞吐卡片", badge: "獨家" },
   { id: "cyber", name: "賽博霓光", icon: "🌌", desc: "深空宇宙星夜霓虹", badge: "極客" },
   { id: "amber", name: "復古暖琥珀", icon: "🍂", desc: "復古牛皮紙典雅暖光", badge: "質感" },
   { id: "emerald", name: "深林青翠", icon: "🌿", desc: "自然翡翠沉靜深綠", badge: "靜謐" },
@@ -2532,6 +2534,26 @@ export default function PlatformFeed({
               const isExpanded = Boolean(expandedPosts[post.txId]);
               const hasLongText = (contentText || "").length > 180 || ((contentText || "").split("\n").length > 4);
               const isCollapsible = hasLongText || mediaUrls.length > 1;
+
+              if (currentTheme === "leopard" || searchParams.get("skin") === "leopard") {
+                return (
+                  <RealLeopardCatCard
+                    key={post.txId}
+                    post={post}
+                    isPostOwner={isPostOwner(post)}
+                    isExpanded={isExpanded}
+                    onToggleExpand={() => setExpandedPosts((prev) => ({ ...prev, [post.txId]: !isExpanded }))}
+                    onDecrypt={() => handleDecryptPost(post, idx)}
+                    onRequestAccess={() => requestReadingAccess(post)}
+                    isDecrypting={post.isDecrypting}
+                    accessBusy={accessBusyId === post.txId}
+                    irysHost={irysHost}
+                    ft={ft}
+                    locale={locale}
+                    onOpenAlbum={openAlbumViewer}
+                  />
+                );
+              }
 
               if (currentTheme === "cat" || searchParams.get("skin") === "cat") {
                 return (
