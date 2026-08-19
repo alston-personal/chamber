@@ -179,35 +179,19 @@ export default function CatMorphingCard({
       <div
         className={`relative z-20 mx-4 sm:mx-6 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden ${
           isExpanded
-            ? "max-h-[3000px] opacity-100 py-6"
-            : "max-h-[75px] opacity-95 py-2 cursor-pointer"
+            ? "max-h-[3000px] opacity-100 py-6 my-2 border-l-[3px] border-r-[3px] border-b-[3px] border-sky-400"
+            : "max-h-0 opacity-0 py-0 my-0 border-none"
         }`}
-        onClick={() => !isExpanded && onToggleExpand()}
         style={{
           background: "radial-gradient(ellipse at center, #2e081f 0%, #150512 60%, #080208 100%)",
           borderRadius: "0 0 45px 45px",
           boxShadow: isExpanded
             ? "inset 0 20px 40px rgba(0,0,0,0.9), 0 0 30px rgba(244,114,182,0.15)"
-            : "inset 0 10px 20px rgba(0,0,0,0.8)",
-          borderLeft: "3px solid #38bdf8",
-          borderRight: "3px solid #38bdf8",
-          borderBottom: isExpanded ? "3px solid #f472b6" : "none",
+            : "none",
         }}
       >
         {/* Soft Pink Throat Arc (Inner Mouth Depth) */}
         <div className="absolute top-0 inset-x-8 h-8 bg-gradient-to-b from-rose-500/20 to-transparent pointer-events-none rounded-b-full" />
-
-        {/* CLOSED STATE TEASER: The Scroll held cleanly between the teeth */}
-        {!isExpanded && (
-          <div className="flex flex-col items-center justify-center px-4 py-1 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs font-semibold shadow-inner">
-              <span>📜</span>
-              <span className="truncate max-w-[280px]">
-                {post.payload.is_encrypted ? "🔒 私密加密回聲卷軸" : (post.payload.content?.slice(0, 30) || "回聲卷軸")}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* EXPANDED STATE: The Full Unfolded Scroll on the Tongue */}
         {isExpanded && (
@@ -308,12 +292,11 @@ export default function CatMorphingCard({
         )}
       </div>
 
-      {/* 🐾 3. LOWER JAW & CHIN (Sliding Mouth Physics) */}
+      {/* 🐾 3. LOWER JAW & CHIN (Seamlessly Closes with Upper Head) */}
       <div
-        className="relative z-30 -mt-2 drop-shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-        style={{
-          transform: isExpanded ? "translateY(0px)" : "translateY(-4px)",
-        }}
+        className={`relative z-30 drop-shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          isExpanded ? "mt-0" : "-mt-10 sm:-mt-12"
+        }`}
       >
         <svg
           viewBox="0 0 500 90"
@@ -347,7 +330,7 @@ export default function CatMorphingCard({
           </g>
         </svg>
 
-        {/* 🐾 Single Clean Tactile Mouth Toggle Button */}
+        {/* 🐾 Tactile Mouth Toggle Button below Chin */}
         <div className="flex justify-center -mt-2 pb-2">
           <button
             type="button"
