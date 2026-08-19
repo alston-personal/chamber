@@ -308,6 +308,30 @@
     });
   }
 
+  function findThreadsModal() {
+    let m = document.querySelector('div[role="dialog"], [aria-label*="串文" i], [aria-label*="thread" i]');
+    if (m && visible(m)) return m;
+
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3, span, div')).filter((el) => {
+      const t = (el.innerText || el.textContent || "").trim();
+      return (t === "新串文" || t === "New thread" || t === "Create thread") && visible(el);
+    });
+    for (const h of headers) {
+      const candidate = h.closest('div[style*="position"], div[style*="z-index"], div[data-pressable-container="true"], div[role="main"]') || h.parentElement?.parentElement?.parentElement;
+      if (candidate && candidate !== document.body) return candidate;
+    }
+
+    const postBtn = Array.from(document.querySelectorAll('div[role="button"], button')).find((b) => {
+      const t = (b.innerText || b.textContent || "").trim();
+      return visible(b) && (/^(發佈|發布|Post)$/i.test(t));
+    });
+    if (postBtn) {
+      return postBtn.closest('div[style*="position"], div[style*="z-index"], div[data-pressable-container="true"]') || postBtn.parentElement?.parentElement?.parentElement;
+    }
+
+    return null;
+  }
+
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new thread|create|post|新增串文|建立|發佈/i;
     const button = Array.from(document.querySelectorAll('button, [role="button"], [role="link"], svg')).find((node) => {
@@ -317,18 +341,18 @@
     button?.click();
 
     let modal = null;
-    for (let attempt = 0; attempt < 30 && !modal; attempt += 1) {
-      modal = document.querySelector('div[role="dialog"]');
+    for (let attempt = 0; attempt < 35 && !modal; attempt += 1) {
+      modal = findThreadsModal();
       if (!modal) await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    const targetScope = modal || document;
+    if (!modal) throw new Error(t("threads.composerMissing"));
 
     let imageAttached = false;
     if (imageUrl) {
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        const input = (modal ? modal.querySelector('input[type="file"]') : null)
+        const input = modal.querySelector('input[type="file"]')
           || Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
         if (input) {
           const transfer = new DataTransfer();
@@ -336,15 +360,16 @@
           input.files = transfer.files;
           input.dispatchEvent(new Event("change", { bubbles: true }));
           imageAttached = true;
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 350));
         }
       } catch (_) {}
     }
 
+    // Find the main textbox inside the modal
     let textbox = null;
     for (let attempt = 0; attempt < 25 && !textbox; attempt += 1) {
-      const scope = document.querySelector('div[role="dialog"]') || targetScope;
-      textbox = Array.from(scope.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
+      modal = findThreadsModal() || modal;
+      textbox = Array.from(modal.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
       if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!textbox) throw new Error(t("threads.composerMissing"));
@@ -359,7 +384,17 @@
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      document.execCommand("insertText", false, text);
+      document.execCommand("delete");
+
+      const lines = text.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i]) {
+          try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+        }
+        if (i < lines.length - 1) {
+          try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+        }
+      }
     }
 
     return { success: true, imageAttached };

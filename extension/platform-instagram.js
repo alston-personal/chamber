@@ -435,6 +435,14 @@
       target?.click();
     }
 
+    // If Instagram opened a submenu with "貼文" / "Post", click it
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const subMenuItem = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="menu"] div[role="button"], span, div')).find((el) => {
+      const text = (el.innerText || el.textContent || "").trim();
+      return (text === "貼文" || text === "Post") && visible(el);
+    });
+    subMenuItem?.closest('div[role="button"], a, button')?.click();
+
     let imageAttached = false;
     if (imageUrl) {
       try {

@@ -460,7 +460,17 @@
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      document.execCommand("insertText", false, text);
+      document.execCommand("delete");
+
+      const lines = text.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i]) {
+          try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+        }
+        if (i < lines.length - 1) {
+          try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+        }
+      }
     }
 
     return { success: true, imageAttached };

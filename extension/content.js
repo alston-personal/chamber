@@ -932,11 +932,18 @@ function fillText(textbox, text) {
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
 
-  try {
-    document.execCommand('insertText', false, text);
-  } catch (_) {}
+  // Insert lines with insertParagraph to preserve clean paragraph spacing
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]) {
+      try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+    }
+    if (i < lines.length - 1) {
+      try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+    }
+  }
 
-  console.log("[Chamber] Auto-filled composer textbox.");
+  console.log("[Chamber] Auto-filled composer textbox with paragraphs.");
 }
 
 async function fillTextAndImage(textbox, text, imageUrl) {
