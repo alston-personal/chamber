@@ -1656,7 +1656,7 @@ export default function PlatformFeed({
                 onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs text-slate-300 hover:text-white border transition-all cursor-pointer shadow-sm"
                 style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
-                title="切換時光牆主題"
+                title={ft("themeTitleHeader")}
               >
                 <span>{(() => {
                   const icons: Record<string, string> = { obsidian: "⬛", cyber: "🌌", amber: "🍂", emerald: "🌿", sakura: "🌸", custom: "🎨" };
@@ -1856,7 +1856,7 @@ export default function PlatformFeed({
             <div className="mb-4 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               {locale === "zh-TW" ? (
                 <>
-                  您正準備將作者「<strong style={{ color: "var(--accent-primary)" }}>{transferModal.authorName}</strong>」（共 <strong>{transferModal.count}</strong> 篇文章）從目前的迴音谷轉移至另一個 Chamber 身分。
+                  您正準備將作者「<strong style={{ color: "var(--accent-primary)" }}>{transferModal.authorName}</strong>」（共 <strong>{transferModal.count}</strong> 篇文章）從目前的迴響谷轉移至另一個 Chamber 身分。
                 </>
               ) : (
                 <>
@@ -1943,16 +1943,16 @@ export default function PlatformFeed({
                     style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)", borderColor: "var(--border-card)" }}
                   />
                   <div className="text-[10px] mb-2 font-medium" style={{ color: "var(--accent-primary)" }}>
-                    {transferTargetAlias ? `接收迴音谷: https://studio.milkcat.org/echo/${transferTargetAlias}` : ""}
+                    {transferTargetAlias ? `接收迴響谷: https://studio.milkcat.org/echo/${transferTargetAlias}` : ""}
                   </div>
                 </div>
               )}
 
               <div className="text-[10px] text-slate-500 leading-normal">
                 {transferMode === "local" ? (
-                  <>💡 {locale === "zh-TW" ? "轉移至本機分身將自動完成雙向簽章，此作者的所有文章將立即從當前迴音谷移出，並掛載至目標分身的迴音谷。" : "Transferring to a local profile will auto-sign both sides. Posts will be immediately moved."}</>
+                  <>💡 {locale === "zh-TW" ? "轉移至本機分身將自動完成雙向簽章，此作者的所有文章將立即從當前迴響谷移出，並掛載至目標分身的迴響谷。" : "Transferring to a local profile will auto-sign both sides. Posts will be immediately moved."}</>
                 ) : (
-                  <>🛡️ {locale === "zh-TW" ? "轉移給外部帳號將發起歸屬轉移，文章將從您的迴音谷移出，並直接劃撥交由對方的 Chamber 迴音谷接管展示。" : "Transferring to an external account will assign the post ownership directly to their Chamber timeline."}</>
+                  <>🛡️ {locale === "zh-TW" ? "轉移給外部帳號將發起歸屬轉移，文章將從您的迴響谷移出，並直接劃撥交由對方的 Chamber 迴響谷接管展示。" : "Transferring to an external account will assign the post ownership directly to their Chamber timeline."}</>
                 )}
               </div>
             </div>
@@ -2171,7 +2171,7 @@ export default function PlatformFeed({
                   <span>📱 該手機仍未綁定 Chamber 主人身分</span>
                 </div>
                 <div className="mt-1 text-[11px] text-slate-300/85 leading-relaxed">
-                  此裝置尚未綁定解密身分。若您是迴音谷谷主，請使用電腦版 Chamber 擴充功能產生 QR Code 進行一鍵綁定；若您是訪客好友，可於下方文章點擊「向作者申請閱讀」。
+                  此裝置尚未綁定解密身分。若您是迴響谷谷主，請使用電腦版 Chamber 擴充功能產生 QR Code 進行一鍵綁定；若您是訪客好友，可於下方文章點擊「向作者申請閱讀」。
                 </div>
               </div>
               <button

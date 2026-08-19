@@ -5,12 +5,12 @@ export async function generateMetadata({ params }: { params: Promise<{ wallet_ad
   const canonical = `/echo/${identity}/${platform}`;
   const english = `/echo/en/${identity}/${platform}`;
   return {
-    title: `${identity} 的 Echo 迴音谷 | Chamber Protocol`,
-    description: `在 Echo 迴音谷查看 ${identity} 透過 Chamber 備份的加密社交文章。`,
+    title: `${identity} 的迴響谷 | Chamber Protocol`,
+    description: `在迴響谷查看 ${identity} 透過 Chamber 備份的加密社交文章。`,
     alternates: { canonical, languages: { "zh-TW": canonical, en: english } },
     openGraph: {
-      title: `${identity} 的 Echo 迴音谷`,
-      description: "由 Chamber Protocol 保存、由作者控制閱讀權限的社交文章迴音谷。",
+      title: `${identity} 的迴響谷`,
+      description: "由 Chamber Protocol 保存、由作者控制閱讀權限的社交文章迴響谷。",
       url: canonical,
       siteName: "Chamber Protocol",
       locale: "zh_TW",
