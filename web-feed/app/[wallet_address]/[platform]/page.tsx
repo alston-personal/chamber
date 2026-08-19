@@ -199,6 +199,8 @@ export default function PlatformFeed({
   const [currentTheme, setCurrentTheme] = useState<string>("obsidian");
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState<boolean>(false);
   const [showThemeModal, setShowThemeModal] = useState<boolean>(false);
+  const [showSkinModal, setShowSkinModal] = useState<boolean>(false);
+  const [savedWallSkin, setSavedWallSkin] = useState<string>("leopard");
   const [customTheme, setCustomTheme] = useState<CustomThemeConfig>(DEFAULT_CUSTOM_THEME);
   const [themeJsonInput, setThemeJsonInput] = useState<string>("");
   const [themeModalTab, setThemeModalTab] = useState<"picker" | "json">("picker");
@@ -1737,6 +1739,16 @@ export default function PlatformFeed({
                     </div>
                     <button
                       onClick={() => {
+                        setShowSkinModal(true);
+                        setIsHeaderDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-indigo-950/40 hover:text-indigo-200 transition-colors flex items-center justify-between"
+                    >
+                      <span>{ft("wallSkinSetting")}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30">PRO</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         setShowRecovery(true);
                         setIsHeaderDropdownOpen(false);
                       }}
@@ -2265,7 +2277,7 @@ export default function PlatformFeed({
             <div className="flex items-center justify-between mb-2.5 px-1">
               <div className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
                 <span>🏢</span>
-                <span>{locale === "zh-TW" ? "作者 / 粉絲專頁分流" : "Author / Page Filter"}</span>
+                <span>{ft("authorFilterTitle")}</span>
                 <span className="text-[10px] opacity-70">({authorStats.length})</span>
               </div>
               {activeAuthor && (
@@ -2293,7 +2305,7 @@ export default function PlatformFeed({
                 style={!activeAuthor ? { backgroundColor: "var(--accent-primary)", color: "#ffffff", borderColor: "var(--accent-primary)" } : { backgroundColor: "var(--bg-page)", color: "var(--text-secondary)", borderColor: "var(--border-card)" }}
               >
                 <span>✨</span>
-                <span>{locale === "zh-TW" ? "全部作者" : "All Authors"}</span>
+                <span>{ft("allAuthors")}</span>
                 <span
                   className="text-[10px] px-1.5 py-0.2 rounded-full opacity-80"
                   style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
@@ -2436,7 +2448,7 @@ export default function PlatformFeed({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜尋文章內容、標籤、作者..."
+              placeholder={ft("searchPlaceholder")}
               className="w-full rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none border transition-all"
               style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
             />
@@ -2452,7 +2464,6 @@ export default function PlatformFeed({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400 shrink-0 font-medium">排序：</span>
             <div
               className="flex rounded-xl p-0.5 border text-[11px]"
               style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
@@ -2465,7 +2476,7 @@ export default function PlatformFeed({
                 }`}
                 style={sortMode === "backup" ? { backgroundColor: "var(--accent-primary)" } : {}}
               >
-                ⚡ 最新備份
+                ⚡ {ft("latestBackupSort")}
               </button>
               <button
                 type="button"
@@ -2475,7 +2486,7 @@ export default function PlatformFeed({
                 }`}
                 style={sortMode === "published" ? { backgroundColor: "var(--accent-primary)" } : {}}
               >
-                📅 原始發文
+                📅 {ft("originalPublishSort")}
               </button>
             </div>
           </div>
@@ -2534,7 +2545,7 @@ export default function PlatformFeed({
               const hasLongText = (contentText || "").length > 180 || ((contentText || "").split("\n").length > 4);
               const isCollapsible = hasLongText || mediaUrls.length > 1;
 
-              const creatorSkin = searchParams.get("skin") || (walletAddress?.toLowerCase().includes("sunlake") || resolvedIdentityKey?.toLowerCase().includes("sunlake") ? "leopard" : "classic");
+              const creatorSkin = searchParams.get("skin") || savedWallSkin || (walletAddress?.toLowerCase().includes("sunlake") || resolvedIdentityKey?.toLowerCase().includes("sunlake") ? "leopard" : "classic");
 
               if (creatorSkin === "leopard" || creatorSkin === "cat") {
                 return (
@@ -3068,6 +3079,102 @@ export default function PlatformFeed({
                   style={{ backgroundColor: "var(--bg-page)", borderColor: "var(--border-card)" }}
                 >
                   取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Wall Skin Setting Modal (回聲壁神獸外觀設定) */}
+        {showSkinModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div
+              className="w-full max-w-md border rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200"
+              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-700/50 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🐯</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">{ft("wallSkinSetting")}</h3>
+                    <p className="text-[10px] text-slate-400">{ft("wallSkinDesc")}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSkinModal(false)}
+                  className="text-slate-400 hover:text-white text-base"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Skin Options */}
+              <div className="space-y-3">
+                {/* 1. Taiwan Leopard Cat (Pro) */}
+                <div
+                  onClick={() => setSavedWallSkin("leopard")}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
+                    savedWallSkin === "leopard" ? "border-amber-400 bg-amber-950/30 shadow-lg shadow-amber-500/10" : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
+                  }`}
+                >
+                  <img
+                    src="/echo/leopardcat/sitting.jpg"
+                    alt="Leopard Cat Skin"
+                    className="w-16 h-16 rounded-xl object-cover border border-amber-500/40 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-amber-200">{ft("skinLeopard")}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">PRO</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      {locale === "zh-TW" ? "包含 3D 萌系警戒坐姿、點擊翻肚肚露出粉紅肉球、文章在肚皮上展開。" : "3D cute sitting mascot, click to roll over and read on fluffy belly with pink toe beans."}
+                    </p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${savedWallSkin === "leopard" ? "border-amber-400 bg-amber-500 text-slate-950 font-black text-xs" : "border-slate-700"}`}>
+                    {savedWallSkin === "leopard" && "✓"}
+                  </div>
+                </div>
+
+                {/* 2. Classic Obsidian */}
+                <div
+                  onClick={() => setSavedWallSkin("classic")}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
+                    savedWallSkin === "classic" ? "border-sky-400 bg-sky-950/30 shadow-lg shadow-sky-500/10" : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-700 flex items-center justify-center text-2xl shrink-0">
+                    📄
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-200">{ft("skinClassic")}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">FREE</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      {locale === "zh-TW" ? "極簡石墨鈦灰卡片，專業乾淨的 Web3 去中心化社群歸檔佈局。" : "Minimalist obsidian card layout, clean decentralized Web3 social archive."}
+                    </p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${savedWallSkin === "classic" ? "border-sky-400 bg-sky-500 text-slate-950 font-black text-xs" : "border-slate-700"}`}>
+                    {savedWallSkin === "classic" && "✓"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("chamber_wall_skin_" + (walletAddress || "default"), savedWallSkin);
+                    }
+                    setShowSkinModal(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
+                >
+                  {ft("saveWallSkin")}
                 </button>
               </div>
             </div>

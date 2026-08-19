@@ -27,6 +27,17 @@ const zhTW = {
   fromPlatform: "來自 {platform}", viewSource: "🔗 檢視原文", decrypted: "已解密", privatePost: "私密加密文章", ownerAutoUnlock: "正在使用你的 Chamber 身分自動解鎖", approvedOnly: "只有作者核准的 Chamber 身分可以閱讀", autoUnlocking: "🔑 自動解鎖中...", sending: "送出中...", requestAuthor: "向作者申請閱讀", grantedRetry: "已獲准？重新解鎖", legacyMustRebackup: "舊版文章需由作者重新備份後才能分享",
   decryptingAlbum: "正在解密相簿圖片 {done}/{total}", imageFailures: " · {count} 張失敗", albumPartial: "相簿已部分解密：成功 {success}/{total} 張", videoSource: "🎬 影片來源 · {status}", videoComplete: "完整影片備份", videoPoster: "網址與封面備份", videoLinkOnly: "網址備份", noVideoUrl: "未提供影片來源網址", openVideo: "開啟影片", videoPosterLabel: "影片封面", albumCount: "相簿 · {count} 張", media: "媒體", incompleteMedia: "未完整取得", album: "相簿", backupMedia: "備份媒體", openAlbum: "開啟相簿瀏覽器",
   albumViewer: "相簿瀏覽器", openImage: "另開圖片", closeEsc: "Esc 關閉", previousImage: "上一張", nextImage: "下一張", thumbnailAlt: "縮圖 {index}",
+  searchPlaceholder: "搜尋文章內容、標籤、作者...", latestBackupSort: "最新備份", originalPublishSort: "原始發文",
+  authorFilterTitle: "作者 / 粉專篩選", allAuthors: "全部作者",
+  leopardBackup: "🐾 台灣石虎 · {platform} 備份", leopardBellyEcho: "石虎肚皮上的密室回聲",
+  leopardTouchBelly: "喵！摸摸我翻肚肚看全文 ▼", leopardFlipBack: "喵！翻回來坐好收合 ▲",
+  leopardPurring: "呼嚕嚕~ 翻肚信任中", guardedByLeopard: "私密文章（由石虎肚皮守護）",
+  unlockWithChamber: "使用您的 Chamber 身分即可一鍵解鎖", requireAuthorApproval: "需獲得作者核准授權方可閱讀",
+  clickToDecrypt: "🔓 點擊解密閱讀", decrypting: "🔑 正在解密中...",
+  verifyAuthorization: "🔓 點擊解密閱讀 (若已獲准)", requestAccessArrow: "向作者申請閱讀 →",
+  leopardAlbumTitle: "石虎珍藏相簿",
+  wallSkinSetting: "🎨 回聲壁外觀設定", wallSkinDesc: "為您的公開回聲壁選擇專屬神獸或卡片版型",
+  saveWallSkin: "儲存回聲壁外觀", skinClassic: "📄 經典極簡黑曜卡片", skinLeopard: "🐯 台灣石虎 3D 翻肚靈獸 (Pro)", proExclusive: "💎 Pro 尊榮限定",
 } as const;
 
 type FeedKey = keyof typeof zhTW;
@@ -57,6 +68,17 @@ const en: Record<FeedKey, string> = {
   fromPlatform: "From {platform}", viewSource: "🔗 View source", decrypted: "Decrypted", privatePost: "Private encrypted post", ownerAutoUnlock: "Unlocking with your Chamber identity", approvedOnly: "Only Chamber identities approved by the author can read this post", autoUnlocking: "🔑 Unlocking...", sending: "Sending...", requestAuthor: "Request access from author", grantedRetry: "Already approved? Unlock again", legacyMustRebackup: "The author must back up this legacy post again before it can be shared",
   decryptingAlbum: "Decrypting album images {done}/{total}", imageFailures: " · {count} failed", albumPartial: "Album partially decrypted: {success}/{total} images succeeded", videoSource: "🎬 Video source · {status}", videoComplete: "Complete video backup", videoPoster: "Link and poster backup", videoLinkOnly: "Link-only backup", noVideoUrl: "No video source URL is available", openVideo: "Open video", videoPosterLabel: "Video poster", albumCount: "Album · {count} images", media: "Media", incompleteMedia: "Incomplete", album: "Album", backupMedia: "Backed-up media", openAlbum: "Open album viewer",
   albumViewer: "Album viewer", openImage: "Open image", closeEsc: "Close (Esc)", previousImage: "Previous image", nextImage: "Next image", thumbnailAlt: "Thumbnail {index}",
+  searchPlaceholder: "Search content, tags, authors...", latestBackupSort: "Latest Backup", originalPublishSort: "Original Date",
+  authorFilterTitle: "Author / Page Filter", allAuthors: "All Authors",
+  leopardBackup: "🐾 Leopard Cat · {platform} Backup", leopardBellyEcho: "Chamber Echo on Leopard Belly",
+  leopardTouchBelly: "Meow! Touch belly to read full post ▼", leopardFlipBack: "Meow! Flip back & sit ▲",
+  leopardPurring: "Purring~ Trusting belly up", guardedByLeopard: "Private post (Guarded by Leopard Cat)",
+  unlockWithChamber: "Unlock with your Chamber identity in one click", requireAuthorApproval: "Requires author's approval to read",
+  clickToDecrypt: "🔓 Click to decrypt & read", decrypting: "🔑 Decrypting...",
+  verifyAuthorization: "🔓 Decrypt & read (if approved)", requestAccessArrow: "Request access from author →",
+  leopardAlbumTitle: "Leopard Cat Album",
+  wallSkinSetting: "🎨 Wall Skin Settings", wallSkinDesc: "Choose a guardian mascot or card skin for your public Echo Wall",
+  saveWallSkin: "Save Wall Skin", skinClassic: "📄 Classic Obsidian Card", skinLeopard: "🐯 Taiwan Leopard Cat 3D Belly-up (Pro)", proExclusive: "💎 Pro Exclusive",
 };
 
 const dicts: Record<Locale, Record<FeedKey, string>> = {

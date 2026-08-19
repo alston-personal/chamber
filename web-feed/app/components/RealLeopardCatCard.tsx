@@ -54,7 +54,7 @@ export default function RealLeopardCatCard({
       <div className="flex justify-center mb-3">
         <div className="inline-flex items-center gap-2 bg-slate-950/90 border border-amber-500/40 px-4 py-1.5 rounded-full text-xs text-amber-200 backdrop-blur shadow-2xl whitespace-nowrap">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span className="font-bold tracking-wider">🐾 台灣石虎 · {platform.toUpperCase()} 備份</span>
+          <span className="font-bold tracking-wider">{ft("leopardBackup", { platform: platform.toUpperCase() })}</span>
           <span className="text-slate-500">|</span>
           <span className="text-slate-400 font-mono text-[11px]">{formattedPublishedTime}</span>
         </div>
@@ -81,7 +81,7 @@ export default function RealLeopardCatCard({
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-950/90 border border-amber-500/50 text-amber-200 text-xs font-semibold backdrop-blur shadow-lg">
                 <span>📜</span>
                 <span className="truncate max-w-[260px]">
-                  {post.payload.is_encrypted ? "🔒 私密回聲（點擊翻肚肚解鎖）" : (post.payload.content?.slice(0, 32) || "點擊石虎翻肚看全文")}
+                  {post.payload.is_encrypted ? "🔒 " + ft("guardedByLeopard") : (post.payload.content?.slice(0, 32) || ft("leopardTouchBelly"))}
                 </span>
               </div>
 
@@ -95,7 +95,7 @@ export default function RealLeopardCatCard({
                 className="px-8 py-3 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/30 flex items-center gap-2 transform active:scale-95 transition-all cursor-pointer"
               >
                 <span>🐾</span>
-                <span>喵！摸摸我翻肚肚看全文 ▼</span>
+                <span>{ft("leopardTouchBelly")}</span>
                 <span>🐾</span>
               </button>
             </div>
@@ -117,7 +117,7 @@ export default function RealLeopardCatCard({
             {/* Happy Purring Badge */}
             <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/40 text-rose-200 text-xs font-bold backdrop-blur">
               <span className="animate-pulse">💖</span>
-              <span>呼嚕嚕~ 翻肚信任中</span>
+              <span>{ft("leopardPurring")}</span>
             </div>
           </div>
 
@@ -127,7 +127,7 @@ export default function RealLeopardCatCard({
               {/* Header status bar */}
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/50">
                 <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <span>🐾</span> <span>石虎肚皮上的密室回聲</span>
+                  <span>🐾</span> <span>{ft("leopardBellyEcho")}</span>
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
                   {post.payload.is_encrypted ? "ENCRYPTED" : "PUBLIC"}
@@ -139,7 +139,7 @@ export default function RealLeopardCatCard({
                 post.decryptedContent ? (
                   <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50">
                     <div className="text-xs font-bold text-emerald-400 mb-2 flex items-center gap-1">
-                      <span>🔓</span> <span>已解密內容：</span>
+                      <span>🔓</span> <span>{ft("decrypted")}：</span>
                     </div>
                     <div className="whitespace-pre-wrap break-words text-slate-100 text-sm sm:text-[15px] leading-relaxed">
                       {post.decryptedContent}
@@ -148,9 +148,9 @@ export default function RealLeopardCatCard({
                 ) : (
                   <div className="py-6 px-4 rounded-xl bg-slate-950/80 border border-slate-800 text-center flex flex-col items-center gap-3">
                     <div className="text-3xl animate-bounce">🔒</div>
-                    <div className="text-sm font-bold text-slate-200">私密文章（由石虎肚皮守護）</div>
+                    <div className="text-sm font-bold text-slate-200">{ft("guardedByLeopard")}</div>
                     <p className="text-xs text-slate-400 max-w-sm">
-                      {isPostOwner ? "使用您的 Chamber 身分即可一鍵解鎖" : "需獲得作者核准授權方可閱讀"}
+                      {isPostOwner ? ft("unlockWithChamber") : ft("requireAuthorApproval")}
                     </p>
                     {isPostOwner ? (
                       <button
@@ -158,7 +158,7 @@ export default function RealLeopardCatCard({
                         disabled={isDecrypting}
                         className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg transition-all cursor-pointer"
                       >
-                        {isDecrypting ? "🔑 正在解密中..." : "🔓 點擊解密閱讀"}
+                        {isDecrypting ? ft("decrypting") : ft("clickToDecrypt")}
                       </button>
                     ) : (
                       <div className="flex flex-col items-center gap-2">
@@ -167,14 +167,14 @@ export default function RealLeopardCatCard({
                           disabled={isDecrypting}
                           className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition-all cursor-pointer"
                         >
-                          {isDecrypting ? "🔑 正在驗證授權..." : "🔓 點擊解密閱讀 (若已獲准)"}
+                          {isDecrypting ? ft("decrypting") : ft("verifyAuthorization")}
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); onRequestAccess(); }}
                           disabled={accessBusy}
                           className="text-[11px] text-slate-400 hover:text-slate-200 underline cursor-pointer"
                         >
-                          {accessBusy ? "送出中..." : "向作者申請閱讀 →"}
+                          {accessBusy ? ft("sending") : ft("requestAccessArrow")}
                         </button>
                       </div>
                     )}
@@ -193,7 +193,7 @@ export default function RealLeopardCatCard({
                     {mediaUrls.map((url: string, i: number) => (
                       <div
                         key={i}
-                        onClick={(e) => { e.stopPropagation(); onOpenAlbum(mediaUrls, i, "石虎珍藏相簿"); }}
+                        onClick={(e) => { e.stopPropagation(); onOpenAlbum(mediaUrls, i, ft("leopardAlbumTitle")); }}
                         className="relative aspect-square rounded-xl overflow-hidden border border-slate-700/60 shadow group/img cursor-zoom-in"
                       >
                         <img
@@ -216,7 +216,7 @@ export default function RealLeopardCatCard({
                 className="px-8 py-3 rounded-full bg-slate-900 hover:bg-slate-800 border border-amber-500/50 text-amber-200 font-bold text-xs shadow-xl flex items-center gap-2 cursor-pointer transform active:scale-95 transition-all"
               >
                 <span>🐾</span>
-                <span>喵！翻回來坐好收合 ▲</span>
+                <span>{ft("leopardFlipBack")}</span>
                 <span>🐾</span>
               </button>
             </div>
