@@ -112,7 +112,10 @@ async function rawPlatformIdentity(tab = null) {
   const platform = platformForTab(tab);
   if (!platform) throw new Error(t("error.openSupportedPlatform"));
   if (platform === "facebook") {
-    const cookie = await chrome.cookies.get({ url: tab.url, name: "c_user" });
+    const cookie = (await chrome.cookies.get({ url: "https://www.facebook.com", name: "i_user" }))
+      || (await chrome.cookies.get({ url: "https://www.facebook.com", name: "c_user" }))
+      || (tab?.url ? await chrome.cookies.get({ url: tab.url, name: "c_user" }) : null)
+      || (tab?.url ? await chrome.cookies.get({ url: tab.url, name: "i_user" }) : null);
     if (!cookie?.value) throw new Error(t("error.loginPlatform", { platform: "Facebook" }));
     return { platform, actorId: cookie.value, actorHandle: "", tab };
   }

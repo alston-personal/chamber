@@ -756,133 +756,119 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+function isCommentOrCoverElement(el) {
+  if (!el) return true;
+  const text = [
+    el.getAttribute('aria-label'),
+    el.getAttribute('placeholder'),
+    el.getAttribute('title'),
+    el.getAttribute('data-tooltip-content'),
+    el.className,
+    el.innerText || el.textContent
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return /封面|cover|大頭貼|avatar|profile picture|相片編輯|edit cover|更新相片|更新封面|留言|回覆|comment|reply|留個言吧|輸入留言|search|搜尋|通知|notification|選單|menu/i.test(text);
+}
+
 function findComposerButton() {
-  const composerRegex = /在想些什麼|你在想些什麼|What.*on your mind|Create a post|建立貼文|建立公開貼文|想分享什麼|寫些什麼|發佈貼文|開始發文|Share what's on your mind|分享你的想法|分享近況|Write something/i;
+  const composerRegex = /在想些什麼|你在想些什麼|What's on your mind|What is on your mind|Create a post|建立貼文|建立公開貼文|建立貼文…|撰寫貼文|寫些什麼|發佈貼文|開始發文|Share what's on your mind|分享你的想法|分享近況|Write something/i;
 
-  // 1. Check elements with aria-label or placeholder
-  const elementsWithLabel = document.querySelectorAll('[aria-label], [placeholder]');
-  for (const el of elementsWithLabel) {
-    const label = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').trim();
-    if (label && composerRegex.test(label)) {
-      const btn = el.closest('div[role="button"]') || el.closest('a') || el.closest('button') || el;
-      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-        btn.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-        return btn;
+  // 1. Search inside explicit feed/profile composer pagelets
+  const composerPagelets = document.querySelectorAll('div[data-pagelet="ProfileComposer"], div[data-pagelet="FeedComposer"], div[data-pagelet*="Composer"]');
+  for (const pagelet of composerPagelets) {
+    const candidates = pagelet.querySelectorAll('div[role="button"], div[role="textbox"], span, a, button');
+    for (const c of candidates) {
+      const label = (c.getAttribute('aria-label') || c.getAttribute('placeholder') || c.innerText || c.textContent || '').trim();
+      if (composerRegex.test(label) && !isCommentOrCoverElement(c)) {
+        if (c.offsetWidth > 0 || c.offsetHeight > 0) {
+          return c.closest('div[role="button"]') || c;
+        }
       }
+    }
+    // If pagelet itself has a primary clickable role="button" that is NOT cover/comment
+    const primaryBtn = pagelet.querySelector('div[role="button"]');
+    if (primaryBtn && !isCommentOrCoverElement(primaryBtn) && (primaryBtn.offsetWidth > 0 || primaryBtn.offsetHeight > 0)) {
+      return primaryBtn;
     }
   }
 
-  // 2. Query main area text
+  // 2. Search inside main area with strict label matching
   const main = document.querySelector('div[role="main"]') || document;
-  const mainElements = main.querySelectorAll('span, p, button, a, div[role="button"]');
-  for (const el of mainElements) {
-    const text = (el.innerText || el.textContent || "").trim();
-    if (text.length > 0 && text.length < 80 && composerRegex.test(text)) {
-      const btn = el.closest('div[role="button"]') || el.closest('a') || el.closest('button') || el;
-      if (btn && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-        btn.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  const elements = main.querySelectorAll('[aria-label], [placeholder], span, p');
+  for (const el of elements) {
+    const label = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.innerText || el.textContent || '').trim();
+    if (label && composerRegex.test(label) && !isCommentOrCoverElement(el)) {
+      const btn = el.closest('div[role="button"]') || el.closest('button') || el;
+      if (btn && !isCommentOrCoverElement(btn) && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
         return btn;
       }
     }
   }
 
-  // 3. Query textboxes / contenteditable placeholders
-  const textboxes = document.querySelectorAll('div[role="textbox"], div[contenteditable="true"]');
-  for (const box of textboxes) {
-    const label = (box.getAttribute('aria-label') || box.getAttribute('placeholder') || box.innerText || "").trim();
-    if (label && composerRegex.test(label)) {
-      if (box.offsetWidth > 0 || box.offsetHeight > 0) {
-        box.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-        return box.closest('div[role="button"]') || box.closest('form') || box;
-      }
-    }
-  }
-
-  return document.querySelector('div[role="main"] div[role="button"]') ||
-    document.querySelector('div[role="button"]') ||
-    document.querySelector('div[role="main"] div[role="textbox"]') ||
-    document.querySelector('div[role="main"] div[contenteditable="true"]');
+  return null;
 }
 
-function findComposerContainer(textbox) {
-  if (!textbox) return document.body;
-  return textbox.closest('div[role="dialog"]') || 
-         textbox.closest('div[role="main"]') || 
-         textbox.closest('form') || 
-         document.body;
-}
-
-function findComposerTextbox(container = document) {
-  // If the container itself is the dialog, check it first
-  if (container !== document && container.getAttribute('role') === 'dialog') {
-    const box = container.querySelector('div[role="textbox"]');
-    if (box && (box.offsetWidth > 0 || box.offsetHeight > 0)) return box;
-  }
-
-  // 1. Try modal dialog first inside the container - this is the most specific and safe
-  const modalTextbox = container.querySelector('div[role="dialog"] div[role="textbox"]');
-  if (modalTextbox && (modalTextbox.offsetWidth > 0 || modalTextbox.offsetHeight > 0)) {
-    return modalTextbox;
-  }
-
-  // 2. Query all textboxes inside the container and filter out comment/reply elements
-  const textboxes = container.querySelectorAll('div[role="textbox"]');
-  for (const box of textboxes) {
-    const label = box.getAttribute('aria-label') || "";
-    // If it contains comment/reply keywords, ignore it
-    if (label.includes("留言") || label.includes("回覆") || label.includes("comment") || label.includes("reply")) {
-      continue;
+function getActiveComposerDialog() {
+  const dialogs = document.querySelectorAll('div[role="dialog"]');
+  for (const dialog of dialogs) {
+    const label = [
+      dialog.getAttribute('aria-label'),
+      dialog.innerText || ""
+    ].join(" ");
+    if (/建立貼文|Create post|Create a post|在想些什麼|發佈|Post/i.test(label) && !/編輯封面|封面相片|大頭貼/i.test(label)) {
+      return dialog;
     }
-    if (box.offsetWidth > 0 || box.offsetHeight > 0) {
-      return box;
+    if (dialog.querySelector('div[role="textbox"]') && !isCommentOrCoverElement(dialog)) {
+      return dialog;
     }
   }
   return null;
 }
 
-function findPhotoBtn() {
-  const selectors = [
-    'div[role="dialog"] div[role="button"]',
-    'div[role="dialog"] button',
-    'div[role="dialog"] i',
-    'div[role="main"] div[role="button"]',
-    'div[role="main"] button',
-    'div[role="button"]',
-    'button',
-    'i'
-  ];
-  for (const selector of selectors) {
-    const elements = document.querySelectorAll(selector);
-    for (const el of elements) {
-      const label = [
-        el.getAttribute('aria-label'),
-        el.getAttribute('title'),
-        el.getAttribute('data-tooltip-content'),
-        el.innerText
-      ].filter(Boolean).join(" ");
-      if (/相片|照片|影片|Photo|Video|photo|video/i.test(label)) {
-        return el.closest('div[role="button"]') || el;
-      }
+function getActiveComposerTextbox() {
+  const dialog = getActiveComposerDialog();
+  if (dialog) {
+    const box = dialog.querySelector('div[role="textbox"]');
+    if (box && !isCommentOrCoverElement(box)) return box;
+  }
+  return null;
+}
+
+function findPhotoBtn(container) {
+  const scope = container || getActiveComposerDialog();
+  if (!scope) return null;
+  const buttons = scope.querySelectorAll('div[role="button"], button, [aria-label], i');
+  for (const btn of buttons) {
+    const label = [
+      btn.getAttribute('aria-label'),
+      btn.getAttribute('title'),
+      btn.getAttribute('data-tooltip-content'),
+      btn.innerText || ""
+    ].filter(Boolean).join(" ");
+    if (/相片|照片|影片|Photo|Video/i.test(label) && !/封面|cover|大頭貼|avatar/i.test(label)) {
+      return btn.closest('div[role="button"]') || btn;
     }
   }
   return null;
 }
 
-function findFileInput() {
-  // Facebook may mount the input outside the composer dialog, and it is often
-  // intentionally hidden. Do not use visibility/size checks here.
-  return document.querySelector('input[type="file"][accept*="image"]') ||
-    document.querySelector('input[type="file"]');
+function findFileInput(container) {
+  const scope = container || getActiveComposerDialog();
+  if (scope) {
+    const input = scope.querySelector('input[type="file"][accept*="image"]') || scope.querySelector('input[type="file"]');
+    if (input) return input;
+  }
+  return null;
 }
 
-function waitForFileInput(timeoutMs = 5000) {
-  const existing = findFileInput();
+function waitForFileInput(container, timeoutMs = 4000) {
+  const existing = findFileInput(container);
   if (existing) return Promise.resolve(existing);
 
   return new Promise((resolve) => {
     const startedAt = Date.now();
     const poll = () => {
-      const input = findFileInput();
+      const input = findFileInput(container);
       if (input || Date.now() - startedAt >= timeoutMs) {
         resolve(input || null);
         return;
@@ -943,9 +929,14 @@ function fillText(textbox, text) {
     .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
     .join("");
 
-  let ok = document.execCommand('insertHTML', false, htmlText);
+  let ok = false;
+  try {
+    ok = document.execCommand('insertHTML', false, htmlText);
+  } catch (_) {}
   if (!ok || !textbox.textContent.trim()) {
-    document.execCommand('insertText', false, text);
+    try {
+      document.execCommand('insertText', false, text);
+    } catch (_) {}
   }
 
   textbox.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
@@ -953,12 +944,8 @@ function fillText(textbox, text) {
   console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
 }
 
-function getActiveComposerTextbox() {
-  return document.querySelector('div[role="dialog"] div[role="textbox"]') ||
-    document.querySelector('div[role="textbox"]');
-}
-
 function fillTextAndImage(textbox, text, imageUrl) {
+  const dialog = getActiveComposerDialog();
   fillText(textbox, text);
 
   if (!imageUrl) {
@@ -975,13 +962,13 @@ function fillTextAndImage(textbox, text, imageUrl) {
   fetch(imageUrl)
     .then(res => res.blob())
     .then(blob => {
-      let fileInput = findFileInput();
+      let fileInput = findFileInput(dialog);
       if (!fileInput) {
-        const photoBtn = findPhotoBtn();
+        const photoBtn = findPhotoBtn(dialog);
         if (photoBtn) {
           console.log("[Chamber] Photo mode not active, switching to photo mode...");
           activateElement(photoBtn);
-          waitForFileInput().then((input) => {
+          waitForFileInput(dialog).then((input) => {
             if (input) {
               triggerUpload(input, blob);
               setTimeout(restoreText, 400);
@@ -1030,7 +1017,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
         clearInterval(interval);
         setTimeout(() => {
           fillTextAndImage(activeTextbox, text, imageUrl);
-        }, 400); // Buffer for composer dialog to render
+        }, 300);
       } else if (attempts > 30) {
         clearInterval(interval);
         console.warn("[Chamber] Failed to find composer textbox after clicking.");
@@ -1038,7 +1025,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
     }, 100);
   } else {
     console.warn("[Chamber] Could not locate any Facebook post composer button.");
-    alert(t("facebook.openComposer"));
+    alert("已將轉世聲明與卡片圖檔複製至剪貼簿！請點擊發文框後按 Ctrl+V 貼上。");
   }
 }
 

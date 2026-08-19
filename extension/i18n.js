@@ -258,6 +258,7 @@
       "backup.currentPlatformTab": "Current social platform tab (not backup content)",
       "backup.currentNonSocialTab": "Current tab (Non-social page)",
       "backup.currentPlatformNamed": "Current {platform} tab (not backup content)",
+      "backup.loading": "Loading...",
       "backup.currentAccount": "Current Chamber account",
       "backup.accountLimit": "This version uses one Chamber account with one Facebook account.",
       "backup.accountLimitMulti": "This version uses one Chamber account, which may bind a Facebook, Threads, Instagram, or X account.",
