@@ -69,7 +69,7 @@ export const messages = {
     "home.echoPortal": "去中心化動態牆",
     "home.echoPortalBody": "Echo 自動向 Chamber 擴充功能請求本機解密，並集中處理單篇閱讀申請。",
     "home.chooseWallet": "選擇連結錢包",
-    "home.chooseWalletBody": "選擇登入時光牆的 Web3 錢包，以讀取去中心化文章並解密私密備份。",
+    "home.chooseWalletBody": "選擇登入迴音谷的 Web3 錢包，以讀取去中心化文章並解密私密備份。",
     "home.extensionWallet": "Chamber 擴充功能錢包",
     "home.detected": "已偵測到",
     "home.useExtensionWallet": "使用此外掛錢包進入",

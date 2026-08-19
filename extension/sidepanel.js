@@ -504,7 +504,7 @@ async function updateQuotaDisplay() {
 
 const quotaProHint = document.getElementById("quotaProHint");
 quotaProHint?.addEventListener("click", () => {
-  alert("🚀 Chamber Pro (進階創作者版) 即將推出！\n\n將享有：\n• 無限量 Arweave 永久上鏈存證\n• 4K 原畫質無損相簿與高畫質影片備份\n• 解鎖全部 VIP 專屬時光牆 Skin 主題\n• 專屬自訂時光牆網址 (Custom Domain)");
+  alert("🚀 Chamber Pro (進階創作者版) 即將推出！\n\n將享有：\n• 無限量 Arweave 永久上鏈存證\n• 4K 原畫質無損相簿與高畫質影片備份\n• 解鎖全部 VIP 專屬迴音谷 Skin 主題\n• 專屬自訂迴音谷網址 (Custom Domain)");
 });
 
 const requestsBanner = document.getElementById("requestsBanner");
@@ -1188,7 +1188,7 @@ async function backupPost(payload, button) {
       const echoBtn = document.createElement("button");
       echoBtn.type = "button";
       echoBtn.className = "chamber-backup-echo-btn";
-      echoBtn.textContent = "🌐 前往我的 Echo 時光牆查看";
+      echoBtn.textContent = "🌐 前往我的 Echo 迴音谷查看";
       echoBtn.onclick = () => chrome.tabs.create({ url: timelineEchoUrl });
 
       const txBtn = document.createElement("button");
