@@ -170,43 +170,47 @@
       try { moreBtn.click(); } catch (_) {}
     }
 
-    // 1. Direct Instagram caption containers (h1 in post modal, div._a9zs / span._a9zs in feed)
-    const captionNode = container.querySelector('h1, div._a9zs, span._a9zs, div._a9zm span, div[class*="caption"] span');
+    // 1. Direct Instagram caption containers (h1 in post modal, div._a9zs / span._a9zs in feed/dialog)
+    const captionNode = container.querySelector('h1, div._a9zs, span._a9zs, div._a9zm span, ul li div._a9zs, ul li h1, ul li span[dir="auto"]');
     if (captionNode && visible(captionNode)) {
       const txt = structuredText(captionNode);
-      if (txt && !ACTION_TEXT.test(txt)) return txt;
+      if (txt && !ACTION_TEXT.test(txt)) {
+        // Strip author handle if prefixed at the very beginning of the caption
+        const cleanTxt = author ? txt.replace(new RegExp(`^@?${author}\\s*`, 'i'), '') : txt;
+        if (cleanTxt.trim()) return cleanTxt.trim();
+      }
     }
 
-    // 2. Candidate caption spans next to author
-    const candidateSpans = Array.from(container.querySelectorAll('div._a9zr span, div._a9zs span, span._aacu'))
+    // 2. Candidate caption spans inside post body/dialog
+    const candidateSpans = Array.from(container.querySelectorAll('div._a9zr span, div._a9zs span, span._aacu, div[dir="auto"], span[dir="auto"]'))
       .filter((node) => {
         if (!visible(node)) return false;
-        if (node.closest('nav, aside, ul[class*="comment"], div[role="menu"]')) return false;
+        if (node.closest('nav, aside, ul[class*="comment"] > li:not(:first-child), div[role="menu"]')) return false;
         const text = String(node.innerText || node.textContent || "").trim();
         if (!text || text.length < 2) return false;
         if (ACTION_TEXT.test(text)) return false;
-        if (normalizeHandle(text) === normalizeHandle(author)) return false;
+        if (/(?:首頁|Reel|訊息|搜尋|通知|建立|主控板|個人檔案|Meta|翻譯年糕|為你推薦|贊助|原始音訊|讚|留言|分享|儲存|Home|Explore|Messages|Notifications|Create|Profile|Sponsored|Suggested|Likes|Comments)/i.test(text)) return false;
         return true;
       });
 
     if (candidateSpans.length > 0) {
-      return structuredText(candidateSpans[0]);
+      for (const span of candidateSpans) {
+        const txt = structuredText(span);
+        const cleanTxt = author ? txt.replace(new RegExp(`^@?${author}\\s*`, 'i'), '') : txt;
+        if (cleanTxt.trim() && cleanTxt.trim().length > 2 && !ACTION_TEXT.test(cleanTxt)) {
+          return cleanTxt.trim();
+        }
+      }
     }
 
-    // 3. Fallback: Search strictly inside article/main content without traversing to feed/nav
-    const textBlocks = Array.from(container.querySelectorAll('div[dir="auto"], span[dir="auto"]'))
-      .filter((node) => {
-        if (!visible(node)) return false;
-        if (node.closest('nav, aside, header, footer, ul[class*="comment"], div[role="menu"]')) return false;
-        const text = String(node.innerText || node.textContent || "").trim();
-        if (!text || text.length < 3) return false;
-        if (ACTION_TEXT.test(text)) return false;
-        if (/(?:首頁|Reel|訊息|搜尋|通知|建立|主控板|個人檔案|Meta|翻譯年糕|為你推薦|贊助|原始音訊|讚|留言|分享|儲存|Home|Explore|Messages|Notifications|Create|Profile|Sponsored|Suggested|Likes|Comments)/i.test(text)) return false;
-        if (normalizeHandle(text) === normalizeHandle(author)) return false;
-        return true;
-      });
+    // 3. Thumbnail alt fallback (contains Instagram caption text on grid thumbnails)
+    const imgAlt = container.querySelector('img[alt]')?.getAttribute('alt') || "";
+    if (imgAlt && imgAlt.length > 10) {
+      const cleaned = imgAlt.replace(/^Photo by .+? on .+\.(?:\s*May be an image of .+?\.)?\s*/i, '').trim();
+      if (cleaned && !ACTION_TEXT.test(cleaned)) return cleaned;
+    }
 
-    return textBlocks.length > 0 ? structuredText(textBlocks[0]) : "";
+    return "";
   }
 
   function extract(container, expectedHandle, preferredSourceUrl = "") {

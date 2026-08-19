@@ -374,24 +374,36 @@
     }
     if (!textbox) throw new Error(t("threads.composerMissing"));
 
-    textbox.focus();
+    const editor = modal.querySelector('[data-lexical-editor="true"], [contenteditable="true"]') || textbox;
+    const p = editor.querySelector('p') || editor;
+    p.focus();
+
     if (textbox.tagName === "TEXTAREA") {
       textbox.value = text;
       textbox.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
       try {
-        const dt = new DataTransfer();
-        dt.setData('text/plain', text);
-        textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        const inputEvent = new InputEvent('beforeinput', {
+          inputType: 'insertText',
+          data: text,
+          bubbles: true,
+          cancelable: true
+        });
+        p.dispatchEvent(inputEvent);
       } catch (_) {}
 
-      if (!textbox.textContent.trim()) {
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        p.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      } catch (_) {}
+
+      if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
         const range = document.createRange();
-        range.selectNodeContents(textbox);
+        range.selectNodeContents(p);
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
-        document.execCommand("delete");
         try {
           document.execCommand("insertText", false, text);
         } catch (_) {}

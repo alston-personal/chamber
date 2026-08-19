@@ -207,6 +207,7 @@
       "picker.failedList": "選取失敗，請再試一次。",
       "declaration.defaultText": "【本人樂觀開朗之 Web3 轉世聲明】\n\n本人不酗酒、不抽菸，無任何精神疾患，亦無任何尋短傾向。特此聲明：若本人帳號無預警消失，絕非自主登出。\n\n若哪天我的 {platform} 遭到演算法無情斬首、人間蒸發……\n他們可以砍掉我的帳號，但不能奪走我的內容自主權。\n\n我的記憶、文字與迴響，已永久存證於 Chamber。\n👉 迴響谷專屬存證：{timelineUrl}",
       "declaration.defaultTextThreads": "【本人樂觀開朗之 Web3 轉世聲明】\n\n若本人 Threads 帳號無預警消失，絕非自主登出。\n\n平台可以移除我的帳號，但不能奪走我的內容自主權。\n\n我的記憶、文字與迴響，已永久存證於 Chamber。\n👉 迴響谷專屬存證：{timelineUrl}",
+      "declaration.defaultTextX": "【本人樂觀開朗之 Web3 轉世聲明】\n\n本人無任何精神疾患或尋短傾向。若帳號無預警消失，絕非自主登出。\n\n你可以斬首我的帳號，但不能奪走我的內容自主權。我的記憶已永久存證於 Chamber。\n\n👉 專屬存證：\n{timelineUrl}",
       "declaration.blobFailed": "無法產生轉世卡圖片",
       "declaration.qrTimeout": "QR Code 載入逾時",
       "declaration.qrFailed": "QR Code 載入失敗",
@@ -419,6 +420,7 @@
       "picker.failedList": "Selection failed. Try again.",
       "declaration.defaultText": "【My Web3 Reborn Declaration】\n\nI am of sound mind and have no intention of disappearing voluntarily. If my account vanishes without warning, it was not a deliberate sign-out.\n\nIf an algorithm erases my {platform} presence one day, the platform may remove my account, but it cannot take away my ownership of my content.\n\nMy memories, words, and echoes are permanently preserved with Chamber.\n👉 My Chamber Echo Archive: {timelineUrl}",
       "declaration.defaultTextThreads": "【My Web3 Reborn Declaration】\n\nIf my Threads account vanishes without warning, it was not a deliberate sign-out.\n\nA platform may remove my account, but it cannot take away my ownership of my content.\n\nMy memories, words, and echoes are permanently preserved with Chamber.\n👉 My Chamber Echo Archive: {timelineUrl}",
+      "declaration.defaultTextX": "【My Web3 Reborn Declaration】\n\nI have no intention of vanishing voluntarily. If my account disappears, it was not a voluntary sign-out.\n\nYou can erase my account, but you cannot take away my content ownership. My memory is preserved with Chamber.\n\n👉 Echo Archive:\n{timelineUrl}",
       "declaration.blobFailed": "Could not create reborn card image",
       "declaration.qrTimeout": "QR code timed out while loading",
       "declaration.qrFailed": "QR code failed to load",
@@ -522,7 +524,8 @@
       "backup.success": "Respaldo exitoso",
       "backup.done": "✅ Respaldado",
       "declaration.defaultText": "【Mi Declaración de Renacimiento Web3】\n\nDeclaro que estoy en pleno uso de mis facultades mentales y no tengo intención de desaparecer voluntariamente. Si mi cuenta desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nSi un algoritmo borra mi presencia en {platform} algún día, la plataforma podrá eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están preservados en Chamber.\n👉 Mi enlace de Chamber Echo: {timelineUrl}",
-      "declaration.defaultTextThreads": "【Mi Declaración de Renacimiento Web3】\n\nSi mi cuenta de Threads desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nLa plataforma puede eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están preservados en Chamber.\n👉 Mi enlace de Chamber Echo: {timelineUrl}"
+      "declaration.defaultTextThreads": "【Mi Declaración de Renacimiento Web3】\n\nSi mi cuenta de Threads desaparece sin previo aviso, no fue un cierre de sesión voluntario.\n\nLa plataforma puede eliminar mi cuenta, pero no puede quitarme la propiedad de mi contenido.\n\nMis recuerdos, palabras y ecos están preservados en Chamber.\n👉 Mi enlace de Chamber Echo: {timelineUrl}",
+      "declaration.defaultTextX": "【Mi Declaración de Renacimiento Web3】\n\nNo tengo intención de desaparecer voluntariamente. Si mi cuenta desaparece, no fue voluntario.\n\nPueden borrar mi cuenta, pero no mi contenido. Mi memoria está preservada en Chamber.\n\n👉 Enlace Echo:\n{timelineUrl}"
     },
     ja: {
       "language.label": "言語",
@@ -611,7 +614,8 @@
       "backup.success": "バックアップ成功",
       "backup.done": "✅ バックアップ済",
       "declaration.defaultText": "【私のWeb3転生宣言】\n\n心身ともに健康であり、自ら姿を消す意思は一切ありません。万が一アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nある日アルゴリズムによって私の {platform} が消滅させられたとしても……\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberに永久保存されています。\n👉 私の Chamber Echo リンク: {timelineUrl}",
-      "declaration.defaultTextThreads": "【私のWeb3転生宣言】\n\n万が一 Threads アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberに永久保存されています。\n👉 私の Chamber Echo リンク: {timelineUrl}"
+      "declaration.defaultTextThreads": "【私のWeb3転生宣言】\n\n万が一 Threads アカウントが予告なく消失した場合、決して自発的なログアウトではありません。\n\nプラットフォームは私のアカウントを削除できても、コンテンツの所有権を奪うことはできません。\n\n私の記憶、言葉、そして響きはすべてChamberに永久保存されています。\n👉 私の Chamber Echo リンク: {timelineUrl}",
+      "declaration.defaultTextX": "【私のWeb3転生宣言】\n\n自ら姿を消す意思はありません。アカウントが予告なく消失した場合、自発的なログアウトではありません。\n\nアカウントは削除できても、コンテンツの所有権は奪えません。記憶はChamberに永久保存されています。\n\n👉 Echo リンク:\n{timelineUrl}"
     },
     fr: {
       "language.label": "Langue",
@@ -696,7 +700,8 @@
       "reborn.successPlatform": "✅ Carte créée et éditeur de {platform} ouvert.",
       "backup.success": "Sauvegarde réussie",
       "backup.done": "✅ Sauvegardé",
-      "declaration.defaultText": "【Ma Déclaration de Renaissance Web3】\n\nJe déclare être sain d'esprit et n'avoir aucune intention de disparaître volontairement. Si mon compte disparaît sans préavis, ce n'est pas une déconnexion volontaire.\n\nSi un algorithme efface un jour ma présence sur {platform}, la plateforme peut supprimer mon compte, mais elle ne peut pas m'enlever la propriété de mon contenu.\n\nMes souvenirs, mes écrits et mes échos sont sauvegardés sur Chamber.\n👉 Mon lien Chamber Echo se trouve dans la première réponse.\n(Les utilisateurs sur ordinateur peuvent également scanner le code QR ci-dessous.)"
+      "declaration.defaultText": "【Ma Déclaration de Renaissance Web3】\n\nJe déclare être sain d'esprit et n'avoir aucune intention de disparaître volontairement. Si mon compte disparaît sans préavis, ce n'est pas une déconnexion volontaire.\n\nSi un algorithme efface un jour ma présence sur {platform}, la plateforme peut supprimer mon compte, mais elle ne peut pas m'enlever la propriété de mon contenu.\n\nMes souvenirs, mes écrits et mes échos sont sauvegardés sur Chamber.\n👉 Mon lien Chamber Echo se trouve dans la première réponse.\n(Les utilisateurs sur ordinateur peuvent également scanner le code QR ci-dessous.)",
+      "declaration.defaultTextX": "【Ma Déclaration de Renaissance Web3】\n\nJe n'ai aucune intention de disparaître. Si mon compte disparaît, ce n'est pas volontaire.\n\nVous pouvez supprimer mon compte, mais pas la propriété de mon contenu. Ma mémoire est sur Chamber.\n\n👉 Lien Echo:\n{timelineUrl}"
     },
     pt: {
       "language.label": "Idioma",
@@ -781,7 +786,8 @@
       "reborn.successPlatform": "✅ Cartão criado e editor do {platform} aberto.",
       "backup.success": "Backup concluído",
       "backup.done": "✅ Salvo",
-      "declaration.defaultText": "【Minha Declaração de Renascimento Web3】\n\nDeclaro que estou em perfeito juízo e não tenho intenção de desaparecer voluntariamente. Se minha conta desaparecer sem aviso prévio, não foi uma saída voluntária.\n\nSe um algoritmo apagar minha presença no {platform} algum dia, a plataforma pode remover minha conta, mas não pode tirar a propriedade do meu conteúdo.\n\nMinhas memórias, palavras e ecos estão salvos no Chamber.\n👉 Meu link do Chamber Echo está na primeira resposta.\n(Usuários de computador também podem escanear o código QR abaixo.)"
+      "declaration.defaultText": "【Minha Declaração de Renascimento Web3】\n\nDeclaro que estou em perfeito juízo e não tenho intenção de desaparecer voluntariamente. Se minha conta desaparecer sem aviso prévio, não foi uma saída voluntária.\n\nSe um algoritmo apagar minha presença no {platform} algum dia, a plataforma pode remover minha conta, mas não pode tirar a propriedade do meu conteúdo.\n\nMinhas memórias, palavras e ecos estão salvos no Chamber.\n👉 Meu link do Chamber Echo está na primeira resposta.\n(Usuários de computador também podem escanear o código QR abaixo.)",
+      "declaration.defaultTextX": "【Minha Declaração de Renascimento Web3】\n\nNão tenho intenção de desaparecer. Se minha conta sumir, não foi voluntário.\n\nPodem apagar minha conta, mas não meu conteúdo. Minha memória está salva no Chamber.\n\n👉 Link Echo:\n{timelineUrl}"
     }
   };
 
