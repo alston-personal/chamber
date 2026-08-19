@@ -907,6 +907,13 @@ function activateElement(el) {
 
 function fillText(textbox, text) {
   if (!textbox) return;
+
+  const existing = (textbox.innerText || textbox.textContent || "").trim();
+  if (existing.includes("本人樂觀開朗之 Web3 轉世聲明") || existing.includes("Web3 Reborn Declaration") || (existing.length > 50 && existing.includes("Chamber"))) {
+    console.log("[Chamber] Reborn declaration already populated in composer. Skipping.");
+    return;
+  }
+
   textbox.focus();
 
   try {
@@ -952,10 +959,13 @@ function fillTextAndImage(textbox, text, imageUrl) {
     return;
   }
 
-  const restoreText = () => {
-    const activeTextbox = getActiveComposerTextbox() || textbox;
+  const restoreTextIfNeeded = () => {
+    const activeTextbox = getActiveComposerTextbox();
     if (activeTextbox) {
-      fillText(activeTextbox, text);
+      const current = activeTextbox.innerText || activeTextbox.textContent || "";
+      if (!current.includes("本人樂觀開朗") && !current.includes("Reborn Declaration") && !current.includes("Chamber")) {
+        fillText(activeTextbox, text);
+      }
     }
   };
 
@@ -971,33 +981,34 @@ function fillTextAndImage(textbox, text, imageUrl) {
           waitForFileInput(dialog).then((input) => {
             if (input) {
               triggerUpload(input, blob);
-              setTimeout(restoreText, 400);
-              setTimeout(restoreText, 900);
-              setTimeout(restoreText, 1600);
+              setTimeout(restoreTextIfNeeded, 800);
               return;
             }
             console.warn("[Chamber] Photo file input did not render after click.");
-            restoreText();
+            restoreTextIfNeeded();
           });
         } else {
           console.warn("[Chamber] Photo button not found inside composer container.");
-          restoreText();
+          restoreTextIfNeeded();
         }
         return;
       }
 
       triggerUpload(fileInput, blob);
-      setTimeout(restoreText, 400);
-      setTimeout(restoreText, 900);
-      setTimeout(restoreText, 1600);
+      setTimeout(restoreTextIfNeeded, 800);
     })
     .catch(err => {
       console.error("[Chamber] Failed to fetch image blob:", err);
-      restoreText();
+      restoreTextIfNeeded();
     });
 }
 
+let isOpeningComposer = false;
 function handleOpenComposerAndFill(text, imageUrl) {
+  if (isOpeningComposer) return;
+  isOpeningComposer = true;
+  setTimeout(() => { isOpeningComposer = false; }, 3000);
+
   const textbox = getActiveComposerTextbox();
   if (textbox) {
     fillTextAndImage(textbox, text, imageUrl);
@@ -1017,7 +1028,7 @@ function handleOpenComposerAndFill(text, imageUrl) {
         clearInterval(interval);
         setTimeout(() => {
           fillTextAndImage(activeTextbox, text, imageUrl);
-        }, 300);
+        }, 200);
       } else if (attempts > 30) {
         clearInterval(interval);
         console.warn("[Chamber] Failed to find composer textbox after clicking.");

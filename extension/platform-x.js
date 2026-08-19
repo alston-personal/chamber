@@ -414,6 +414,10 @@
 
   function setEditorText(el, textToInsert) {
     if (!el) return;
+    const current = (el.innerText || el.textContent || "").trim();
+    if (current.includes("本人樂觀開朗之 Web3 轉世聲明") || current.includes("Web3 Reborn Declaration") || (current.length > 50 && current.includes("Chamber"))) {
+      return;
+    }
     el.focus();
     try {
       const sel = window.getSelection();
