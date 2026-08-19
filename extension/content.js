@@ -932,19 +932,27 @@ function fillText(textbox, text) {
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
 
-  const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const html = text
-    .split("\n")
-    .map(line => line === "" ? "<div><br></div>" : `<div>${escapeHtml(line)}</div>`)
-    .join("");
-
+  // 1. Try native Draft.js paste event
   try {
-    document.execCommand('insertHTML', false, html);
-  } catch (_) {
-    try { document.execCommand('insertText', false, text); } catch (_) {}
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  } catch (_) {}
+
+  // 2. Fallback: line-by-line insertText
+  if (!textbox.textContent.trim()) {
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]) {
+        try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+      }
+      if (i < lines.length - 1) {
+        try { document.execCommand('insertText', false, '\n'); } catch (_) {}
+      }
+    }
   }
 
-  console.log("[Chamber] Auto-filled composer textbox with paragraphs.");
+  console.log("[Chamber] Auto-filled composer textbox.");
 }
 
 async function fillTextAndImage(textbox, text, imageUrl) {

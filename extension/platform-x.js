@@ -462,18 +462,23 @@
       sel.addRange(range);
       document.execCommand("delete");
 
-      const lines = text.split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i]) {
-          try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-        }
-        if (i < lines.length - 1) {
-          try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      } catch (_) {}
+
+      if (!textbox.textContent.trim()) {
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i]) {
+            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+          }
+          if (i < lines.length - 1) {
+            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+          }
         }
       }
-      try {
-        textbox.dispatchEvent(new Event("input", { bubbles: true }));
-      } catch (_) {}
     }
 
     return { success: true, imageAttached };

@@ -360,7 +360,7 @@
           input.files = transfer.files;
           input.dispatchEvent(new Event("change", { bubbles: true }));
           imageAttached = true;
-          await new Promise((resolve) => setTimeout(resolve, 350));
+          await new Promise((resolve) => setTimeout(resolve, 600));
         }
       } catch (_) {}
     }
@@ -379,15 +379,23 @@
       textbox.value = text;
       textbox.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
-      const range = document.createRange();
-      range.selectNodeContents(textbox);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand("delete");
       try {
-        document.execCommand("insertText", false, text);
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
       } catch (_) {}
+
+      if (!textbox.textContent.trim()) {
+        const range = document.createRange();
+        range.selectNodeContents(textbox);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand("delete");
+        try {
+          document.execCommand("insertText", false, text);
+        } catch (_) {}
+      }
     }
 
     return { success: true, imageAttached };

@@ -396,10 +396,14 @@
       };
 
       const onClick = async (e) => {
-        const container = postContainerFor(e.target);
+        let container = postContainerFor(e.target);
+        if (!container) {
+          const link = e.target.closest?.('a[href*="/p/"], a[href*="/reel/"]');
+          if (link) container = link;
+        }
         if (!container) return;
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         banner.textContent = "Chamber：正在擷取 Instagram 貼文內容與相簿…";
         const result = await expandAndExtract(container, expectedHandle);
         finish(result);
