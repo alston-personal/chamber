@@ -936,19 +936,25 @@ function fillText(textbox, text) {
     .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
     .join("");
 
-  let ok = false;
   try {
-    ok = document.execCommand('insertHTML', false, htmlText);
+    document.execCommand('insertText', false, text);
   } catch (_) {}
-  if (!ok || !textbox.textContent.trim()) {
+
+  // Only fallback to insertHTML if textbox is still completely empty
+  if (!textbox.textContent.trim()) {
     try {
-      document.execCommand('insertText', false, text);
+      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const htmlText = text
+        .split("\n")
+        .map(line => line === "" ? "<br>" : `<div style="margin: 0; line-height: 1.35;">${escapeHtml(line)}</div>`)
+        .join("");
+      document.execCommand('insertHTML', false, htmlText);
     } catch (_) {}
   }
 
   textbox.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
   textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-  console.log("[Chamber] Auto-filled composer textbox with layout preserved.");
+  console.log("[Chamber] Auto-filled composer textbox with single-shot text.");
 }
 
 function fillTextAndImage(textbox, text, imageUrl) {

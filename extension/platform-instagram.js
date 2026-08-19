@@ -428,12 +428,11 @@
     } catch (_) {}
 
     document.execCommand("selectAll", false, null);
-    let success = false;
     try {
-      success = document.execCommand("insertText", false, textToInsert);
+      document.execCommand("insertText", false, textToInsert);
     } catch (_) {}
 
-    if (!success || !el.textContent.trim()) {
+    if (!el.textContent.trim()) {
       const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const htmlText = textToInsert
         .split("\n")
