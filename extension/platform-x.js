@@ -412,67 +412,17 @@
     });
   }
 
-  function setEditorText(el, textToInsert) {
-    if (!el) return;
-    const current = (el.innerText || el.textContent || "").trim();
-    if (current.includes("本人樂觀開朗之 Web3 轉世聲明") || current.includes("Web3 Reborn Declaration") || (current.length > 50 && current.includes("Chamber"))) {
-      return;
-    }
-    el.focus();
-    try {
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch (_) {}
-
-    document.execCommand("selectAll", false, null);
-    try {
-      document.execCommand("insertText", false, textToInsert);
-    } catch (_) {}
-
-    if (!el.textContent.trim()) {
-      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const htmlText = textToInsert
-        .split("\n")
-        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
-        .join("");
-      try {
-        document.execCommand("insertHTML", false, htmlText);
-      } catch (_) {}
-    }
-
-    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
-  }
-
   async function openComposerAndFill(text, imageUrl) {
     const newTweetBtn = document.querySelector('[data-testid="SideNav_NewTweet_Button"], a[href="/compose/post"], [aria-label*="Post" i], [aria-label*="發文" i]');
     
-    // Check if modal dialog is already open
     let modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
     if (!modal && newTweetBtn) {
       newTweetBtn.click();
-      // Wait for modal dialog to appear
       for (let attempt = 0; attempt < 25 && !modal; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 80));
         modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
       }
     }
-
-    // Prioritize textbox inside modal dialog if present, otherwise fallback to any visible composer
-    let textbox = null;
-    let targetScope = modal || document;
-    for (let attempt = 0; attempt < 30 && !textbox; attempt += 1) {
-      modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
-      targetScope = modal || document;
-      textbox = Array.from(targetScope.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible) || null;
-      if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    if (!textbox) throw new Error("Could not locate X tweet composer");
-
-    setEditorText(textbox, text);
 
     let imageAttached = false;
     if (imageUrl) {
@@ -487,19 +437,26 @@
           fileInput.files = transfer.files;
           fileInput.dispatchEvent(new Event("change", { bubbles: true }));
           imageAttached = true;
-
-          // Re-verify text retention after X re-renders Draft.js on attachment
-          const restore = () => {
-            const currentScope = document.querySelector('[role="dialog"], [aria-modal="true"]') || document;
-            const currentTextbox = Array.from(currentScope.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible);
-            if (currentTextbox && !currentTextbox.innerText?.trim()) {
-              setEditorText(currentTextbox, text);
-            }
-          };
-          setTimeout(restore, 400);
-          setTimeout(restore, 900);
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
       } catch (_) {}
+    }
+
+    let textbox = null;
+    let targetScope = modal || document;
+    for (let attempt = 0; attempt < 30 && !textbox; attempt += 1) {
+      modal = document.querySelector('[role="dialog"], [aria-modal="true"]');
+      targetScope = modal || document;
+      textbox = Array.from(targetScope.querySelectorAll('[data-testid="tweetTextarea_0"], [contenteditable="true"][role="textbox"]')).find(visible) || null;
+      if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!textbox) throw new Error("Could not locate X tweet composer");
+
+    textbox.focus();
+    const current = (textbox.innerText || textbox.textContent || "").trim();
+    if (!current.includes("本人樂觀開朗") && !current.includes("Chamber")) {
+      document.execCommand("insertText", false, text);
+      textbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     }
 
     return { success: true, imageAttached };

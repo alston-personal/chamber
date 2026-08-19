@@ -1076,22 +1076,23 @@ rebornGenerate?.addEventListener("click", async () => {
       rebornStatus.innerHTML = (result?.imageAttached ? t("reborn.successPlatform", { platform: "X (Twitter)" }) : t("reborn.successTextOnly", { platform: "X (Twitter)" })) +
         `<br><span style="font-size:11px;opacity:0.9;">💡 文案與圖片已同步複製至剪貼簿，若有缺漏可按 Ctrl+V 貼上。</span>`;
     } else {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "content.js"] }).catch(() => {});
+      let sent = false;
       try {
-        await sendTabMessageWithRecovery(tab.id, {
+        await chrome.tabs.sendMessage(tab.id, {
           action: "OPEN_FB_COMPOSER_AND_FILL",
           payload: { text, imageUrl: card.dataUrl },
         });
-      } catch (_) {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: (body, imageUrl) => {
-            if (globalThis.ChamberFacebookPlatform?.openComposerAndFill) {
-              globalThis.ChamberFacebookPlatform.openComposerAndFill(body, imageUrl);
-            }
-          },
-          args: [text, card.dataUrl]
-        });
+        sent = true;
+      } catch (_) {}
+
+      if (!sent) {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["i18n.js", "content.js"] }).catch(() => {});
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: "OPEN_FB_COMPOSER_AND_FILL",
+            payload: { text, imageUrl: card.dataUrl },
+          });
+        } catch (_) {}
       }
       rebornStatus.innerHTML = t("reborn.successPlatform", { platform: "Facebook" }) +
         `<br><span style="font-size:11px;opacity:0.9;">💡 文案與圖片已同步複製至剪貼簿，若有缺漏可按 Ctrl+V 貼上。</span>`;

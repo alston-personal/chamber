@@ -412,45 +412,10 @@
     });
   }
 
-  function setEditorText(el, textToInsert) {
-    if (!el) return;
-    const current = (el.innerText || el.textContent || "").trim();
-    if (current.includes("本人樂觀開朗之 Web3 轉世聲明") || current.includes("Web3 Reborn Declaration") || (current.length > 50 && current.includes("Chamber"))) {
-      return;
-    }
-    el.focus();
-    try {
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch (_) {}
-
-    document.execCommand("selectAll", false, null);
-    try {
-      document.execCommand("insertText", false, textToInsert);
-    } catch (_) {}
-
-    if (!el.textContent.trim()) {
-      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const htmlText = textToInsert
-        .split("\n")
-        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
-        .join("");
-      try {
-        document.execCommand("insertHTML", false, htmlText);
-      } catch (_) {}
-    }
-
-    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
-  }
-
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new post|create|新增貼文|建立|發佈|貼文/i;
-    const button = Array.from(document.querySelectorAll('a, button, [role="button"], svg')).find((node) => {
-      const label = `${node.getAttribute("aria-label") || ""} ${node.innerText || node.textContent || ""}`.trim();
+    const button = Array.from(document.querySelectorAll('a, button, [role="button"], svg, div[role="menuitem"]')).find((node) => {
+      const label = `${node.getAttribute("aria-label") || ""} ${node.getAttribute("title") || ""} ${node.innerText || node.textContent || ""}`.trim();
       return visible(node) && labels.test(label);
     });
     const clickTarget = button?.closest('a, button, [role="button"]') || button;
@@ -461,7 +426,7 @@
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        for (let attempt = 0; attempt < 25; attempt += 1) {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
           const fileInput = Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
           if (fileInput) {
             const transfer = new DataTransfer();
@@ -471,23 +436,10 @@
             imageAttached = true;
             break;
           }
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 150));
         }
       } catch (_) {}
     }
-
-    // Watch for Instagram caption input box appearing during the wizard
-    let watchCount = 0;
-    const watchInterval = setInterval(() => {
-      watchCount++;
-      const captionBox = Array.from(document.querySelectorAll('div[aria-label*="說明" i], div[aria-label*="caption" i], div[role="textbox"]')).find(visible);
-      if (captionBox && !captionBox.innerText?.trim()) {
-        setEditorText(captionBox, text);
-      }
-      if (watchCount > 40) {
-        clearInterval(watchInterval);
-      }
-    }, 400);
 
     return { success: true, imageAttached };
   }

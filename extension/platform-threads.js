@@ -308,41 +308,6 @@
     });
   }
 
-  function setEditorText(el, textToInsert) {
-    if (!el) return;
-    const current = (el.innerText || el.textContent || "").trim();
-    if (current.includes("本人樂觀開朗之 Web3 轉世聲明") || current.includes("Web3 Reborn Declaration") || (current.length > 50 && current.includes("Chamber"))) {
-      return;
-    }
-    el.focus();
-    try {
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch (_) {}
-
-    document.execCommand("selectAll", false, null);
-    try {
-      document.execCommand("insertText", false, textToInsert);
-    } catch (_) {}
-
-    if (!el.textContent.trim()) {
-      const escapeHtml = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const htmlText = textToInsert
-        .split("\n")
-        .map((l) => (l === "" ? "<br>" : `<div>${escapeHtml(l)}</div>`))
-        .join("");
-      try {
-        document.execCommand("insertHTML", false, htmlText);
-      } catch (_) {}
-    }
-
-    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: textToInsert }));
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textToInsert }));
-  }
-
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new thread|create|post|新增串文|建立|發佈/i;
     const button = Array.from(document.querySelectorAll('button, [role="button"]')).find((node) => {
@@ -356,14 +321,6 @@
       if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!textbox) throw new Error(t("threads.composerMissing"));
-    
-    if (textbox.tagName === "TEXTAREA") {
-      textbox.focus();
-      textbox.value = text;
-      textbox.dispatchEvent(new Event("input", { bubbles: true }));
-    } else {
-      setEditorText(textbox, text);
-    }
 
     let imageAttached = false;
     if (imageUrl) {
@@ -377,24 +334,21 @@
           input.files = transfer.files;
           input.dispatchEvent(new Event("change", { bubbles: true }));
           imageAttached = true;
-
-          // Re-verify text retention after Threads attachment DOM update
-          const restore = () => {
-            const currentTextbox = Array.from(document.querySelectorAll('[contenteditable="true"][role="textbox"], textarea')).find(visible);
-            if (currentTextbox && !currentTextbox.innerText?.trim()) {
-              if (currentTextbox.tagName === "TEXTAREA") {
-                currentTextbox.value = text;
-                currentTextbox.dispatchEvent(new Event("input", { bubbles: true }));
-              } else {
-                setEditorText(currentTextbox, text);
-              }
-            }
-          };
-          setTimeout(restore, 400);
-          setTimeout(restore, 900);
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
       } catch (_) {}
     }
+
+    const activeTextbox = Array.from(document.querySelectorAll('[contenteditable="true"][role="textbox"], textarea')).find(visible) || textbox;
+    activeTextbox.focus();
+    if (activeTextbox.tagName === "TEXTAREA") {
+      activeTextbox.value = text;
+      activeTextbox.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      document.execCommand("insertText", false, text);
+      activeTextbox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    }
+
     return { success: true, imageAttached };
   }
 

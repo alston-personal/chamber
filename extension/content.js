@@ -737,24 +737,27 @@ observer.observe(document.body, {
 setTimeout(processDOM, 3000);
 
 // 6. Listen to messages from popup.js for composer auto-fill automation
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "CAPTURE_CURRENT_POST") {
-    const payload = getCurrentPostForSidePanel();
-    sendResponse(payload
-      ? { success: true, payload }
-      : { success: false, error: t("facebook.outerPostMissing") });
-    return false;
-  }
-  if (request.action === "LIST_VISIBLE_POSTS") {
-    sendResponse({ success: true, posts: listVisiblePostsForSidePanel() });
-    return false;
-  }
-  if (request.action === "OPEN_FB_COMPOSER_AND_FILL") {
-    handleOpenComposerAndFill(request.payload.text, request.payload.imageUrl);
-    sendResponse({ success: true });
-    return true;
-  }
-});
+if (!globalThis.__chamberFacebookMessageListenerRegistered) {
+  globalThis.__chamberFacebookMessageListenerRegistered = true;
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "CAPTURE_CURRENT_POST") {
+      const payload = getCurrentPostForSidePanel();
+      sendResponse(payload
+        ? { success: true, payload }
+        : { success: false, error: t("facebook.outerPostMissing") });
+      return false;
+    }
+    if (request.action === "LIST_VISIBLE_POSTS") {
+      sendResponse({ success: true, posts: listVisiblePostsForSidePanel() });
+      return false;
+    }
+    if (request.action === "OPEN_FB_COMPOSER_AND_FILL") {
+      handleOpenComposerAndFill(request.payload.text, request.payload.imageUrl);
+      sendResponse({ success: true });
+      return true;
+    }
+  });
+}
 
 function isCommentOrCoverElement(el) {
   if (!el) return true;
@@ -908,12 +911,19 @@ function activateElement(el) {
 function fillText(textbox, text) {
   if (!textbox) return;
 
+  const now = Date.now();
+  if (window.__chamberLastFillTime && (now - window.__chamberLastFillTime < 3500)) {
+    console.log("[Chamber] FillText debounced (already ran within 3.5s). Skipping.");
+    return;
+  }
+
   const existing = (textbox.innerText || textbox.textContent || "").trim();
   if (existing.includes("本人樂觀開朗之 Web3 轉世聲明") || existing.includes("Web3 Reborn Declaration") || (existing.length > 50 && existing.includes("Chamber"))) {
     console.log("[Chamber] Reborn declaration already populated in composer. Skipping.");
     return;
   }
 
+  window.__chamberLastFillTime = now;
   textbox.focus();
 
   try {
@@ -957,56 +967,34 @@ function fillText(textbox, text) {
   console.log("[Chamber] Auto-filled composer textbox with single-shot text.");
 }
 
-function fillTextAndImage(textbox, text, imageUrl) {
+async function fillTextAndImage(textbox, text, imageUrl) {
   const dialog = getActiveComposerDialog();
-  fillText(textbox, text);
 
-  if (!imageUrl) {
-    return;
-  }
-
-  const restoreTextIfNeeded = () => {
-    const activeTextbox = getActiveComposerTextbox();
-    if (activeTextbox) {
-      const current = activeTextbox.innerText || activeTextbox.textContent || "";
-      if (!current.includes("本人樂觀開朗") && !current.includes("Reborn Declaration") && !current.includes("Chamber")) {
-        fillText(activeTextbox, text);
-      }
-    }
-  };
-
-  fetch(imageUrl)
-    .then(res => res.blob())
-    .then(blob => {
+  if (imageUrl) {
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
       let fileInput = findFileInput(dialog);
       if (!fileInput) {
         const photoBtn = findPhotoBtn(dialog);
         if (photoBtn) {
-          console.log("[Chamber] Photo mode not active, switching to photo mode...");
           activateElement(photoBtn);
-          waitForFileInput(dialog).then((input) => {
-            if (input) {
-              triggerUpload(input, blob);
-              setTimeout(restoreTextIfNeeded, 800);
-              return;
-            }
-            console.warn("[Chamber] Photo file input did not render after click.");
-            restoreTextIfNeeded();
-          });
-        } else {
-          console.warn("[Chamber] Photo button not found inside composer container.");
-          restoreTextIfNeeded();
+          fileInput = await waitForFileInput(dialog);
         }
-        return;
       }
+      if (fileInput) {
+        triggerUpload(fileInput, blob);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    } catch (err) {
+      console.error("[Chamber] Image attachment failed:", err);
+    }
+  }
 
-      triggerUpload(fileInput, blob);
-      setTimeout(restoreTextIfNeeded, 800);
-    })
-    .catch(err => {
-      console.error("[Chamber] Failed to fetch image blob:", err);
-      restoreTextIfNeeded();
-    });
+  const activeTextbox = getActiveComposerTextbox() || textbox;
+  if (activeTextbox) {
+    fillText(activeTextbox, text);
+  }
 }
 
 let isOpeningComposer = false;
