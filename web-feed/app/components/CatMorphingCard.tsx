@@ -197,16 +197,15 @@ export default function CatMorphingCard({
         {/* Soft Pink Throat Arc (Inner Mouth Depth) */}
         <div className="absolute top-0 inset-x-8 h-8 bg-gradient-to-b from-rose-500/20 to-transparent pointer-events-none rounded-b-full" />
 
-        {/* CLOSED STATE TEASER: The Scroll sticking out of the mouth */}
+        {/* CLOSED STATE TEASER: The Scroll held cleanly between the teeth */}
         {!isExpanded && (
-          <div className="flex flex-col items-center justify-center px-4 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-xs font-bold shadow-lg animate-pulse">
-              <span>📜 喵！嘴裡含著文章卷軸</span>
-              <span className="text-[10px] text-amber-200">（點擊大口張開）▼</span>
+          <div className="flex flex-col items-center justify-center px-4 py-1 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs font-semibold shadow-inner">
+              <span>📜</span>
+              <span className="truncate max-w-[280px]">
+                {post.payload.is_encrypted ? "🔒 私密加密回聲卷軸" : (post.payload.content?.slice(0, 30) || "回聲卷軸")}
+              </span>
             </div>
-            <p className="text-[11px] text-slate-400 truncate max-w-sm mt-1">
-              {post.payload.is_encrypted ? "🔒 [私密加密內容]" : post.payload.content}
-            </p>
           </div>
         )}
 
@@ -214,11 +213,11 @@ export default function CatMorphingCard({
         {isExpanded && (
           <div className="px-6 sm:px-8 space-y-4">
             {/* The Ancient Scroll Background for text */}
-            <div className="relative p-5 rounded-2xl bg-slate-900/90 border border-slate-700/70 shadow-2xl backdrop-blur">
+            <div className="relative p-5 rounded-2xl bg-slate-900/95 border border-slate-700/70 shadow-2xl backdrop-blur">
               {/* Top status bar in the scroll */}
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/50">
                 <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <span>🐾</span> <span>貓咪吞吐文章卷軸</span>
+                  <span>🐾</span> <span>貓咪回聲卷軸</span>
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-300 border border-sky-500/30">
                   {post.payload.is_encrypted ? "ENCRYPTED" : "PUBLIC"}
@@ -301,7 +300,7 @@ export default function CatMorphingCard({
 
             {/* Pink Cat Tongue resting at the bottom of the mouth */}
             <div className="flex justify-center">
-              <div className="w-32 h-6 rounded-b-full bg-gradient-to-b from-rose-400 to-rose-600 shadow-lg flex items-center justify-center text-[10px] text-rose-950 font-black">
+              <div className="w-32 h-5 rounded-b-full bg-gradient-to-b from-rose-400 to-rose-600 shadow-md flex items-center justify-center text-[10px] text-rose-950 font-black">
                 👅 貓舌頭
               </div>
             </div>
@@ -313,7 +312,7 @@ export default function CatMorphingCard({
       <div
         className="relative z-30 -mt-2 drop-shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         style={{
-          transform: isExpanded ? "translateY(0px)" : "translateY(-8px)",
+          transform: isExpanded ? "translateY(0px)" : "translateY(-4px)",
         }}
       >
         <svg
@@ -348,12 +347,12 @@ export default function CatMorphingCard({
           </g>
         </svg>
 
-        {/* 🐾 Big Tactile Mouth Open/Close Toggle Button */}
-        <div className="flex justify-center -mt-3 pb-3">
+        {/* 🐾 Single Clean Tactile Mouth Toggle Button */}
+        <div className="flex justify-center -mt-2 pb-2">
           <button
             type="button"
             onClick={onToggleExpand}
-            className="px-6 py-2 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-xl shadow-orange-500/30 flex items-center gap-2 cursor-pointer transform active:scale-95 transition-all"
+            className="px-6 py-2 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-orange-500/25 flex items-center gap-2 cursor-pointer transform active:scale-95 transition-all"
           >
             <span>🐾</span>
             <span>{isExpanded ? "喵！咬合收嘴 ▲" : "喵！大口張開看全文 ▼"}</span>
