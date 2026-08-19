@@ -66,7 +66,7 @@ export default function RealLeopardCatCard({
         onClick={() => !isExpanded && onToggleExpand()}
       >
         <img
-          src="/leopardcat/upper_head.png"
+          src="/echo/leopardcat/upper_head.png"
           alt="Taiwan Leopard Cat Head"
           className="w-full h-auto block select-none pointer-events-none rounded-t-3xl"
           style={{
@@ -199,7 +199,7 @@ export default function RealLeopardCatCard({
         }`}
       >
         <img
-          src="/leopardcat/lower_jaw.png"
+          src="/echo/leopardcat/lower_jaw.png"
           alt="Taiwan Leopard Cat Jaw"
           className="w-full h-auto block select-none pointer-events-none rounded-b-3xl"
           style={{

@@ -2535,29 +2535,14 @@ export default function PlatformFeed({
               const hasLongText = (contentText || "").length > 180 || ((contentText || "").split("\n").length > 4);
               const isCollapsible = hasLongText || mediaUrls.length > 1;
 
-              if (currentTheme === "leopard" || searchParams.get("skin") === "leopard") {
+              if (
+                currentTheme === "leopard" ||
+                currentTheme === "cat" ||
+                searchParams.get("skin") === "cat" ||
+                searchParams.get("skin") === "leopard"
+              ) {
                 return (
                   <RealLeopardCatCard
-                    key={post.txId}
-                    post={post}
-                    isPostOwner={isPostOwner(post)}
-                    isExpanded={isExpanded}
-                    onToggleExpand={() => setExpandedPosts((prev) => ({ ...prev, [post.txId]: !isExpanded }))}
-                    onDecrypt={() => handleDecryptPost(post, idx)}
-                    onRequestAccess={() => requestReadingAccess(post)}
-                    isDecrypting={post.isDecrypting}
-                    accessBusy={accessBusyId === post.txId}
-                    irysHost={irysHost}
-                    ft={ft}
-                    locale={locale}
-                    onOpenAlbum={openAlbumViewer}
-                  />
-                );
-              }
-
-              if (currentTheme === "cat" || searchParams.get("skin") === "cat") {
-                return (
-                  <CatMorphingCard
                     key={post.txId}
                     post={post}
                     isPostOwner={isPostOwner(post)}
