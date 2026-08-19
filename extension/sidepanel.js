@@ -1027,17 +1027,10 @@ rebornGenerate?.addEventListener("click", async () => {
     const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/${timelinePlatform}?ref=${encodeURIComponent(alias)}`;
     const card = await ChamberDeclaration.generateCard({ timelineUrl, alias });
 
-    // Always copy both text and image blob to clipboard
+    // Always copy declaration text to clipboard for manual paste if needed
     try {
-      await navigator.clipboard.write([new ClipboardItem({
-        "text/plain": new Blob([text], { type: "text/plain" }),
-        "image/png": card.blob,
-      })]);
-    } catch (_) {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch (_) {}
-    }
+      await navigator.clipboard.writeText(text);
+    } catch (_) {}
 
     if (!tab?.id || !platform) {
       rebornStatus.innerHTML = `🎉 <strong>${t("reborn.successPlatform", { platform: "剪貼簿" })}</strong><br><span style="font-size:11px;opacity:0.9;">轉世聲明文案與卡片圖片已複製！請至社交平台發文並貼上（Ctrl+V / Cmd+V）。</span>`;
