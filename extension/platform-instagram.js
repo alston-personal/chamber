@@ -307,24 +307,43 @@
   }
 
   async function expandAndExtract(container, expectedHandle) {
-    const moreControls = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).filter((el) => visible(el) && isMoreControl(el));
+    let targetScope = container;
+
+    // If selected node is a profile grid thumbnail, click it to open the post dialog for full extraction
+    const isGridThumb = Boolean(container.closest?.('div._aabd, div[style*="aspect-ratio"]') || (container.tagName === "A" && container.href.includes("/p/")));
+    if (isGridThumb && !container.closest?.('article, div[role="dialog"]')) {
+      const link = container.matches?.('a[href*="/p/"], a[href*="/reel/"]') ? container : container.querySelector?.('a[href*="/p/"], a[href*="/reel/"]');
+      if (link) {
+        link.click();
+        for (let i = 0; i < 20; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          const dialog = document.querySelector('div[role="dialog"] article, div[role="dialog"]');
+          if (dialog) {
+            targetScope = dialog;
+            break;
+          }
+        }
+      }
+    }
+
+    const moreControls = Array.from(targetScope.querySelectorAll('[role="button"], button, span, div, a')).filter((el) => visible(el) && isMoreControl(el));
     for (const more of moreControls) {
       try { if (typeof more.click === "function") more.click(); } catch (_) {}
     }
     if (moreControls.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
-    let payload = extract(container, expectedHandle);
+    let payload = extract(targetScope, expectedHandle);
     if (!payload?.media?.album || payload.media.albumComplete !== false) return payload;
     const collected = [...payload.mediaUrls];
     const expected = payload.media.albumExpectedCount || 0;
 
     for (let attempt = 0; attempt < Math.min(Math.max(expected || 0, 10), 30); attempt += 1) {
-      const next = Array.from(container.querySelectorAll('button[aria-label*="Next" i], button[aria-label*="下一張" i], div[role="button"][aria-label*="Next" i]')).find(visible);
+      const next = Array.from(targetScope.querySelectorAll('button[aria-label*="Next" i], button[aria-label*="下一張" i], div[role="button"][aria-label*="Next" i]')).find(visible);
       if (!next) break;
       try { next.click(); } catch (_) {}
       await new Promise((resolve) => setTimeout(resolve, 200));
-      const current = extract(container, expectedHandle);
+      const current = extract(targetScope, expectedHandle);
       const before = collected.length;
       for (const url of current?.mediaUrls || []) if (!collected.includes(url)) collected.push(url);
       if ((expected && collected.length >= expected) || (!expected && collected.length === before)) break;
@@ -538,6 +557,39 @@
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
       } catch (_) {}
+    }
+
+    // 3. Advance wizard from Crop -> Filter -> Caption
+    for (let step = 0; step < 2; step += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const nextBtn = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] button, header div[role="button"]')).find((b) => {
+        const t = (b.innerText || b.textContent || "").trim();
+        return /^(下一步|Next)$/i.test(t) && visible(b);
+      });
+      if (nextBtn) {
+        nextBtn.click();
+      }
+    }
+
+    // 4. Fill caption on the final caption screen
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const captionBox = document.querySelector('div[role="dialog"] textarea, div[role="dialog"] div[contenteditable="true"][role="textbox"], div[role="dialog"] [aria-label*="說明" i], div[role="dialog"] [aria-label*="Write a caption" i]');
+    if (captionBox) {
+      captionBox.focus();
+      if (captionBox.tagName === "TEXTAREA") {
+        captionBox.value = text;
+        captionBox.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i]) {
+            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+          }
+          if (i < lines.length - 1) {
+            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+          }
+        }
+      }
     }
 
     return { success: true, imageAttached };

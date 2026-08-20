@@ -353,6 +353,11 @@
       const textbox = Array.from(modalScope.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
       if (!textbox) return false;
       const editor = modalScope.querySelector('[data-lexical-editor="true"], [contenteditable="true"]') || textbox;
+      
+      // Dispatch synthetic mouse events to awaken Lexical's internal selection listener
+      editor.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      editor.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      editor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       editor.focus();
 
       if (textbox.tagName === "TEXTAREA") {
@@ -369,24 +374,18 @@
           sel.addRange(range);
         } catch (_) {}
 
-        try {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', text);
-          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        } catch (_) {}
-
-        if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
-          const lines = text.split('\n');
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i]) {
-              try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-            }
-            if (i < lines.length - 1) {
-              try { document.execCommand('insertParagraph', false, null); } catch (_) {}
-            }
+        // 1. Line-by-line insertText + insertParagraph
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i]) {
+            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+          }
+          if (i < lines.length - 1) {
+            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
           }
         }
 
+        // 2. Fallback: beforeinput / input events on editor
         if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
           try {
             editor.dispatchEvent(new InputEvent('beforeinput', {
