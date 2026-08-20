@@ -303,6 +303,9 @@
     const media = mediaForPost(container);
     const textContent = textForPost(container, author);
     const expected = normalizeHandle(expectedHandle);
+    const currentAccount = normalizeHandle(getAccountContext()?.handle);
+    const normalizedAuthor = normalizeHandle(author);
+    const isOwn = !expected || !normalizedAuthor || normalizedAuthor === expected || (currentAccount && normalizedAuthor === currentAccount);
     const hasMore = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).some((el) => visible(el) && isMoreControl(el));
 
     return {
@@ -310,11 +313,11 @@
       textContent,
       sourceUrl: parsed.url,
       sourceCandidates: candidates.map(({ parsed: p }) => p.url),
-      authorName: author ? `@${author}` : "",
+      authorName: author ? `@${author}` : (expectedHandle ? `@${expectedHandle}` : ""),
       authorUrl: author ? `https://www.instagram.com/${encodeURIComponent(author)}/` : "https://www.instagram.com/",
       publishedAt,
       timestamp: publishedAt,
-      isOwnAuthor: expected && author ? normalizeHandle(author) === expected : true,
+      isOwnAuthor: isOwn,
       contentExpanded: !hasMore,
       mediaUrls: media.urls,
       media: media.meta
@@ -574,33 +577,15 @@
       } catch (_) {}
     }
 
-    // 3. Advance wizard from Crop -> Filter -> Caption using structural DOM header positioning (Language-Agnostic)
-    for (let step = 0; step < 3; step += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+    // 3. Advance wizard from Crop -> Filter -> Caption with polling loop
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const dialog = document.querySelector('div[role="dialog"]');
-      if (!dialog) break;
+      if (!dialog) continue;
 
-      // If caption box is already present in dialog, we have reached the final step!
-      const captionBoxPresent = dialog.querySelector('textarea, div[contenteditable="true"][role="textbox"], [aria-label*="說明" i], [aria-label*="caption" i]');
-      if (captionBoxPresent && visible(captionBoxPresent)) break;
-
-      // Locate dialog header
-      const header = dialog.querySelector('header, div._ab5c, div[class*="header"]') || dialog;
-      const headerButtons = Array.from(header.querySelectorAll('div[role="button"], button, [role="link"], span[role="button"]'))
-        .filter((b) => visible(b) && !b.querySelector('svg[aria-label*="Back" i], svg[aria-label*="Close" i]') && b.innerText?.trim() !== "✕");
-
-      // The primary action button (繼續 / Next / 下一步) is the rightmost / last button in the header
-      const nextBtn = headerButtons[headerButtons.length - 1];
-      if (nextBtn) {
-        nextBtn.click();
-      }
-    }
-
-    // 4. Fill caption on the final caption screen
-    for (let retry = 0; retry < 10; retry++) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      const captionBox = document.querySelector('div[role="dialog"] textarea, div[role="dialog"] div[contenteditable="true"][role="textbox"], div[role="dialog"] [aria-label*="說明" i], div[role="dialog"] [aria-label*="caption" i]');
-      if (captionBox) {
+      // Check if caption box is present (Final Step reached)
+      const captionBox = dialog.querySelector('textarea, div[contenteditable="true"][role="textbox"], [aria-label*="說明" i], [aria-label*="caption" i]');
+      if (captionBox && visible(captionBox)) {
         captionBox.focus();
         if (captionBox.tagName === "TEXTAREA") {
           captionBox.value = text;
@@ -611,13 +596,27 @@
             dt.setData('text/plain', text);
             captionBox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
           } catch (_) {}
-          const current = (captionBox.innerText || captionBox.textContent || "").trim();
-          if (!current) {
+          const cur = (captionBox.innerText || captionBox.textContent || "").trim();
+          if (!cur) {
             document.execCommand('selectAll', false, null);
             document.execCommand('insertText', false, text);
           }
         }
         break;
+      }
+
+      // Advance through header buttons: 繼續 / 下一步 / Next / Continue
+      const header = dialog.querySelector('header, div._ab5c, div[class*="header"]') || dialog;
+      const headerButtons = Array.from(header.querySelectorAll('div[role="button"], button, [role="link"], span[role="button"], div.x1i10hfl'))
+        .filter((b) => visible(b) && !b.querySelector('svg[aria-label*="Back" i], svg[aria-label*="Close" i], svg[aria-label*="返回" i], svg[aria-label*="關閉" i]') && b.innerText?.trim() !== "✕");
+
+      const nextBtn = headerButtons[headerButtons.length - 1];
+      if (nextBtn) {
+        const t = (nextBtn.innerText || nextBtn.textContent || "").trim();
+        if (/^(下一步|Next|繼續|Continue|次へ)$/i.test(t) || nextBtn.classList?.contains('_acas') || nextBtn.classList?.contains('_acao')) {
+          nextBtn.click();
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
       }
     }
 

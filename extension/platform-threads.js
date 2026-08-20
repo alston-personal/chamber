@@ -420,12 +420,17 @@
       } catch (_) {}
     }
 
-    // 3. Verify text after image attachment
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const liveModal = findThreadsModal() || modal;
-    const currentEditor = liveModal.querySelector('[data-lexical-editor="true"], [contenteditable="true"]');
-    if (!currentEditor || !currentEditor.textContent.trim() || currentEditor.textContent.includes("新鮮事")) {
-      fillEditorText(liveModal);
+    // 3. Verify and persist text after image attachment settles
+    for (let r = 0; r < 6; r += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const liveModal = findThreadsModal() || modal;
+      const currentEditor = liveModal.querySelector('[data-lexical-editor="true"], [contenteditable="true"]');
+      const curText = (currentEditor?.innerText || currentEditor?.textContent || "").trim();
+      if (!curText || curText === "有什麼新鮮事？" || curText === "有什麼新鮮事") {
+        fillEditorText(liveModal);
+      } else {
+        break;
+      }
     }
 
     return { success: true, imageAttached };
