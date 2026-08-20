@@ -1619,7 +1619,8 @@ export default function PlatformFeed({
 
   return (
     <div
-      data-theme={currentTheme}
+      data-theme={savedWallSkin === "leopard" && currentTheme === "obsidian" ? "leopard" : currentTheme}
+      data-skin={savedWallSkin}
       className="flex flex-col min-h-screen font-sans transition-colors duration-300"
       style={{ backgroundColor: "var(--bg-page)", color: "var(--text-primary)" }}
     >

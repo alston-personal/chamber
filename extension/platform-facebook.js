@@ -550,31 +550,34 @@
 
   function findPostRoot(target, point = { x: 0, y: 0 }) {
     if (!target || target === document.documentElement || target === document.body) return null;
-    // This picker intentionally handles one stable case first: a direct
-    // click on the main post's message or media. Comments are rejected before
-    // any ancestor lookup, so they can never become a post candidate.
     if (isCommentNode(target)) return null;
+
     const directMessage = target.closest?.(messageSelector);
     const media = !directMessage && target.closest?.('img, video');
     const genericText = !directMessage && !media && target.closest?.(textSelector);
-    const seed = directMessage || (media && (() => {
-      const rect = media.getBoundingClientRect();
-      return rect.width >= 120 && rect.height >= 120 ? media : null;
-    })()) || (genericText && !isCommentNode(genericText) ? genericText : null);
+    const linkCard = target.closest?.('a[target="_blank"], a[href*="http"], div[role="article"] a');
+    const articleContainer = target.closest?.('div[role="article"], div[data-pagelet*="FeedUnit"]');
+
+    const seed = directMessage
+      || (media && (() => {
+        const rect = media.getBoundingClientRect();
+        return rect.width >= 80 && rect.height >= 80 ? media : null;
+      })())
+      || (genericText && !isCommentNode(genericText) ? genericText : null)
+      || linkCard
+      || articleContainer;
+
     if (!seed) return null;
 
-    const story = storyContainerFor(seed);
+    const story = articleContainer || storyContainerFor(seed);
     if (!story) return null;
-    const message = directMessage || (genericText && !isCommentNode(genericText) ? genericText : null) || story.querySelector(messageSelector);
+    const message = directMessage || (genericText && !isCommentNode(genericText) ? genericText : null) || story.querySelector(messageSelector) || linkCard;
 
     let link = null;
     link = choosePostLink(Array.from(story.querySelectorAll(permalinkSelector)));
     return {
       link,
       message: message || null,
-      // Media-only posts have no message node. Keep the media as the seed so
-      // an empty caption/photo album remains selectable and backupPost can
-      // rely on mediaUrls as the content.
       node: story,
       media: localMedia(story) || media
     };
@@ -586,10 +589,6 @@
     const message = record.message;
     const mediaElements = record.media ? [record.media, ...visibleMedia(root)] : visibleMedia(root);
     const videoElement = mediaElements.find((element) => element?.tagName === 'VIDEO') || null;
-    // Full Facebook video capture is outside the MVP. Even an HTTP currentSrc
-    // is a playback resource with short-lived access semantics, not a stable
-    // image and not necessarily a complete downloadable video. Persist only
-    // the optional poster; the Reel permalink remains the durable source.
     const mediaCandidates = videoElement ? [videoElement] : mediaElements;
     const mediaUrls = [];
     const seenMedia = new Set();
@@ -604,8 +603,18 @@
     const mediaUrl = mediaUrls[0] || '';
     const author = extractAuthor(root, pageUrl);
     const publishedAt = extractPublishedAt(root);
+    let textContent = extractMessageText(message);
+    if (!textContent) {
+      const cardTitle = Array.from(root.querySelectorAll('span[dir="auto"], div[dir="auto"], a[target="_blank"] span'))
+        .map((el) => (el.innerText || el.textContent || "").trim())
+        .filter((t) => t.length > 5 && !/^(讚|留言|分享|Like|Comment|Share|查看洞察報告)$/i.test(t));
+      if (cardTitle.length > 0) {
+        textContent = cardTitle.join("\n");
+      }
+    }
+
     return {
-      textContent: extractMessageText(message),
+      textContent,
       media: {
         primary_fb_cdn: mediaUrl,
         fallback_backup: "",
