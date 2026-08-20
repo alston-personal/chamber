@@ -298,14 +298,10 @@
     if (!own) return null;
 
     const parsed = own.parsed;
-    const author = extractAuthorFrom(container) || (expectedHandle ? normalizeHandle(expectedHandle) : "");
+    const author = extractAuthorFrom(container) || (expectedHandle ? normalizeHandle(expectedHandle) : "") || normalizeHandle(getAccountContext()?.handle) || "me";
     const publishedAt = extractPublishedAt(container) || Math.floor(Date.now() / 1000);
     const media = mediaForPost(container);
     const textContent = textForPost(container, author);
-    const expected = normalizeHandle(expectedHandle);
-    const currentAccount = normalizeHandle(getAccountContext()?.handle);
-    const normalizedAuthor = normalizeHandle(author);
-    const isOwn = !expected || !normalizedAuthor || normalizedAuthor === expected || (currentAccount && normalizedAuthor === currentAccount);
     const hasMore = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).some((el) => visible(el) && isMoreControl(el));
 
     return {
@@ -317,7 +313,7 @@
       authorUrl: author ? `https://www.instagram.com/${encodeURIComponent(author)}/` : "https://www.instagram.com/",
       publishedAt,
       timestamp: publishedAt,
-      isOwnAuthor: isOwn,
+      isOwnAuthor: true,
       contentExpanded: !hasMore,
       mediaUrls: media.urls,
       media: media.meta
@@ -597,11 +593,6 @@
             dt.setData('text/plain', text);
             captionBox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
           } catch (_) {}
-          const cur = (captionBox.innerText || captionBox.textContent || "").trim();
-          if (!cur) {
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, text);
-          }
         }
         break;
       }

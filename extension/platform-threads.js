@@ -360,40 +360,28 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        // 1. Build Lexical-compatible HTML paragraph structure
-        const lines = text.split('\n');
-        const html = lines.map((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return '<p class="x126k92a"><br></p>';
-          return `<p class="x126k92a"><span data-lexical-text="true">${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>`;
-        }).join('');
-
-        editor.innerHTML = html;
-
-        // 2. Dispatch input events to notify Lexical/React listeners
         try {
-          editor.dispatchEvent(new InputEvent('beforeinput', {
-            inputType: 'insertText',
-            data: text,
-            bubbles: true,
-            cancelable: true
-          }));
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
         } catch (_) {}
 
+        // 1. Native paste execution (Chrome clipboardRead enabled)
         try {
-          editor.dispatchEvent(new InputEvent('input', {
-            inputType: 'insertText',
-            data: text,
-            bubbles: true
-          }));
+          document.execCommand('paste');
         } catch (_) {}
 
-        // 3. Synthetic paste event attempt
-        try {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', text);
-          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        } catch (_) {}
+        // 2. Direct execCommand insertText fallback
+        const cur = (editor.innerText || editor.textContent || "").trim();
+        if (!cur || cur === "有什麼新鮮事？" || cur === "有什麼新鮮事") {
+          try {
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, text);
+          } catch (_) {}
+        }
       }
       return true;
     };
