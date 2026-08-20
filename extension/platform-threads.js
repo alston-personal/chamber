@@ -360,38 +360,28 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        // 1. Build Lexical-compatible HTML paragraph structure directly
-        const lines = text.split('\n');
-        const html = lines.map((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return '<p class="x126k92a"><br></p>';
-          return `<p class="x126k92a"><span data-lexical-text="true">${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>`;
-        }).join('');
-        editor.innerHTML = html;
-
-        // 2. Dispatch Synthetic ClipboardEvent paste
         try {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', text);
-          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          selection.removeAllRanges();
+          selection.addRange(range);
         } catch (_) {}
 
-        // 3. Dispatch InputEvents
+        // Use native execCommand to trigger Lexical's internal input pipeline
+        let execSuccess = false;
         try {
-          editor.dispatchEvent(new InputEvent('beforeinput', {
-            inputType: 'insertText',
-            data: text,
-            bubbles: true,
-            cancelable: true
-          }));
+          execSuccess = document.execCommand('insertText', false, text);
         } catch (_) {}
-        try {
-          editor.dispatchEvent(new InputEvent('input', {
-            inputType: 'insertText',
-            data: text,
-            bubbles: true
-          }));
-        } catch (_) {}
+
+        if (!execSuccess || !editor.innerText?.trim()) {
+          // Fallback: Dispatch synthetic paste
+          try {
+            const dt = new DataTransfer();
+            dt.setData('text/plain', text);
+            editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          } catch (_) {}
+        }
       }
       return true;
     };

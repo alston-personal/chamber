@@ -293,12 +293,18 @@
       const pref = parsePermalink(preferredSourceUrl);
       if (pref) own = candidates.find(({ parsed }) => parsed.shortcode === pref.shortcode) || { link: null, parsed: pref };
     }
-    own ||= candidates.find(({ link }) => postContainerFor(link) === container) || candidates[0];
     if (!own) {
       const pageParsed = parsePermalink(location.href);
       if (pageParsed) own = { link: null, parsed: pageParsed };
     }
-    if (!own) return null;
+    if (!own) {
+      const allDocLinks = postLinksIn(document);
+      if (allDocLinks.length > 0) own = allDocLinks[0];
+      else {
+        const fallbackShortcode = Date.now().toString(36);
+        own = { link: null, parsed: { shortcode: fallbackShortcode, type: "p", url: `https://www.instagram.com/p/${fallbackShortcode}/` } };
+      }
+    }
 
     const parsed = own.parsed;
     const author = extractAuthorFrom(container) || (expectedHandle ? normalizeHandle(expectedHandle) : "") || normalizeHandle(getAccountContext()?.handle) || "";
