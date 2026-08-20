@@ -932,18 +932,14 @@ function fillText(textbox, text) {
   document.execCommand('selectAll', false, null);
   document.execCommand('delete', false, null);
 
-  // Single-pass line-by-line insertText + insertParagraph (guarantees exactly 1 cleanly formatted copy)
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i]) {
-      try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-    }
-    if (i < lines.length - 1) {
-      try { document.execCommand('insertParagraph', false, null); } catch (_) {}
-    }
-  }
+  // Dispatch paste event which Draft.js natively parses into formatted paragraph blocks
+  try {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  } catch (_) {}
 
-  console.log("[Chamber] Auto-filled Facebook composer textbox with clean paragraph formatting.");
+  console.log("[Chamber] Auto-filled Facebook composer textbox with formatted paragraphs.");
 }
 
 async function fillTextAndImage(textbox, text, imageUrl) {

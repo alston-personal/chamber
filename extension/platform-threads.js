@@ -374,31 +374,19 @@
           sel.addRange(range);
         } catch (_) {}
 
-        // 1. Line-by-line insertText + insertParagraph
-        const lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i]) {
-            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-          }
-          if (i < lines.length - 1) {
-            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
-          }
-        }
+        // 1. Dispatch synthetic paste event which Lexical parses with full paragraphs
+        try {
+          const dt = new DataTransfer();
+          dt.setData('text/plain', text);
+          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        } catch (_) {}
 
-        // 2. Fallback: beforeinput / input events on editor
-        if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
+        // 2. Direct insertText on active selection
+        const current = (editor.innerText || editor.textContent || "").trim();
+        if (!current || current === "有什麼新鮮事？" || current === "有什麼新鮮事") {
           try {
-            editor.dispatchEvent(new InputEvent('beforeinput', {
-              inputType: 'insertText',
-              data: text,
-              bubbles: true,
-              cancelable: true
-            }));
-            editor.dispatchEvent(new InputEvent('input', {
-              inputType: 'insertText',
-              data: text,
-              bubbles: true
-            }));
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, text);
           } catch (_) {}
         }
       }

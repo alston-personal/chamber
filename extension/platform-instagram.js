@@ -265,6 +265,21 @@
       if (cleaned && !ACTION_TEXT.test(cleaned) && !TIMESTAMP_TEXT.test(cleaned)) return cleaned;
     }
 
+    // 4. Fallback: Search img[alt] inside container (Profile grid or thumbnail alt often contains post caption)
+    const imgWithAlt = Array.from(container.querySelectorAll('img[alt]')).find((img) => {
+      const alt = img.getAttribute('alt') || '';
+      return alt.length > 5 && !/profile picture|大頭貼|頭像/i.test(alt);
+    });
+    if (imgWithAlt) {
+      let altText = imgWithAlt.getAttribute('alt') || '';
+      altText = altText.replace(/^Photo by .*?\.\s*(?:May be an image of .*?\.\s*)?:?\s*/i, '').trim();
+      altText = altText.replace(/^(?:相片由|照片由).*?\.\s*(?:可能是.*?的圖像)?:?\s*/i, '').trim();
+      const txt = cleanCaptionText(altText, author);
+      if (txt && txt.length > 1 && !ACTION_TEXT.test(txt) && !TIMESTAMP_TEXT.test(txt)) {
+        return txt;
+      }
+    }
+
     return "";
   }
 
@@ -559,12 +574,12 @@
       } catch (_) {}
     }
 
-    // 3. Advance wizard from Crop -> Filter -> Caption
+    // 3. Advance wizard from Crop -> Filter -> Caption (Support 繼續, 下一步, Next)
     for (let step = 0; step < 2; step += 1) {
       await new Promise((resolve) => setTimeout(resolve, 600));
-      const nextBtn = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] button, header div[role="button"]')).find((b) => {
+      const nextBtn = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] button, div[role="dialog"] [role="link"], header div[role="button"], header button, header div')).find((b) => {
         const t = (b.innerText || b.textContent || "").trim();
-        return /^(下一步|Next)$/i.test(t) && visible(b);
+        return /^(下一步|Next|繼續|Continue|次へ)$/i.test(t) && visible(b);
       });
       if (nextBtn) {
         nextBtn.click();
@@ -572,23 +587,27 @@
     }
 
     // 4. Fill caption on the final caption screen
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const captionBox = document.querySelector('div[role="dialog"] textarea, div[role="dialog"] div[contenteditable="true"][role="textbox"], div[role="dialog"] [aria-label*="說明" i], div[role="dialog"] [aria-label*="Write a caption" i]');
-    if (captionBox) {
-      captionBox.focus();
-      if (captionBox.tagName === "TEXTAREA") {
-        captionBox.value = text;
-        captionBox.dispatchEvent(new Event("input", { bubbles: true }));
-      } else {
-        const lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i]) {
-            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-          }
-          if (i < lines.length - 1) {
-            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+    for (let retry = 0; retry < 10; retry++) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const captionBox = document.querySelector('div[role="dialog"] textarea, div[role="dialog"] div[contenteditable="true"][role="textbox"], div[role="dialog"] [aria-label*="說明" i], div[role="dialog"] [aria-label*="caption" i]');
+      if (captionBox) {
+        captionBox.focus();
+        if (captionBox.tagName === "TEXTAREA") {
+          captionBox.value = text;
+          captionBox.dispatchEvent(new Event("input", { bubbles: true }));
+        } else {
+          try {
+            const dt = new DataTransfer();
+            dt.setData('text/plain', text);
+            captionBox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          } catch (_) {}
+          const current = (captionBox.innerText || captionBox.textContent || "").trim();
+          if (!current) {
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, text);
           }
         }
+        break;
       }
     }
 
