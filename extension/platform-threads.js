@@ -360,27 +360,48 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        const htmlData = `<meta charset='utf-8'>${text.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('')}`;
+        dt.setData('text/html', htmlData);
+
+        // 1. Dispatch beforeinput with insertFromPaste
+        try {
+          const beforeInput = new InputEvent('beforeinput', {
+            inputType: 'insertFromPaste',
+            dataTransfer: dt,
+            bubbles: true,
+            cancelable: true
+          });
+          editor.dispatchEvent(beforeInput);
+        } catch (_) {}
+
+        // 2. Dispatch synthetic ClipboardEvent paste
+        try {
+          const pasteEvent = new ClipboardEvent('paste', {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true
+          });
+          editor.dispatchEvent(pasteEvent);
+        } catch (_) {}
+
+        // 3. Native execCommand fallback
         try {
           const selection = window.getSelection();
           const range = document.createRange();
           range.selectNodeContents(editor);
           selection.removeAllRanges();
           selection.addRange(range);
+          document.execCommand('insertText', false, text);
         } catch (_) {}
 
-        // Use native execCommand to trigger Lexical's internal input pipeline
-        let execSuccess = false;
-        try {
-          execSuccess = document.execCommand('insertText', false, text);
-        } catch (_) {}
-
-        if (!execSuccess || !editor.innerText?.trim()) {
-          // Fallback: Dispatch synthetic paste
-          try {
-            const dt = new DataTransfer();
-            dt.setData('text/plain', text);
-            editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-          } catch (_) {}
+        // 4. Lexical paragraph DOM structure fallback if empty
+        const cur = (editor.innerText || editor.textContent || "").trim();
+        if (!cur || cur === "有什麼新鮮事？" || cur === "有什麼新鮮事") {
+          const lines = text.split('\n');
+          editor.innerHTML = lines.map(line => line ? `<p class="x126k92a"><span data-lexical-text="true">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>` : `<p class="x126k92a"><br></p>`).join('');
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
         }
       }
       return true;

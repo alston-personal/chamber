@@ -313,10 +313,8 @@
     const textContent = textForPost(container, author);
     const currentAccount = normalizeHandle(getAccountContext()?.handle);
     const profileSlug = location.pathname.replace(/^\/|\/$/g, '').split('/')[0] || "";
-    const isProfilePage = Boolean(profileSlug && !["", "explore", "reels", "direct", "stories", "accounts"].includes(profileSlug.toLowerCase()));
-    const expected = normalizeHandle(expectedHandle);
-    const normalizedAuthor = normalizeHandle(author);
-    const isOwn = isProfilePage || !normalizedAuthor || (currentAccount && normalizedAuthor === currentAccount) || (expected && normalizedAuthor === expected);
+    const isDialog = Boolean(container.closest?.('div[role="dialog"], [role="presentation"]') || document.querySelector('div[role="dialog"]'));
+    const isOwn = isDialog || isProfilePage || !normalizedAuthor || (currentAccount && normalizedAuthor === currentAccount) || (expected && normalizedAuthor === expected);
     const hasMore = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).some((el) => visible(el) && isMoreControl(el));
 
     return {

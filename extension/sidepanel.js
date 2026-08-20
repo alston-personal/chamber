@@ -117,7 +117,15 @@ async function rawPlatformIdentity(tab = null) {
       || (tab?.url ? await chrome.cookies.get({ url: tab.url, name: "c_user" }) : null)
       || (tab?.url ? await chrome.cookies.get({ url: tab.url, name: "i_user" }) : null);
     if (!cookie?.value) throw new Error(t("error.loginPlatform", { platform: "Facebook" }));
-    return { platform, actorId: cookie.value, actorHandle: "", tab };
+    let pageSlug = "";
+    try {
+      const urlObj = new URL(tab?.url || "https://www.facebook.com");
+      const slug = urlObj.pathname.replace(/^\/|\/$/g, '').split('/')[0] || "";
+      if (slug && !["home", "watch", "groups", "marketplace", "notifications", "messages", "reels", "search", "gaming", "events", "friends", "profile.php"].includes(slug.toLowerCase())) {
+        pageSlug = slug.toLowerCase();
+      }
+    } catch (_) {}
+    return { platform, actorId: cookie.value, actorHandle: pageSlug, pageSlug, tab };
   }
   if (platform === "instagram") {
     const cookie = await chrome.cookies.get({ url: tab.url, name: "ds_user_id" });
@@ -225,6 +233,7 @@ newProfileButton?.addEventListener("click", async () => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
   profiles.push(newProf);
   await chrome.storage.local.set({ chamberProfiles: profiles, activeChamberProfileId: newId });
   await renderProfiles();
@@ -232,8 +241,17 @@ newProfileButton?.addEventListener("click", async () => {
   setStatus(t("profile.created", { name: trimmedName }));
 });
 
-profileSelect?.addEventListener("change", async () => {
-  const nextId = profileSelect.value;
+deleteProfileButton?.addEventListener("click", async () => {
+  const { profiles, activeId } = await getActiveProfile();
+  if (profiles.length <= 1) return;
+  const nextProfiles = profiles.filter((p) => p.id !== activeId);
+  const nextId = nextProfiles[0].id;
+  await chrome.storage.local.set({ chamberProfiles: nextProfiles, activeChamberProfileId: nextId });
+  await renderProfiles();
+});
+
+profileSelect?.addEventListener("change", async (e) => {
+  const nextId = e.target.value;
   await chrome.storage.local.set({ activeChamberProfileId: nextId });
   await renderProfiles();
   await loadPageInfo();
@@ -266,13 +284,15 @@ async function getActiveProfile(rawIdentity = null) {
     await chrome.storage.local.set({ activeChamberProfileId: activeId });
   }
 
-  // Auto-switch to the Chamber Profile bound to the current platform/actorId
-  if (raw?.actorId) {
+  // Auto-switch to the Chamber Profile bound to the current platform/actorId/pageSlug
+  if (raw?.actorId || raw?.actorHandle) {
+    const handle = (raw.actorHandle || "").toLowerCase();
     const boundProfile = profiles.find((p) => 
       p.ownerUserId === initialOwnerId ||
       p.ownerUserId === raw.actorId ||
       p.boundAccounts?.[raw.platform] === raw.actorId ||
-      (p.alias && p.alias.toLowerCase() === raw.actorId.toLowerCase())
+      (handle && p.alias && (p.alias.toLowerCase() === handle || handle.includes(p.alias.toLowerCase()) || p.alias.toLowerCase().includes(handle))) ||
+      (p.alias && p.alias.toLowerCase() === raw.actorId?.toLowerCase())
     );
     if (boundProfile && boundProfile.id !== activeId) {
       activeId = boundProfile.id;
