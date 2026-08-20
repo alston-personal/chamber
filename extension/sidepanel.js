@@ -1025,7 +1025,8 @@ rebornGenerate?.addEventListener("click", async () => {
     const alias = profile?.alias || "chamber";
     const timelinePlatform = platform === "threads" ? "threads" : platform === "instagram" ? "instagram" : platform === "x" ? "x" : "facebook";
     const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/${timelinePlatform}?ref=${encodeURIComponent(alias)}`;
-    const card = await ChamberDeclaration.generateCard({ timelineUrl, alias, theme: currentTheme || "leopard" });
+    const activeTheme = document.documentElement.getAttribute("data-theme") || "leopard";
+    const card = await ChamberDeclaration.generateCard({ timelineUrl, alias, theme: activeTheme });
 
     // Always copy declaration text to clipboard for manual paste if needed
     try {
@@ -1956,7 +1957,7 @@ async function initializePanel() {
   const themeSelect = document.getElementById("themeSelect");
   try {
     const stored = await chrome.storage.local.get(["chamber_timeline_theme", "chamber_theme"]);
-    const currentTheme = stored.chamber_theme || stored.chamber_timeline_theme || "obsidian";
+    const currentTheme = stored.chamber_theme || stored.chamber_timeline_theme || "leopard";
     document.documentElement.setAttribute("data-theme", currentTheme);
     if (themeSelect) themeSelect.value = currentTheme;
   } catch (_) {}
