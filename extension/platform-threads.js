@@ -364,31 +364,56 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        const p = editor.querySelector('p') || editor;
+        let p = editor.querySelector('p');
+        if (!p) {
+          p = document.createElement('p');
+          editor.appendChild(p);
+        }
+        let textNode = p.firstChild;
+        if (!textNode || textNode.nodeType !== 3) {
+          textNode = document.createTextNode("");
+          p.replaceChildren(textNode);
+        }
+
         try {
           const range = document.createRange();
-          range.selectNodeContents(p);
-          range.collapse(false);
+          range.setStart(textNode, 0);
+          range.setEnd(textNode, 0);
           const sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(range);
         } catch (_) {}
 
-        // 1. Dispatch synthetic paste event which Lexical parses with full paragraphs
+        // 1. Dispatch beforeinput event
+        try {
+          editor.dispatchEvent(new InputEvent('beforeinput', {
+            inputType: 'insertText',
+            data: text,
+            bubbles: true,
+            cancelable: true
+          }));
+        } catch (_) {}
+
+        // 2. Direct execCommand insertText on the exact textNode
+        try {
+          document.execCommand('insertText', false, text);
+        } catch (_) {}
+
+        // 3. Dispatch synthetic paste event
         try {
           const dt = new DataTransfer();
           dt.setData('text/plain', text);
           editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
         } catch (_) {}
 
-        // 2. Direct insertText on active selection
-        const current = (editor.innerText || editor.textContent || "").trim();
-        if (!current || current === "有什麼新鮮事？" || current === "有什麼新鮮事") {
-          try {
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, text);
-          } catch (_) {}
-        }
+        // 4. Dispatch input event to notify React/Lexical listeners
+        try {
+          editor.dispatchEvent(new InputEvent('input', {
+            inputType: 'insertText',
+            data: text,
+            bubbles: true
+          }));
+        } catch (_) {}
       }
       return true;
     };

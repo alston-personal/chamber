@@ -605,18 +605,23 @@
         break;
       }
 
-      // Advance through header buttons: 繼續 / 下一步 / Next / Continue
-      const header = dialog.querySelector('header, div._ab5c, div[class*="header"]') || dialog;
-      const headerButtons = Array.from(header.querySelectorAll('div[role="button"], button, [role="link"], span[role="button"], div.x1i10hfl'))
-        .filter((b) => visible(b) && !b.querySelector('svg[aria-label*="Back" i], svg[aria-label*="Close" i], svg[aria-label*="返回" i], svg[aria-label*="關閉" i]') && b.innerText?.trim() !== "✕");
+      // 3. Advance through top header button: 繼續 / 下一步 / Next / Continue (Strictly Top-Right Bar)
+      const dialogRect = dialog.getBoundingClientRect();
+      const allTopElements = Array.from(dialog.querySelectorAll('div[role="button"], button, [role="link"], span, div')).filter((el) => {
+        if (!visible(el)) return false;
+        const rect = el.getBoundingClientRect();
+        // Must be in the top 70px of the dialog and on the right half
+        return rect.top >= (dialogRect.top - 10) && rect.top <= (dialogRect.top + 70) && rect.right >= (dialogRect.left + dialogRect.width * 0.5);
+      });
 
-      const nextBtn = headerButtons[headerButtons.length - 1];
+      const nextBtn = allTopElements.find((el) => {
+        const t = (el.innerText || el.textContent || "").trim();
+        return /^(下一步|Next|繼續|Continue|次へ|Share|分享)$/i.test(t);
+      }) || (allTopElements.length > 0 ? allTopElements[allTopElements.length - 1].closest('div[role="button"], button, div') : null);
+
       if (nextBtn) {
-        const t = (nextBtn.innerText || nextBtn.textContent || "").trim();
-        if (/^(下一步|Next|繼續|Continue|次へ)$/i.test(t) || nextBtn.classList?.contains('_acas') || nextBtn.classList?.contains('_acao')) {
-          nextBtn.click();
-          await new Promise((resolve) => setTimeout(resolve, 600));
-        }
+        nextBtn.click();
+        await new Promise((resolve) => setTimeout(resolve, 600));
       }
     }
 
