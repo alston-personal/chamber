@@ -354,37 +354,23 @@
       if (!textbox) return false;
       const editor = modalScope.querySelector('[data-lexical-editor="true"], [contenteditable="true"]') || textbox;
       
-      // Dispatch synthetic mouse events to awaken Lexical's internal selection listener
-      editor.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      editor.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-      editor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       editor.focus();
 
       if (textbox.tagName === "TEXTAREA") {
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        let p = editor.querySelector('p');
-        if (!p) {
-          p = document.createElement('p');
-          editor.appendChild(p);
-        }
-        let textNode = p.firstChild;
-        if (!textNode || textNode.nodeType !== 3) {
-          textNode = document.createTextNode("");
-          p.replaceChildren(textNode);
-        }
+        // 1. Build Lexical-compatible HTML paragraph structure
+        const lines = text.split('\n');
+        const html = lines.map((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<p class="x126k92a"><br></p>';
+          return `<p class="x126k92a"><span data-lexical-text="true">${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>`;
+        }).join('');
 
-        try {
-          const range = document.createRange();
-          range.setStart(textNode, 0);
-          range.setEnd(textNode, 0);
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } catch (_) {}
+        editor.innerHTML = html;
 
-        // 1. Dispatch beforeinput event
+        // 2. Dispatch input events to notify Lexical/React listeners
         try {
           editor.dispatchEvent(new InputEvent('beforeinput', {
             inputType: 'insertText',
@@ -394,25 +380,19 @@
           }));
         } catch (_) {}
 
-        // 2. Direct execCommand insertText on the exact textNode
-        try {
-          document.execCommand('insertText', false, text);
-        } catch (_) {}
-
-        // 3. Dispatch synthetic paste event
-        try {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', text);
-          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        } catch (_) {}
-
-        // 4. Dispatch input event to notify React/Lexical listeners
         try {
           editor.dispatchEvent(new InputEvent('input', {
             inputType: 'insertText',
             data: text,
             bubbles: true
           }));
+        } catch (_) {}
+
+        // 3. Synthetic paste event attempt
+        try {
+          const dt = new DataTransfer();
+          dt.setData('text/plain', text);
+          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
         } catch (_) {}
       }
       return true;
@@ -457,6 +437,30 @@
         break;
       }
     }
+
+    // 4. Show friendly toast confirmation
+    try {
+      let toast = document.getElementById("chamber-threads-toast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "chamber-threads-toast";
+        toast.style.position = "fixed";
+        toast.style.bottom = "24px";
+        toast.style.left = "50%";
+        toast.style.transform = "translateX(-50%)";
+        toast.style.background = "#10b981";
+        toast.style.color = "#022c22";
+        toast.style.padding = "10px 20px";
+        toast.style.borderRadius = "9999px";
+        toast.style.fontWeight = "bold";
+        toast.style.fontSize = "13px";
+        toast.style.zIndex = "2147483647";
+        toast.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+        document.documentElement.appendChild(toast);
+      }
+      toast.textContent = "✅ Chamber：轉世聲明圖文已就緒！（文案已同步複製至剪貼簿）";
+      setTimeout(() => toast?.remove(), 4000);
+    } catch (_) {}
 
     return { success: true, imageAttached };
   }
