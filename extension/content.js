@@ -939,7 +939,21 @@ function fillText(textbox, text) {
     textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   } catch (_) {}
 
-  console.log("[Chamber] Auto-filled Facebook composer textbox with single paste event.");
+  // Fallback: If paste event was not processed by Draft.js, execute line-by-line insertText + insertParagraph
+  const current = (textbox.innerText || textbox.textContent || "").trim();
+  if (!current || current === "在想些什麼？" || current === "在想些什麼" || current === "What's on your mind?") {
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]) {
+        try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+      }
+      if (i < lines.length - 1) {
+        try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+      }
+    }
+  }
+
+  console.log("[Chamber] Auto-filled Facebook composer textbox.");
 }
 
 async function fillTextAndImage(textbox, text, imageUrl) {

@@ -3,7 +3,7 @@
   const POST_PATH = /^\/@([^/]+)\/post\/([A-Za-z0-9_-]+)\/?$/i;
   const POST_LINK_SELECTOR = 'a[href*="/post/"]';
   const ACTION_TEXT = /^(like|reply|repost|quote|share|send|more|follow|following|liked|replies|likes|views|讚|回覆|轉發|引用|分享|傳送|更多|追蹤|查看翻譯)$/i;
-  const MORE_TEXT = /^(more|see more|顯示更多|查看更多)$/i;
+  const MORE_TEXT = /^(?:\.\.\.|…|\s)*(?:more|see more|顯示更多|查看更多|更多|más|mais)(?:\.\.\.|…|\s)*$/i;
   const PLAYBACK_ERROR_TEXT = /^(?:sorry,?\s+we(?:'|\u2019)?re having trouble playing this video\.?|learn more)$/i;
   const baseHref = () => typeof location !== "undefined" ? location.href : "https://www.threads.com/";
 
@@ -33,7 +33,9 @@
   function isMoreControl(node) {
     if (!node || node.getAttribute?.("aria-haspopup")) return false;
     if (node.querySelector?.('svg[aria-label="More"], svg[aria-label="更多"]')) return false;
-    return MORE_TEXT.test(String(node.innerText || node.textContent || "").trim());
+    const text = String(node.innerText || node.textContent || "").trim();
+    if (!text || text.length > 25) return false;
+    return MORE_TEXT.test(text);
   }
 
   function postLinksIn(node) {
@@ -347,67 +349,96 @@
     }
     if (!modal) throw new Error(t("threads.composerMissing"));
 
+    const fillEditorText = (modalScope) => {
+      const textbox = Array.from(modalScope.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
+      if (!textbox) return false;
+      const editor = modalScope.querySelector('[data-lexical-editor="true"], [contenteditable="true"]') || textbox;
+      editor.focus();
+
+      if (textbox.tagName === "TEXTAREA") {
+        textbox.value = text;
+        textbox.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        const p = editor.querySelector('p') || editor;
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(p);
+          range.collapse(false);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (_) {}
+
+        try {
+          const dt = new DataTransfer();
+          dt.setData('text/plain', text);
+          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        } catch (_) {}
+
+        if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
+          const lines = text.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i]) {
+              try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+            }
+            if (i < lines.length - 1) {
+              try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+            }
+          }
+        }
+
+        if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
+          try {
+            editor.dispatchEvent(new InputEvent('beforeinput', {
+              inputType: 'insertText',
+              data: text,
+              bubbles: true,
+              cancelable: true
+            }));
+            editor.dispatchEvent(new InputEvent('input', {
+              inputType: 'insertText',
+              data: text,
+              bubbles: true
+            }));
+          } catch (_) {}
+        }
+      }
+      return true;
+    };
+
+    // 1. Fill text FIRST when composer is fresh
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    fillEditorText(modal);
+
+    // 2. Attach image SECOND
     let imageAttached = false;
     if (imageUrl) {
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        const input = modal.querySelector('input[type="file"]')
-          || Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
-        if (input) {
-          const transfer = new DataTransfer();
-          transfer.items.add(file);
-          input.files = transfer.files;
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-          imageAttached = true;
-          await new Promise((resolve) => setTimeout(resolve, 600));
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          const input = modal.querySelector('input[type="file"]')
+            || Array.from(document.querySelectorAll('input[type="file"]')).find((node) => !node.disabled);
+          if (input) {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            imageAttached = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 150));
         }
       } catch (_) {}
     }
 
-    // Find the main textbox inside the modal
-    let textbox = null;
-    for (let attempt = 0; attempt < 25 && !textbox; attempt += 1) {
-      modal = findThreadsModal() || modal;
-      textbox = Array.from(modal.querySelectorAll('[contenteditable="true"][role="textbox"], [contenteditable="true"], textarea')).find(visible) || null;
-      if (!textbox) await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    if (!textbox) throw new Error(t("threads.composerMissing"));
-
-    const editor = modal.querySelector('[data-lexical-editor="true"], [contenteditable="true"]') || textbox;
-    const p = editor.querySelector('p') || editor;
-    p.focus();
-
-    if (textbox.tagName === "TEXTAREA") {
-      textbox.value = text;
-      textbox.dispatchEvent(new Event("input", { bubbles: true }));
-    } else {
-      try {
-        const inputEvent = new InputEvent('beforeinput', {
-          inputType: 'insertText',
-          data: text,
-          bubbles: true,
-          cancelable: true
-        });
-        p.dispatchEvent(inputEvent);
-      } catch (_) {}
-
-      try {
-        const dt = new DataTransfer();
-        dt.setData('text/plain', text);
-        p.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-      } catch (_) {}
-
-      if (!editor.textContent.trim() || editor.textContent.includes("新鮮事")) {
-        const range = document.createRange();
-        range.selectNodeContents(p);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        try {
-          document.execCommand("insertText", false, text);
-        } catch (_) {}
-      }
+    // 3. Verify text after image attachment
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const liveModal = findThreadsModal() || modal;
+    const currentEditor = liveModal.querySelector('[data-lexical-editor="true"], [contenteditable="true"]');
+    if (!currentEditor || !currentEditor.textContent.trim() || currentEditor.textContent.includes("新鮮事")) {
+      fillEditorText(liveModal);
     }
 
     return { success: true, imageAttached };

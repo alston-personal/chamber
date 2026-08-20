@@ -429,15 +429,21 @@
       try {
         const response = await fetch(imageUrl);
         const file = new File([await response.blob()], "chamber-reborn-card.png", { type: "image/png" });
-        const fileInput = (modal ? modal.querySelector('input[type="file"][accept*="image"]') : null)
-          || Array.from(document.querySelectorAll('input[type="file"][accept*="image"]')).find((node) => !node.disabled);
-        if (fileInput) {
-          const transfer = new DataTransfer();
-          transfer.items.add(file);
-          fileInput.files = transfer.files;
-          fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-          imageAttached = true;
-          await new Promise((resolve) => setTimeout(resolve, 300));
+        for (let attempt = 0; attempt < 25; attempt += 1) {
+          const liveModal = document.querySelector('[role="dialog"], [aria-modal="true"]');
+          const fileInput = (liveModal ? liveModal.querySelector('input[data-testid="fileInput"], input[type="file"]') : null)
+            || Array.from(document.querySelectorAll('input[data-testid="fileInput"], input[type="file"]')).find((node) => !node.disabled);
+          if (fileInput) {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+            fileInput.dispatchEvent(new Event("input", { bubbles: true }));
+            imageAttached = true;
+            await new Promise((resolve) => setTimeout(resolve, 400));
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 120));
         }
       } catch (_) {}
     }

@@ -3,7 +3,8 @@
   const POST_PATH = /^\/(?:p|reel)\/([A-Za-z0-9_-]+)\/?$/i;
   const POST_LINK_SELECTOR = 'a[href*="/p/"], a[href*="/reel/"]';
   const ACTION_TEXT = /^(like|reply|repost|quote|share|send|more|follow|following|liked|replies|likes|views|讚|回覆|轉發|引用|分享|傳送|更多|追蹤|查看翻譯|留言|儲存)$/i;
-  const MORE_TEXT = /^(more|see more|顯示更多|查看更多|\.\.\.\s*more)$/i;
+  const MORE_TEXT = /^(?:\.\.\.|…|\s)*(?:more|see more|顯示更多|查看更多|更多|más|mais|続きを読む|他)(?:\.\.\.|…|\s)*$/i;
+  const TIMESTAMP_TEXT = /^(?:\d+\s*(?:小時|分鐘|秒|天|週|年|h|m|s|d|w|y|hours?|mins?|days?|ago|前)|\d+\s*[小時分鐘秒天週年hmsdwy]\s*(?:前|ago)?)$/i;
   const baseHref = () => typeof location !== "undefined" ? location.href : "https://www.instagram.com/";
 
   function parsePermalink(value) {
@@ -33,7 +34,10 @@
 
   function isMoreControl(node) {
     if (!node || node.getAttribute?.("aria-haspopup")) return false;
-    return MORE_TEXT.test(String(node.innerText || node.textContent || "").trim());
+    if (node.closest?.('header, nav, time')) return false;
+    const text = String(node.innerText || node.textContent || "").trim();
+    if (!text || text.length > 25) return false;
+    return MORE_TEXT.test(text);
   }
 
   function postLinksIn(node) {
@@ -164,50 +168,101 @@
     };
   }
 
+  function cleanCaptionText(rawText, author) {
+    if (!rawText) return "";
+    let txt = rawText.trim();
+    // Strip leading action bar text (讚, 回應, 1轉發, 分享, 儲存, etc.)
+    txt = txt.replace(/^(?:(?:\d+\s*)?(?:讚|回應|轉發|分享|儲存|Like|Likes|Reply|Replies|Repost|Share|Save)\s*\n+)+/gim, '').trim();
+    if (author) {
+      txt = txt.replace(new RegExp(`^@?${author}\\s*`, 'i'), '').trim();
+    }
+    // Strip any remaining action bar labels
+    txt = txt.replace(/^(?:(?:\d+\s*)?(?:讚|回應|轉發|分享|儲存|Like|Likes|Reply|Replies|Repost|Share|Save)\s*\n+)+/gim, '').trim();
+    // Strip trailing action labels: ... 更多, 翻譯年糕, 查看翻譯, See translation
+    txt = txt.replace(/(?:(?:\.\.\.|…)?\s*(?:更多|顯示更多|查看更多|more|see more|翻譯年糕|See translation|查看翻譯)\s*)+$/i, '').trim();
+    // Strip trailing comment counters like 查看全部 1 則留言
+    txt = txt.replace(/(?:\n|^)(?:查看全部\s*\d+\s*則留言|View all\s*\d+\s*comments?)(?:\n|$).*$/is, '').trim();
+    return txt;
+  }
+
   function textForPost(container, author) {
-    const moreBtn = Array.from(container.querySelectorAll('button, [role="button"], span')).find(isMoreControl);
-    if (moreBtn && typeof moreBtn.click === "function") {
-      try { moreBtn.click(); } catch (_) {}
-    }
+    const isSingleDialog = Boolean(container.closest?.('div[role="dialog"]') || container.matches?.('div[role="dialog"]'));
 
-    // 1. Direct Instagram caption containers (h1 in post modal, div._a9zs / span._a9zs in feed/dialog)
-    const captionNode = container.querySelector('h1, div._a9zs, span._a9zs, div._a9zm span, ul li div._a9zs, ul li h1, ul li span[dir="auto"]');
-    if (captionNode && visible(captionNode)) {
-      const txt = structuredText(captionNode);
-      if (txt && !ACTION_TEXT.test(txt)) {
-        // Strip author handle if prefixed at the very beginning of the caption
-        const cleanTxt = author ? txt.replace(new RegExp(`^@?${author}\\s*`, 'i'), '') : txt;
-        if (cleanTxt.trim()) return cleanTxt.trim();
+    // 1. Single Post Dialog / Modal: Caption is in h1 or first list item of the comments list
+    if (isSingleDialog) {
+      const h1Node = container.querySelector('h1');
+      if (h1Node && visible(h1Node)) {
+        const txt = cleanCaptionText(structuredText(h1Node), author);
+        if (txt && !ACTION_TEXT.test(txt) && !TIMESTAMP_TEXT.test(txt)) return txt;
       }
-    }
 
-    // 2. Candidate caption spans inside post body/dialog
-    const candidateSpans = Array.from(container.querySelectorAll('div._a9zr span, div._a9zs span, span._aacu, div[dir="auto"], span[dir="auto"]'))
-      .filter((node) => {
-        if (!visible(node)) return false;
-        if (node.closest('nav, aside, ul[class*="comment"] > li:not(:first-child), div[role="menu"]')) return false;
-        const text = String(node.innerText || node.textContent || "").trim();
-        if (!text || text.length < 2) return false;
-        if (ACTION_TEXT.test(text)) return false;
-        if (/(?:首頁|Reel|訊息|搜尋|通知|建立|主控板|個人檔案|Meta|翻譯年糕|為你推薦|贊助|原始音訊|讚|留言|分享|儲存|Home|Explore|Messages|Notifications|Create|Profile|Sponsored|Suggested|Likes|Comments)/i.test(text)) return false;
-        return true;
-      });
-
-    if (candidateSpans.length > 0) {
-      for (const span of candidateSpans) {
-        const txt = structuredText(span);
-        const cleanTxt = author ? txt.replace(new RegExp(`^@?${author}\\s*`, 'i'), '') : txt;
-        if (cleanTxt.trim() && cleanTxt.trim().length > 2 && !ACTION_TEXT.test(cleanTxt)) {
-          return cleanTxt.trim();
+      // In modal/dialog, the caption is strictly the first item in the comments list (or div._a9zm)
+      const firstItem = container.querySelector('ul > div > li:first-child, ul > li:first-child, div._a9zm, div._a9zr');
+      if (firstItem && visible(firstItem)) {
+        // Exclude if it's a comment from a different user when post author is known
+        const userLink = firstItem.querySelector('a[href^="/"]');
+        const userHandle = userLink ? normalizeHandle(userLink.getAttribute("href")?.split("/")?.[1]) : "";
+        if (!author || !userHandle || userHandle === normalizeHandle(author)) {
+          const txt = cleanCaptionText(structuredText(firstItem), author);
+          if (txt && !ACTION_TEXT.test(txt) && !TIMESTAMP_TEXT.test(txt)) return txt;
         }
       }
     }
 
-    // 3. Thumbnail alt fallback (contains Instagram caption text on grid thumbnails)
+    // 2. Feed Post: Find caption block associated with the post author
+    if (author) {
+      const authorLinks = Array.from(container.querySelectorAll(`a[href^="/${author}/"], a[href^="/${author}"], a[href*="instagram.com/${author}"]`))
+        .filter((node) => visible(node) && !node.closest('header, nav, time, button, svg'));
+
+      for (const link of authorLinks) {
+        let captionBlock = link.closest('div, span, p');
+        if (captionBlock === link) captionBlock = link.parentElement;
+        while (captionBlock && captionBlock.parentElement && captionBlock.parentElement !== container) {
+          const parent = captionBlock.parentElement;
+          if (parent.matches?.('article, div[role="dialog"]') || parent.tagName === "HEADER") break;
+          // Do not climb into containers that include the action bar (like/comment/share icons)
+          if (parent.querySelector('svg[aria-label*="讚"], svg[aria-label*="Like"], svg[aria-label*="留言"], svg[aria-label*="Comment"]')) break;
+          const parentText = structuredText(parent);
+          if (/^(?:讚|回應|轉發|分享|儲存|Like|Comment)/i.test(parentText.trim())) break;
+          captionBlock = parent;
+        }
+
+        if (captionBlock) {
+          const txt = cleanCaptionText(structuredText(captionBlock), author);
+          if (txt && txt.length > 1 && !ACTION_TEXT.test(txt) && !TIMESTAMP_TEXT.test(txt)) {
+            return txt;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: Search candidate caption spans inside post body (excluding header, time, comments)
+    const candidateNodes = Array.from(container.querySelectorAll('div._a9zs, span._a9zs, span._aacu, div[dir="auto"], span[dir="auto"], div._a72d'))
+      .filter((node) => {
+        if (!visible(node)) return false;
+        if (node.closest('header, nav, aside, time, button, ul > li:not(:first-child), div[role="menu"]')) return false;
+        const text = String(node.innerText || node.textContent || "").trim();
+        if (!text || text.length < 2) return false;
+        if (ACTION_TEXT.test(text) || TIMESTAMP_TEXT.test(text)) return false;
+        if (/(?:首頁|Reel|訊息|搜尋|通知|建立|主控板|個人檔案|Meta|翻譯年糕|為你推薦|贊助|原始音訊|讚|留言|分享|儲存|Home|Explore|Messages|Notifications|Create|Profile|Sponsored|Suggested|Likes|Comments|查看全部.*則留言|View all.*comments|加強推廣貼文|查看洞察報告)/i.test(text)) return false;
+        return true;
+      });
+
+    // Sort candidates by text length descending so full caption is preferred over small fragments
+    candidateNodes.sort((a, b) => (structuredText(b).length - structuredText(a).length));
+
+    for (const node of candidateNodes) {
+      const txt = cleanCaptionText(structuredText(node), author);
+      if (txt && txt.length > 2 && !ACTION_TEXT.test(txt) && !TIMESTAMP_TEXT.test(txt)) {
+        return txt;
+      }
+    }
+
+    // 4. Thumbnail alt fallback (contains Instagram caption text on grid thumbnails)
     const imgAlt = container.querySelector('img[alt]')?.getAttribute('alt') || "";
     if (imgAlt && imgAlt.length > 10) {
       const cleaned = imgAlt.replace(/^Photo by .+? on .+\.(?:\s*May be an image of .+?\.)?\s*/i, '').trim();
-      if (cleaned && !ACTION_TEXT.test(cleaned)) return cleaned;
+      if (cleaned && !ACTION_TEXT.test(cleaned) && !TIMESTAMP_TEXT.test(cleaned)) return cleaned;
     }
 
     return "";
@@ -233,6 +288,7 @@
     const media = mediaForPost(container);
     const textContent = textForPost(container, author);
     const expected = normalizeHandle(expectedHandle);
+    const hasMore = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).some((el) => visible(el) && isMoreControl(el));
 
     return {
       platform: "instagram",
@@ -244,17 +300,19 @@
       publishedAt,
       timestamp: publishedAt,
       isOwnAuthor: expected && author ? normalizeHandle(author) === expected : true,
-      contentExpanded: true,
+      contentExpanded: !hasMore,
       mediaUrls: media.urls,
       media: media.meta
     };
   }
 
   async function expandAndExtract(container, expectedHandle) {
-    const more = Array.from(container.querySelectorAll('[role="button"], button')).find(isMoreControl);
-    if (more) {
-      try { more.click(); } catch (_) {}
-      await new Promise((resolve) => setTimeout(resolve, 250));
+    const moreControls = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).filter((el) => visible(el) && isMoreControl(el));
+    for (const more of moreControls) {
+      try { if (typeof more.click === "function") more.click(); } catch (_) {}
+    }
+    if (moreControls.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
     }
     let payload = extract(container, expectedHandle);
     if (!payload?.media?.album || payload.media.albumComplete !== false) return payload;
@@ -430,34 +488,36 @@
 
   async function openComposerAndFill(text, imageUrl) {
     const labels = /new post|create|新增貼文|建立|發佈|貼文/i;
-    const elements = Array.from(document.querySelectorAll('svg, a, div[role="button"], [role="link"], span, button'));
-    let clickTarget = null;
-    for (const el of elements) {
-      const label = [
-        el.getAttribute("aria-label"),
-        el.getAttribute("title"),
-        el.innerText || el.textContent
-      ].filter(Boolean).join(" ");
-      if (labels.test(label) && label.length < 40 && visible(el)) {
-        clickTarget = el.closest('a, button, div[role="button"], div[role="menuitem"]') || el;
-        break;
+    // 1. Look specifically for the Create / New Post button on the left sidebar
+    const createIcons = Array.from(document.querySelectorAll('svg[aria-label*="New post" i], svg[aria-label*="建立" i], svg[aria-label*="Create" i], svg[aria-label*="貼文" i]'));
+    let clickTarget = createIcons.find(visible)?.closest('a, button, div[role="button"], div[role="menuitem"]');
+
+    if (!clickTarget) {
+      const elements = Array.from(document.querySelectorAll('a, button, div[role="button"], div[role="menuitem"], [role="link"], span'));
+      for (const el of elements) {
+        const label = [
+          el.getAttribute("aria-label"),
+          el.getAttribute("title"),
+          el.innerText || el.textContent
+        ].filter(Boolean).join(" ");
+        if (labels.test(label) && label.length < 30 && visible(el)) {
+          clickTarget = el.closest('a, button, div[role="button"], div[role="menuitem"]') || el;
+          break;
+        }
       }
     }
+
     if (clickTarget) {
       clickTarget.click();
-    } else {
-      const svg = Array.from(document.querySelectorAll('svg[aria-label*="New post" i], svg[aria-label*="建立" i], svg[aria-label*="Create" i]')).find(visible);
-      const target = svg?.closest('a, button, div') || svg;
-      target?.click();
     }
 
-    // If Instagram opened a submenu with "貼文" / "Post", click it
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const subMenuItem = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="menu"] div[role="button"], span, div')).find((el) => {
+    // 2. If Instagram opened a submenu with "貼文" / "Post", click it
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const subMenuItem = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="menu"] div[role="button"], [role="menuitem"], span, div')).find((el) => {
       const text = (el.innerText || el.textContent || "").trim();
       return (text === "貼文" || text === "Post") && visible(el);
     });
-    subMenuItem?.closest('div[role="button"], a, button')?.click();
+    subMenuItem?.closest('div[role="button"], a, button, [role="menuitem"]')?.click();
 
     let imageAttached = false;
     if (imageUrl) {
@@ -471,6 +531,7 @@
             transfer.items.add(file);
             fileInput.files = transfer.files;
             fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+            fileInput.dispatchEvent(new Event("input", { bubbles: true }));
             imageAttached = true;
             break;
           }
