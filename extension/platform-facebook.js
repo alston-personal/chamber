@@ -492,10 +492,16 @@
     if (!seed) return null;
     for (const { node } of ancestors(seed, 28)) {
       if (!node || node === document.body || node === document.documentElement || isCommentNode(node)) continue;
+      // Do not climb into outer feed columns containing multiple articles
+      if (node.querySelectorAll?.('div[role="article"]').length > 1) break;
+      const links = Array.from(node.querySelectorAll?.(permalinkSelector) || []);
+      const uniqueCodes = unique(links.map((l) => parsePermalink(l.href)?.shortcode).filter(Boolean));
+      if (uniqueCodes.length > 1) break;
+
       const hasStoryMessage = node.querySelector?.(messageSelector);
       const hasPostAction = node.querySelector?.('[aria-label*="這則貼文採取的動作"], [aria-label*="post actions"], [data-ad-rendering-role="story_message"]');
       const hasPostControl = node.querySelector?.('[aria-label="讚"], [aria-label="留言"], [data-ad-rendering-role="comment_button"]');
-      if ((hasStoryMessage || hasPostAction) && hasPostControl) return node;
+      if (node.matches?.('div[role="article"]') || ((hasStoryMessage || hasPostAction) && hasPostControl)) return node;
     }
     return null;
   }
@@ -552,11 +558,19 @@
     if (!target || target === document.documentElement || target === document.body) return null;
     if (isCommentNode(target)) return null;
 
+    // Reject giant layout containers directly
+    if (target.matches?.('div[role="main"], div[role="feed"], div[data-pagelet*="ProfileTilesFeed"], div[data-pagelet="root"], div[data-pagelet="ProfileTabs"]')) {
+      return null;
+    }
+
+    const directArticle = target.closest?.('div[role="article"]');
+    // Ensure directArticle is a single post node (not a parent container wrapping other articles)
+    const singleArticle = directArticle && !directArticle.querySelector('div[role="article"]') ? directArticle : null;
+
     const directMessage = target.closest?.(messageSelector);
     const media = !directMessage && target.closest?.('img, video');
     const genericText = !directMessage && !media && target.closest?.(textSelector);
-    const linkCard = target.closest?.('a[target="_blank"], a[href*="http"], div[role="article"] a');
-    const articleContainer = target.closest?.('div[role="article"], div[data-pagelet*="FeedUnit"]');
+    const linkCard = target.closest?.('a[target="_blank"][href*="http"], a[href*="pfbid"], a[href*="/posts/"], a[href*="/permalink/"]');
 
     const seed = directMessage
       || (media && (() => {
@@ -565,16 +579,23 @@
       })())
       || (genericText && !isCommentNode(genericText) ? genericText : null)
       || linkCard
-      || articleContainer;
+      || singleArticle
+      || directArticle;
 
     if (!seed) return null;
 
-    const story = articleContainer || storyContainerFor(seed);
+    let story = storyContainerFor(seed) || singleArticle || directArticle;
     if (!story) return null;
-    const message = directMessage || (genericText && !isCommentNode(genericText) ? genericText : null) || story.querySelector(messageSelector) || linkCard;
 
-    let link = null;
-    link = choosePostLink(Array.from(story.querySelectorAll(permalinkSelector)));
+    // Guard: story must NEVER be the entire feed or outer page column
+    const permalinks = Array.from(story.querySelectorAll(permalinkSelector));
+    const permalinkCodes = unique(permalinks.map((l) => parsePermalink(l.href)?.shortcode).filter(Boolean));
+    if (permalinkCodes.length > 1 && directArticle && directArticle !== story) {
+      story = directArticle;
+    }
+
+    const message = directMessage || (genericText && !isCommentNode(genericText) ? genericText : null) || story.querySelector(messageSelector) || linkCard;
+    let link = choosePostLink(Array.from(story.querySelectorAll(permalinkSelector)));
     return {
       link,
       message: message || null,
