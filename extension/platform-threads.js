@@ -360,23 +360,31 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        // 1. Clear any placeholder
+        // 1. Build Lexical-compatible HTML paragraph structure directly
+        const lines = text.split('\n');
+        const html = lines.map((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<p class="x126k92a"><br></p>';
+          return `<p class="x126k92a"><span data-lexical-text="true">${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>`;
+        }).join('');
+        editor.innerHTML = html;
+
+        // 2. Dispatch Synthetic ClipboardEvent paste
         try {
-          document.execCommand('selectAll', false, null);
+          const dt = new DataTransfer();
+          dt.setData('text/plain', text);
+          editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
         } catch (_) {}
 
-        // 2. Insert line-by-line with native insertParagraph & insertText
-        const lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (i > 0) {
-            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
-          }
-          if (lines[i]) {
-            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
-          }
-        }
-
-        // 3. Dispatch input event to commit state to React
+        // 3. Dispatch InputEvents
+        try {
+          editor.dispatchEvent(new InputEvent('beforeinput', {
+            inputType: 'insertText',
+            data: text,
+            bubbles: true,
+            cancelable: true
+          }));
+        } catch (_) {}
         try {
           editor.dispatchEvent(new InputEvent('input', {
             inputType: 'insertText',

@@ -1025,7 +1025,7 @@ rebornGenerate?.addEventListener("click", async () => {
     const alias = profile?.alias || "chamber";
     const timelinePlatform = platform === "threads" ? "threads" : platform === "instagram" ? "instagram" : platform === "x" ? "x" : "facebook";
     const timelineUrl = `https://studio.milkcat.org/echo/${encodeURIComponent(alias)}/${timelinePlatform}?ref=${encodeURIComponent(alias)}`;
-    const card = await ChamberDeclaration.generateCard({ timelineUrl, alias });
+    const card = await ChamberDeclaration.generateCard({ timelineUrl, alias, theme: currentTheme || "leopard" });
 
     // Always copy declaration text to clipboard for manual paste if needed
     try {

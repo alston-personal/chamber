@@ -52,7 +52,10 @@
 
   function postContainerFor(target) {
     if (!target) return null;
-    const direct = target.closest?.('article, div[role="dialog"] article, div[role="dialog"]');
+    const dialog = target.closest?.('div[role="dialog"], [role="presentation"]');
+    if (dialog) return dialog.querySelector('article') || dialog;
+
+    const direct = target.closest?.('article');
     if (direct) return direct;
 
     const directLink = target.closest?.(POST_LINK_SELECTOR);
@@ -460,6 +463,16 @@
 
   function startPicker(pageUrl, expectedHandle) {
     return new Promise((resolve) => {
+      // 1. Instant check: If an Instagram post modal is already open, extract it immediately!
+      const openDialog = document.querySelector('div[role="dialog"] article, div[role="dialog"], article[role="presentation"]');
+      if (openDialog && visible(openDialog)) {
+        const payload = extract(openDialog, expectedHandle);
+        if (payload && (payload.textContent || payload.mediaUrls?.length)) {
+          resolve(payload);
+          return;
+        }
+      }
+
       document.documentElement.setAttribute("data-chamber-picker-session", "active");
       let banner = document.getElementById("chamber-picker-banner");
       if (!banner) {
