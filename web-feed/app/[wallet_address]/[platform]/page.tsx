@@ -59,7 +59,7 @@ interface EncryptedBlob {
 }
 
 const TIMELINE_THEMES = [
-  { id: "obsidian", name: "極簡黑曜", icon: "⬛", desc: "鈦灰石墨經典沉穩", badge: "經典" },
+  { id: "leopard", name: "台灣石虎", icon: "🐯", desc: "暖金石虎萌系靈獸", badge: "標準" },
   { id: "cyber", name: "賽博霓光", icon: "🌌", desc: "深空宇宙星夜霓虹", badge: "極客" },
   { id: "amber", name: "復古暖琥珀", icon: "🍂", desc: "復古牛皮紙典雅暖光", badge: "質感" },
   { id: "emerald", name: "深林青翠", icon: "🌿", desc: "自然翡翠沉靜深綠", badge: "靜謐" },

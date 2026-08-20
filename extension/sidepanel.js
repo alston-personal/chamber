@@ -1800,6 +1800,14 @@ async function selectPost() {
     postListEl.replaceChildren();
     const card = document.createElement("div");
     card.className = "post";
+
+    if (payload.isSharedPost) {
+      const shareBadge = document.createElement("div");
+      shareBadge.style.cssText = "font-size:11px;color:#f59e0b;background:rgba(245,158,11,0.15);padding:4px 8px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;gap:6px;border:1px solid rgba(245,158,11,0.3);font-weight:bold;";
+      shareBadge.innerHTML = `<span>🔄</span><span>轉發分享貼文${payload.sharedAuthor ? `（原內容作者：${payload.sharedAuthor}）` : ""}</span>`;
+      card.appendChild(shareBadge);
+    }
+
     const text = document.createElement("div");
     text.className = "post-text";
     text.textContent = payload.textContent || t("post.selectedNoTextPlatform", { platform: platformName(platform) });

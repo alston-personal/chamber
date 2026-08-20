@@ -617,8 +617,20 @@
       }
     }
 
+    // Detect if this post is a shared/reshared post containing another author's content
+    const subStory = root.querySelector('div[role="article"] div[role="article"], div[data-ad-preview="message"], div[class*="x1yztbdb"]');
+    const isSharedPost = Boolean(subStory && subStory !== root);
+    let sharedAuthor = "";
+    if (isSharedPost && subStory) {
+      const subAuthorNode = subStory.querySelector('strong, h4 a, h3 a, a[role="link"] span, span[dir="auto"]');
+      sharedAuthor = (subAuthorNode?.innerText || subAuthorNode?.textContent || "").trim();
+      if (/^(讚|留言|分享|like|comment|share)$/i.test(sharedAuthor)) sharedAuthor = "";
+    }
+
     return {
       textContent,
+      isSharedPost,
+      sharedAuthor,
       media: {
         primary_fb_cdn: mediaUrl,
         fallback_backup: "",
