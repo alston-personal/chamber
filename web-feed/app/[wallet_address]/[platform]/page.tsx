@@ -3178,12 +3178,10 @@ export default function PlatformFeed({
 
               {/* Skin Options */}
               <div className="space-y-3">
-                {/* 1. Taiwan Leopard Cat (Pro) */}
+                {/* 1. Taiwan Leopard Cat (Standard & Mascot) */}
                 <div
                   onClick={() => setSavedWallSkin("leopard")}
-                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
-                    savedWallSkin === "leopard" ? "border-amber-400 bg-amber-950/30 shadow-lg shadow-amber-500/10" : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
-                  }`}
+                  className="p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 border-amber-400 bg-amber-950/30 shadow-lg shadow-amber-500/10"
                 >
                   <img
                     src="/echo/leopardcat/sitting.jpg"
@@ -3193,38 +3191,14 @@ export default function PlatformFeed({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-amber-200">{ft("skinLeopard")}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">PRO</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">DEFAULT</span>
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
                       {locale === "zh-TW" ? "包含 3D 萌系警戒坐姿、點擊翻肚肚露出粉紅肉球、文章在肚皮上展開。" : "3D cute sitting mascot, click to roll over and read on fluffy belly with pink toe beans."}
                     </p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${savedWallSkin === "leopard" ? "border-amber-400 bg-amber-500 text-slate-950 font-black text-xs" : "border-slate-700"}`}>
-                    {savedWallSkin === "leopard" && "✓"}
-                  </div>
-                </div>
-
-                {/* 2. Classic Obsidian */}
-                <div
-                  onClick={() => setSavedWallSkin("classic")}
-                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
-                    savedWallSkin === "classic" ? "border-sky-400 bg-sky-950/30 shadow-lg shadow-sky-500/10" : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-700 flex items-center justify-center text-2xl shrink-0">
-                    📄
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-200">{ft("skinClassic")}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">FREE</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                      {locale === "zh-TW" ? "極簡石墨鈦灰卡片，專業乾淨的 Web3 去中心化社群歸檔佈局。" : "Minimalist obsidian card layout, clean decentralized Web3 social archive."}
-                    </p>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${savedWallSkin === "classic" ? "border-sky-400 bg-sky-500 text-slate-950 font-black text-xs" : "border-slate-700"}`}>
-                    {savedWallSkin === "classic" && "✓"}
+                  <div className="w-5 h-5 rounded-full border border-amber-400 bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                    ✓
                   </div>
                 </div>
               </div>

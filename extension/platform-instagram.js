@@ -298,10 +298,14 @@
     if (!own) return null;
 
     const parsed = own.parsed;
-    const author = extractAuthorFrom(container) || (expectedHandle ? normalizeHandle(expectedHandle) : "") || normalizeHandle(getAccountContext()?.handle) || "me";
+    const author = extractAuthorFrom(container) || (expectedHandle ? normalizeHandle(expectedHandle) : "") || normalizeHandle(getAccountContext()?.handle) || "";
     const publishedAt = extractPublishedAt(container) || Math.floor(Date.now() / 1000);
     const media = mediaForPost(container);
     const textContent = textForPost(container, author);
+    const currentAccount = normalizeHandle(getAccountContext()?.handle);
+    const expected = normalizeHandle(expectedHandle);
+    const normalizedAuthor = normalizeHandle(author);
+    const isOwn = !normalizedAuthor || (currentAccount && normalizedAuthor === currentAccount) || (expected && normalizedAuthor === expected);
     const hasMore = Array.from(container.querySelectorAll('[role="button"], button, span, div, a')).some((el) => visible(el) && isMoreControl(el));
 
     return {
@@ -313,7 +317,7 @@
       authorUrl: author ? `https://www.instagram.com/${encodeURIComponent(author)}/` : "https://www.instagram.com/",
       publishedAt,
       timestamp: publishedAt,
-      isOwnAuthor: true,
+      isOwnAuthor: isOwn,
       contentExpanded: !hasMore,
       mediaUrls: media.urls,
       media: media.meta
@@ -327,14 +331,26 @@
 
     // If selected node is a profile grid thumbnail, click it to open the post dialog for full extraction
     const isGridThumb = Boolean(container.closest?.('div._aabd, div[style*="aspect-ratio"]') || (container.tagName === "A" && container.href.includes("/p/")));
+    let openedDialog = false;
     if (isGridThumb && !container.closest?.('article, div[role="dialog"]')) {
       if (initialLink) {
-        initialLink.click();
-        for (let i = 0; i < 20; i++) {
+        const rect = initialLink.getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+        const opts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+        initialLink.dispatchEvent(new PointerEvent('pointerdown', opts));
+        initialLink.dispatchEvent(new MouseEvent('mousedown', opts));
+        initialLink.dispatchEvent(new PointerEvent('pointerup', opts));
+        initialLink.dispatchEvent(new MouseEvent('mouseup', opts));
+        initialLink.dispatchEvent(new MouseEvent('click', opts));
+        if (typeof initialLink.click === 'function') initialLink.click();
+
+        for (let i = 0; i < 30; i++) {
           await new Promise((r) => setTimeout(r, 100));
           const dialog = document.querySelector('div[role="dialog"] article, div[role="dialog"]');
           if (dialog) {
             targetScope = dialog;
+            openedDialog = true;
             break;
           }
         }
@@ -349,30 +365,33 @@
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
     let payload = extract(targetScope, expectedHandle, initialHref);
-    if (!payload?.media?.album || payload.media.albumComplete !== false) return payload;
-    const collected = [...payload.mediaUrls];
-    const expected = payload.media.albumExpectedCount || 0;
+    if (payload?.media?.album && payload.media.albumComplete === false) {
+      const collected = [...payload.mediaUrls];
+      const expected = payload.media.albumExpectedCount || 0;
 
-    for (let attempt = 0; attempt < Math.min(Math.max(expected || 0, 10), 30); attempt += 1) {
-      const next = Array.from(targetScope.querySelectorAll('button[aria-label*="Next" i], button[aria-label*="下一張" i], div[role="button"][aria-label*="Next" i]')).find(visible);
-      if (!next) break;
-      try { next.click(); } catch (_) {}
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      const current = extract(targetScope, expectedHandle);
-      const before = collected.length;
-      for (const url of current?.mediaUrls || []) if (!collected.includes(url)) collected.push(url);
-      if ((expected && collected.length >= expected) || (!expected && collected.length === before)) break;
-      payload = current || payload;
+      for (let attempt = 0; attempt < Math.min(Math.max(expected || 0, 10), 30); attempt += 1) {
+        const next = Array.from(targetScope.querySelectorAll('button[aria-label*="Next" i], button[aria-label*="下一張" i], div[role="button"][aria-label*="Next" i]')).find(visible);
+        if (!next) break;
+        try { next.click(); } catch (_) {}
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const current = extract(targetScope, expectedHandle);
+        const before = collected.length;
+        for (const url of current?.mediaUrls || []) if (!collected.includes(url)) collected.push(url);
+        if ((expected && collected.length >= expected) || (!expected && collected.length === before)) break;
+        payload = current || payload;
+      }
     }
-    payload.mediaUrls = collected;
-    payload.media = {
-      ...payload.media,
-      primary_fb_cdn: collected[0] || payload.media.primary_fb_cdn || "",
-      album: true,
-      albumLoadedCount: collected.length,
-      albumExpectedCount: expected || collected.length,
-      albumComplete: !expected || collected.length >= expected
-    };
+
+    // If opened dialog for profile thumbnail extraction, automatically close the popup dialog
+    if (openedDialog) {
+      const closeBtn = document.querySelector('div[role="dialog"] [aria-label*="關閉" i], div[role="dialog"] [aria-label*="Close" i], svg[aria-label*="關閉" i]');
+      if (closeBtn) {
+        try { closeBtn.closest('button, div[role="button"]')?.click(); } catch (_) {}
+      } else {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+      }
+    }
+
     return payload;
   }
 

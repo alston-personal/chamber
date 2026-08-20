@@ -12,22 +12,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Theme Engine Presets */
-:root, [data-theme="obsidian"] {
-  --bg-page: #0b0f17;
-  --bg-card: rgba(17, 24, 39, 0.95);
-  --border-card: #1e293b;
-  --border-card-hover: #38bdf8;
-  --accent-primary: #38bdf8;
-  --accent-text: #7dd3fc;
-  --accent-glow: rgba(56, 189, 248, 0.2);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --node-color: #64748b;
-  --tag-bg: #0f172a;
-}
-
-[data-theme="leopard"], [data-skin="leopard"] {
+/* Theme Engine - Default Taiwan Leopard Cat Theme */
+:root, [data-theme="leopard"], [data-skin="leopard"], [data-theme="obsidian"] {
   --bg-page: #0c0a09;
   --bg-card: rgba(28, 25, 23, 0.95);
   --border-card: #44403c;

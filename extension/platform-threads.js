@@ -360,28 +360,30 @@
         textbox.value = text;
         textbox.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
+        // 1. Clear any placeholder
         try {
-          const sel = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(editor);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
+          document.execCommand('selectAll', false, null);
         } catch (_) {}
 
-        // 1. Native paste execution (Chrome clipboardRead enabled)
-        try {
-          document.execCommand('paste');
-        } catch (_) {}
-
-        // 2. Direct execCommand insertText fallback
-        const cur = (editor.innerText || editor.textContent || "").trim();
-        if (!cur || cur === "有什麼新鮮事？" || cur === "有什麼新鮮事") {
-          try {
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, text);
-          } catch (_) {}
+        // 2. Insert line-by-line with native insertParagraph & insertText
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (i > 0) {
+            try { document.execCommand('insertParagraph', false, null); } catch (_) {}
+          }
+          if (lines[i]) {
+            try { document.execCommand('insertText', false, lines[i]); } catch (_) {}
+          }
         }
+
+        // 3. Dispatch input event to commit state to React
+        try {
+          editor.dispatchEvent(new InputEvent('input', {
+            inputType: 'insertText',
+            data: text,
+            bubbles: true
+          }));
+        } catch (_) {}
       }
       return true;
     };
