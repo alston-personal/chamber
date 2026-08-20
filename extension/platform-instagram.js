@@ -288,7 +288,7 @@
     let own = null;
     if (preferredSourceUrl) {
       const pref = parsePermalink(preferredSourceUrl);
-      if (pref) own = candidates.find(({ parsed }) => parsed.shortcode === pref.shortcode);
+      if (pref) own = candidates.find(({ parsed }) => parsed.shortcode === pref.shortcode) || { link: null, parsed: pref };
     }
     own ||= candidates.find(({ link }) => postContainerFor(link) === container) || candidates[0];
     if (!own) {
@@ -326,13 +326,14 @@
 
   async function expandAndExtract(container, expectedHandle) {
     let targetScope = container;
+    const initialLink = container.matches?.('a[href*="/p/"], a[href*="/reel/"]') ? container : container.querySelector?.('a[href*="/p/"], a[href*="/reel/"]');
+    const initialHref = initialLink?.href || "";
 
     // If selected node is a profile grid thumbnail, click it to open the post dialog for full extraction
     const isGridThumb = Boolean(container.closest?.('div._aabd, div[style*="aspect-ratio"]') || (container.tagName === "A" && container.href.includes("/p/")));
     if (isGridThumb && !container.closest?.('article, div[role="dialog"]')) {
-      const link = container.matches?.('a[href*="/p/"], a[href*="/reel/"]') ? container : container.querySelector?.('a[href*="/p/"], a[href*="/reel/"]');
-      if (link) {
-        link.click();
+      if (initialLink) {
+        initialLink.click();
         for (let i = 0; i < 20; i++) {
           await new Promise((r) => setTimeout(r, 100));
           const dialog = document.querySelector('div[role="dialog"] article, div[role="dialog"]');
@@ -351,7 +352,7 @@
     if (moreControls.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
-    let payload = extract(targetScope, expectedHandle);
+    let payload = extract(targetScope, expectedHandle, initialHref);
     if (!payload?.media?.album || payload.media.albumComplete !== false) return payload;
     const collected = [...payload.mediaUrls];
     const expected = payload.media.albumExpectedCount || 0;
@@ -620,7 +621,16 @@
       }) || (allTopElements.length > 0 ? allTopElements[allTopElements.length - 1].closest('div[role="button"], button, div') : null);
 
       if (nextBtn) {
-        nextBtn.click();
+        const rect = nextBtn.getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+        const opts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+        nextBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
+        nextBtn.dispatchEvent(new MouseEvent('mousedown', opts));
+        nextBtn.dispatchEvent(new PointerEvent('pointerup', opts));
+        nextBtn.dispatchEvent(new MouseEvent('mouseup', opts));
+        nextBtn.dispatchEvent(new MouseEvent('click', opts));
+        if (typeof nextBtn.click === 'function') nextBtn.click();
         await new Promise((resolve) => setTimeout(resolve, 600));
       }
     }

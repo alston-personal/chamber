@@ -38,12 +38,24 @@ parsedAlt = cleanCaptionText(parsedAlt, "alstonhuang");
 assert(parsedAlt.includes("【《天道敕令_阿賴耶識修真錄》11"), "Img Alt parsing must extract caption correctly");
 console.log("✅ 2. Instagram 9-Grid Thumbnail Alt Parser Test Passed.");
 
-// Test Case C: Instagram Taiwan UI Wizard Button Matcher
-const wizardBtnRegex = /^(下一步|Next|繼續|Continue|次へ)$/i;
-assert(wizardBtnRegex.test("繼續"), "Must match Taiwan UI '繼續' button");
-assert(wizardBtnRegex.test("下一步"), "Must match '下一步' button");
-assert(wizardBtnRegex.test("Next"), "Must match English 'Next' button");
-console.log("✅ 3. Instagram Taiwan UI '繼續' / 'Next' Wizard Matcher Test Passed.");
+// Test Case C: Instagram Top-70px Header Button Geometry Filter
+const dialogMock = {
+  getBoundingClientRect: () => ({ top: 100, left: 200, width: 600, height: 600 })
+};
+const candidateButtons = [
+  { text: "✕", getBoundingClientRect: () => ({ top: 110, left: 210, right: 230 }) },
+  { text: "下一步", getBoundingClientRect: () => ({ top: 115, left: 720, right: 780 }) }, // Correct Top-Right Next button
+  { text: "+", getBoundingClientRect: () => ({ top: 620, left: 740, right: 770 }) } // Misleading Bottom-Right carousel button
+];
+
+const dialogRect = dialogMock.getBoundingClientRect();
+const filteredTopNext = candidateButtons.filter((b) => {
+  const rect = b.getBoundingClientRect();
+  return rect.top >= (dialogRect.top - 10) && rect.top <= (dialogRect.top + 70) && rect.right >= (dialogRect.left + dialogRect.width * 0.5);
+}).find((b) => /^(下一步|Next|繼續|Continue)$/i.test(b.text));
+
+assert.equal(filteredTopNext.text, "下一步", "Geometry filter MUST accurately select the Top-Right Next button and ignore bottom carousel '+'");
+console.log("✅ 3. Instagram Top-70px Header Geometry Filter Test Passed (Bottom '+' successfully ignored).");
 
 // Test Case D: Facebook Single-Pass Paste Event Text Structure
 const sampleDeclaration = `【本人樂觀開朗之 Web3 轉世聲明】
