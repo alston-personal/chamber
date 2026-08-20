@@ -605,9 +605,9 @@
     const publishedAt = extractPublishedAt(root);
     let textContent = extractMessageText(message);
     if (!textContent) {
-      const linkCard = root.querySelector('a[target="_blank"][href*="l.facebook.com"], a[target="_blank"][href*="http"], a[rel*="nofollow"][target="_blank"]');
+      const linkCard = root.querySelector('a[target="_blank"][href*="l.facebook.com"], a[target="_blank"][href*="http"]:not([href*="facebook.com"])');
       if (linkCard) {
-        const cardTexts = Array.from(linkCard.querySelectorAll('span[dir="auto"], div[dir="auto"], span, div'))
+        const cardTexts = Array.from(linkCard.querySelectorAll('span[dir="auto"], div[dir="auto"]'))
           .map((el) => (el.innerText || el.textContent || "").trim())
           .filter((t) => t.length > 3 && !/^(facebook|讚|留言|分享|like|comment|share|查看洞察報告)$/i.test(t));
         const uniqueTexts = Array.from(new Set(cardTexts));
@@ -617,14 +617,34 @@
       }
     }
 
-    // Detect if this post is a shared/reshared post containing another author's content
-    const subStory = root.querySelector('div[role="article"] div[role="article"], div[data-ad-preview="message"], div[class*="x1yztbdb"]');
-    const isSharedPost = Boolean(subStory && subStory !== root);
+    // Sanitize textContent to strip any Facebook anti-scraping / encrypted span noise
+    if (textContent) {
+      const cleanLines = textContent.split('\n')
+        .map((l) => l.trim())
+        .filter((l) => {
+          if (!l) return false;
+          // Filter out base64 tracking strings like 9zanUFKdaRk7NTc2... or al1nvgLnXB.com
+          if (/^[A-Za-z0-9+/=]{15,}$/.test(l)) return false;
+          if (/[A-Za-z0-9_]{8,}\.com/i.test(l) && !l.includes(' ')) return false;
+          return true;
+        });
+      textContent = cleanLines.join('\n').trim();
+    }
+
+    // Detect if this post is a REAL shared post containing another creator's sub-article
+    const nestedArticles = Array.from(root.querySelectorAll('div[role="article"]'));
+    const subStory = nestedArticles.find((node) => node !== root && root.contains(node));
+    let isSharedPost = false;
     let sharedAuthor = "";
-    if (isSharedPost && subStory) {
-      const subAuthorNode = subStory.querySelector('strong, h4 a, h3 a, a[role="link"] span, span[dir="auto"]');
-      sharedAuthor = (subAuthorNode?.innerText || subAuthorNode?.textContent || "").trim();
-      if (/^(讚|留言|分享|like|comment|share)$/i.test(sharedAuthor)) sharedAuthor = "";
+    if (subStory) {
+      const authorNode = subStory.querySelector('h4 a, h3 a, a[role="link"] strong, strong');
+      const candidateAuthor = (authorNode?.innerText || authorNode?.textContent || "").trim();
+      if (candidateAuthor && candidateAuthor.length > 1 && candidateAuthor.length < 35 && !candidateAuthor.includes('\n')) {
+        if (!/^(讚|留言|分享|like|comment|share|查看洞察報告)$/i.test(candidateAuthor)) {
+          isSharedPost = true;
+          sharedAuthor = candidateAuthor;
+        }
+      }
     }
 
     return {
