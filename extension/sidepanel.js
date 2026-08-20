@@ -265,6 +265,21 @@ async function getActiveProfile(rawIdentity = null) {
     activeId = profiles[0].id;
     await chrome.storage.local.set({ activeChamberProfileId: activeId });
   }
+
+  // Auto-switch to the Chamber Profile bound to the current platform/actorId
+  if (raw?.actorId) {
+    const boundProfile = profiles.find((p) => 
+      p.ownerUserId === initialOwnerId ||
+      p.ownerUserId === raw.actorId ||
+      p.boundAccounts?.[raw.platform] === raw.actorId ||
+      (p.alias && p.alias.toLowerCase() === raw.actorId.toLowerCase())
+    );
+    if (boundProfile && boundProfile.id !== activeId) {
+      activeId = boundProfile.id;
+      await chrome.storage.local.set({ activeChamberProfileId: activeId });
+    }
+  }
+
   const activeProfile = profiles.find((profile) => profile.id === activeId);
   if (activeProfile && !activeProfile.ownerUserId) {
     activeProfile.ownerUserId = initialOwnerId;
