@@ -734,7 +734,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         setTimeout(() => {
             saveBtn.innerText = "💾 儲存成功！";
-            saveBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+            saveBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
           
           setTimeout(() => {
             saveBtn.innerText = "💾 儲存並套用";
@@ -938,13 +938,13 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("[Chamber] Copy text and image to clipboard successful.");
           
           genCardBtn.innerText = "✅ 複製成功 & 發文框已開啟！";
-          genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+          genCardBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
         } catch (clipErr) {
           console.warn("[Chamber] Multi-mime clipboard write failed:", clipErr);
           // Fallback to text-only copy
           await navigator.clipboard.writeText(textToCopy);
           genCardBtn.innerText = "✅ 複製聲明 & 發文框已開啟！";
-          genCardBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+          genCardBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
         }
       }, "image/png");
 

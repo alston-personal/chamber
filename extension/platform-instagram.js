@@ -627,6 +627,16 @@
             dt.setData('text/plain', text);
             captionBox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
           } catch (_) {}
+
+          setTimeout(() => {
+            const cur = (captionBox.innerText || captionBox.textContent || "").trim();
+            if (!cur || cur.length < 5) {
+              try {
+                document.execCommand('selectAll', false, null);
+                document.execCommand('insertText', false, text);
+              } catch (_) {}
+            }
+          }, 300);
         }
         break;
       }

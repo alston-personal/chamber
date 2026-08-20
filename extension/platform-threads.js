@@ -446,8 +446,8 @@
         toast.style.bottom = "24px";
         toast.style.left = "50%";
         toast.style.transform = "translateX(-50%)";
-        toast.style.background = "#10b981";
-        toast.style.color = "#022c22";
+        toast.style.background = "#f59e0b";
+        toast.style.color = "#1c1511";
         toast.style.padding = "10px 20px";
         toast.style.borderRadius = "9999px";
         toast.style.fontWeight = "bold";

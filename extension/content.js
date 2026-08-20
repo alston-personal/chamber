@@ -588,7 +588,7 @@ function handleBackupClick(btn, postEl) {
       btn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
     } else if (response && response.success) {
       btn.innerText = t("legacy.backedUp");
-      btn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+      btn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
       const echoUrl = response.echoUrl || "";
       if (echoUrl && btn.parentElement && !btn.parentElement.querySelector(".chamber-echo-link")) {
         const link = document.createElement("a");
