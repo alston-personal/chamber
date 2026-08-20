@@ -574,13 +574,23 @@
       } catch (_) {}
     }
 
-    // 3. Advance wizard from Crop -> Filter -> Caption (Support 繼續, 下一步, Next)
-    for (let step = 0; step < 2; step += 1) {
+    // 3. Advance wizard from Crop -> Filter -> Caption using structural DOM header positioning (Language-Agnostic)
+    for (let step = 0; step < 3; step += 1) {
       await new Promise((resolve) => setTimeout(resolve, 600));
-      const nextBtn = Array.from(document.querySelectorAll('div[role="dialog"] div[role="button"], div[role="dialog"] button, div[role="dialog"] [role="link"], header div[role="button"], header button, header div')).find((b) => {
-        const t = (b.innerText || b.textContent || "").trim();
-        return /^(下一步|Next|繼續|Continue|次へ)$/i.test(t) && visible(b);
-      });
+      const dialog = document.querySelector('div[role="dialog"]');
+      if (!dialog) break;
+
+      // If caption box is already present in dialog, we have reached the final step!
+      const captionBoxPresent = dialog.querySelector('textarea, div[contenteditable="true"][role="textbox"], [aria-label*="說明" i], [aria-label*="caption" i]');
+      if (captionBoxPresent && visible(captionBoxPresent)) break;
+
+      // Locate dialog header
+      const header = dialog.querySelector('header, div._ab5c, div[class*="header"]') || dialog;
+      const headerButtons = Array.from(header.querySelectorAll('div[role="button"], button, [role="link"], span[role="button"]'))
+        .filter((b) => visible(b) && !b.querySelector('svg[aria-label*="Back" i], svg[aria-label*="Close" i]') && b.innerText?.trim() !== "✕");
+
+      // The primary action button (繼續 / Next / 下一步) is the rightmost / last button in the header
+      const nextBtn = headerButtons[headerButtons.length - 1];
       if (nextBtn) {
         nextBtn.click();
       }
