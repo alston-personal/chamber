@@ -605,11 +605,15 @@
     const publishedAt = extractPublishedAt(root);
     let textContent = extractMessageText(message);
     if (!textContent) {
-      const cardTitle = Array.from(root.querySelectorAll('span[dir="auto"], div[dir="auto"], a[target="_blank"] span'))
-        .map((el) => (el.innerText || el.textContent || "").trim())
-        .filter((t) => t.length > 5 && !/^(讚|留言|分享|Like|Comment|Share|查看洞察報告)$/i.test(t));
-      if (cardTitle.length > 0) {
-        textContent = cardTitle.join("\n");
+      const linkCard = root.querySelector('a[target="_blank"][href*="l.facebook.com"], a[target="_blank"][href*="http"], a[rel*="nofollow"][target="_blank"]');
+      if (linkCard) {
+        const cardTexts = Array.from(linkCard.querySelectorAll('span[dir="auto"], div[dir="auto"], span, div'))
+          .map((el) => (el.innerText || el.textContent || "").trim())
+          .filter((t) => t.length > 3 && !/^(facebook|讚|留言|分享|like|comment|share|查看洞察報告)$/i.test(t));
+        const uniqueTexts = Array.from(new Set(cardTexts));
+        if (uniqueTexts.length > 0) {
+          textContent = uniqueTexts.join("\n");
+        }
       }
     }
 

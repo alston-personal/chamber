@@ -912,7 +912,7 @@ function fillText(textbox, text) {
   if (!textbox) return;
 
   const existing = (textbox.innerText || textbox.textContent || "").trim();
-  if (existing.includes("本人樂觀開朗之 Web3 轉世聲明") || existing.includes("Web3 Reborn Declaration") || (existing.length > 50 && existing.includes("Chamber"))) {
+  if (existing.includes("本人樂觀開朗之 Web3 轉世聲明") || existing.includes("Web3 Reborn Declaration")) {
     console.log("[Chamber] Reborn declaration already populated in composer. Skipping.");
     return;
   }
@@ -929,15 +929,23 @@ function fillText(textbox, text) {
     console.debug("[Chamber] Failed to set selection range:", selectErr);
   }
 
-  document.execCommand('selectAll', false, null);
-  document.execCommand('delete', false, null);
-
-  // Dispatch paste event which Draft.js natively parses into formatted paragraph blocks
+  // 1. Dispatch paste event which Draft.js natively parses into formatted paragraph blocks
   try {
     const dt = new DataTransfer();
     dt.setData('text/plain', text);
     textbox.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   } catch (_) {}
+
+  // 2. If Draft.js did not populate text after 100ms, use insertText
+  setTimeout(() => {
+    const cur = (textbox.innerText || textbox.textContent || "").trim();
+    if (!cur || cur === "在想些什麼？" || cur === "你在想些什麼？" || cur === "What's on your mind?") {
+      try {
+        document.execCommand('selectAll', false, null);
+        document.execCommand('insertText', false, text);
+      } catch (_) {}
+    }
+  }, 100);
 
   console.log("[Chamber] Auto-filled Facebook composer textbox with formatted paragraphs.");
 }
@@ -945,6 +953,10 @@ function fillText(textbox, text) {
 async function fillTextAndImage(textbox, text, imageUrl) {
   const dialog = getActiveComposerDialog();
 
+  // 1. Fill text FIRST
+  if (textbox) fillText(textbox, text);
+
+  // 2. Attach image SECOND
   if (imageUrl) {
     try {
       const res = await fetch(imageUrl);
@@ -959,13 +971,14 @@ async function fillTextAndImage(textbox, text, imageUrl) {
       }
       if (fileInput) {
         triggerUpload(fileInput, blob);
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 600));
       }
     } catch (err) {
       console.error("[Chamber] Image attachment failed:", err);
     }
   }
 
+  // 3. Verify text THIRD
   const activeTextbox = getActiveComposerTextbox() || textbox;
   if (activeTextbox) {
     fillText(activeTextbox, text);

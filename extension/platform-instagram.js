@@ -606,32 +606,26 @@
         break;
       }
 
-      // 3. Advance through top header button: 繼續 / 下一步 / Next / Continue (Strictly Top-Right Bar)
-      const dialogRect = dialog.getBoundingClientRect();
-      const allTopElements = Array.from(dialog.querySelectorAll('div[role="button"], button, [role="link"], span, div')).filter((el) => {
-        if (!visible(el)) return false;
-        const rect = el.getBoundingClientRect();
-        // Must be in the top 70px of the dialog and on the right half
-        return rect.top >= (dialogRect.top - 10) && rect.top <= (dialogRect.top + 70) && rect.right >= (dialogRect.left + dialogRect.width * 0.5);
-      });
-
-      const nextBtn = allTopElements.find((el) => {
+      // 3. Advance through wizard button: 繼續 / 下一步 / Next / Continue / 分享 / Share
+      const allButtons = Array.from(dialog.querySelectorAll('div[role="button"], button, div.x1i10hfl, span[role="button"]')).filter(visible);
+      const nextBtn = allButtons.find((el) => {
         const t = (el.innerText || el.textContent || "").trim();
         return /^(下一步|Next|繼續|Continue|次へ|Share|分享)$/i.test(t);
-      }) || (allTopElements.length > 0 ? allTopElements[allTopElements.length - 1].closest('div[role="button"], button, div') : null);
+      });
 
       if (nextBtn) {
-        const rect = nextBtn.getBoundingClientRect();
+        const targetBtn = nextBtn.closest('div[role="button"], button') || nextBtn;
+        const rect = targetBtn.getBoundingClientRect();
         const clientX = rect.left + rect.width / 2;
         const clientY = rect.top + rect.height / 2;
         const opts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
-        nextBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
-        nextBtn.dispatchEvent(new MouseEvent('mousedown', opts));
-        nextBtn.dispatchEvent(new PointerEvent('pointerup', opts));
-        nextBtn.dispatchEvent(new MouseEvent('mouseup', opts));
-        nextBtn.dispatchEvent(new MouseEvent('click', opts));
-        if (typeof nextBtn.click === 'function') nextBtn.click();
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        targetBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
+        targetBtn.dispatchEvent(new MouseEvent('mousedown', opts));
+        targetBtn.dispatchEvent(new PointerEvent('pointerup', opts));
+        targetBtn.dispatchEvent(new MouseEvent('mouseup', opts));
+        targetBtn.dispatchEvent(new MouseEvent('click', opts));
+        if (typeof targetBtn.click === 'function') targetBtn.click();
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
     }
 
